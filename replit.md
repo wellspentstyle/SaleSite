@@ -52,6 +52,34 @@ The project is configured to run on port 5000 in Replit:
 - Misc: next-themes, recharts, sonner, vaul
 
 ## Recent Changes
+- **2025-11-13**: Product Scraper Speed & Accuracy Improvements
+  - **Multi-Phase Extraction Pipeline**: Completely rewrote scraper for 3-5x speed improvement
+    - **Phase 1 - JSON-LD Structured Data** (instant, 95% confidence):
+      - Extracts Schema.org product data from `<script type="application/ld+json">`
+      - Handles @graph containers and nested product arrays
+      - Normalizes image URLs (supports string, object, array formats)
+      - Validates absolute URLs (http/https only)
+    - **Phase 2 - Smart HTML Extraction**:
+      - Targets price/product-related sections (50KB max)
+      - Falls back to raw HTML when no patterns match
+      - Reduces AI processing time and cost
+    - **Phase 3 - AI Extraction with Confidence Scoring**:
+      - OpenAI gpt-4o-mini extracts product data when structured data unavailable
+      - Returns confidence score (1-100) with each extraction
+      - Minimum 50% confidence required to accept results
+    - **Phase 4 - Comprehensive Validation**:
+      - Verifies prices exist in HTML (10 format variants)
+      - Supports: $59.99, $1,299.99, 59.99, 1,299.99, 59,99, 5999 cents, $50, etc.
+      - Validates percent-off math (tolerance: ±2%)
+      - Applies -20 confidence penalty for validation failures
+  - **Confidence Score Display**: New Airtable "Confidence" field
+    - Saved with each scraped product
+    - Color-coded badges in admin finalize picks page:
+      - Green (80-100%): High confidence
+      - Yellow (60-79%): Medium confidence
+      - Red (50-59%): Low confidence (review recommended)
+    - Helps identify uncertain extractions requiring manual review
+
 - **2025-11-05**: Admin System & Product Picks Management
   - **Admin Interface** (`/admin`): Password-protected admin panel for managing product picks
     - Session-based authentication with `ADMIN_PASSWORD` secret
@@ -63,7 +91,7 @@ The project is configured to run on port 5000 in Replit:
     - URL validation to prevent SSRF attacks (blocks private IPs and non-HTTP protocols)
     - Numeric validation ensures prices are valid numbers
   - **Picks Data Structure**: New "Picks" table in Airtable
-    - Fields: ProductURL, ProductName, ImageURL, OriginalPrice, SalePrice, PercentOff, SaleID (linked), ShopMyURL
+    - Fields: ProductURL, ProductName, ImageURL, OriginalPrice, SalePrice, PercentOff, SaleID (linked), ShopMyURL, Confidence
     - ShopMy affiliate URLs automatically generated and stored (format: `https://go.shopmy.us/ap/l9N1lH?url=ENCODED_URL`)
     - Picks linked to sales via SaleID field
   - **Frontend Picks Display**: Updated sale picks dialog to show real product data
