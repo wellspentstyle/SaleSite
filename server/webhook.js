@@ -146,13 +146,13 @@ app.get('/sales', async (req, res) => {
     console.log(`📊 Found ${liveSaleIds.length} live sales, fetching only their picks...`);
     
     // Build filter formula to only fetch picks for live sales
-    // For linked record fields, use direct equality: {SaleID} = "rec123"
-    // Example: OR({SaleID} = "rec123", {SaleID} = "rec456", {SaleID} = "rec789")
+    // Uses SaleRecordIDs lookup field to search for record IDs
+    // Example: OR(FIND("rec123", {SaleRecordIDs} & ''), FIND("rec456", {SaleRecordIDs} & ''))
     let picksRecords = [];
     
     if (liveSaleIds.length > 0) {
       const filterConditions = liveSaleIds.map(saleId => 
-        `{SaleID} = "${saleId}"`
+        `FIND("${saleId}", {SaleRecordIDs} & '')`
       ).join(', ');
       
       const picksFilter = liveSaleIds.length === 1 
