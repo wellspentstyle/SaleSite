@@ -8,6 +8,7 @@ interface Product {
   originalPrice: number | null;
   salePrice: number;
   percentOff: number;
+  confidence?: number;
 }
 
 interface FinalizePicksProps {
@@ -256,18 +257,34 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
                           </span>
                         )}
                       </div>
-                      {pick.percentOff !== null && pick.percentOff !== undefined && (
-                        <div 
-                          style={{ 
-                            fontFamily: 'DM Sans, sans-serif',
-                            fontSize: '12px',
-                            marginTop: '4px',
-                            color: '#999'
-                          }}
-                        >
-                          {pick.percentOff}% OFF
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                        {pick.percentOff !== null && pick.percentOff !== undefined && (
+                          <div 
+                            style={{ 
+                              fontFamily: 'DM Sans, sans-serif',
+                              fontSize: '12px',
+                              color: '#999'
+                            }}
+                          >
+                            {pick.percentOff}% OFF
+                          </div>
+                        )}
+                        {pick.confidence !== undefined && (
+                          <div 
+                            style={{ 
+                              fontFamily: 'DM Sans, sans-serif',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              padding: '2px 6px',
+                              borderRadius: '3px',
+                              backgroundColor: pick.confidence >= 80 ? '#dcfce7' : pick.confidence >= 60 ? '#fef3c7' : '#fee2e2',
+                              color: pick.confidence >= 80 ? '#166534' : pick.confidence >= 60 ? '#92400e' : '#991b1b'
+                            }}
+                          >
+                            {pick.confidence}% confidence
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

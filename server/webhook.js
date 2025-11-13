@@ -325,14 +325,114 @@ app.post('/admin/scrape-product', async (req, res) => {
       timeout: 10000
     });
     const html = await response.text();
+    console.log(`📄 Fetched HTML: ${html.length} characters`);
     
-    // Extract a larger portion of HTML to capture JavaScript-rendered prices
-    // Many Shopify sites have price data beyond 100KB into the HTML
-    const htmlSnippet = html.substring(0, 200000); // Increased to 200KB to capture deep price data
+    // ===== PHASE 1: Try JSON-LD Structured Data (Fast & Accurate) =====
+    const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
     
-    console.log(`📄 HTML snippet length: ${htmlSnippet.length} characters (total: ${html.length})`);
+    if (jsonLdMatch && jsonLdMatch.length > 0) {
+      console.log(`📊 Found ${jsonLdMatch.length} JSON-LD scripts, trying structured data extraction...`);
+      
+      for (const scriptTag of jsonLdMatch) {
+        try {
+          const jsonContent = scriptTag.replace(/<script[^>]*>/, '').replace(/<\/script>/, '').trim();
+          const data = JSON.parse(jsonContent);
+          
+          // Handle @graph containers and regular items
+          let items = [];
+          if (data['@graph']) {
+            items = Array.isArray(data['@graph']) ? data['@graph'] : [data['@graph']];
+          } else {
+            items = Array.isArray(data) ? data : [data];
+          }
+          
+          for (const item of items) {
+            // Look for Product type in Schema.org data
+            if (item['@type'] === 'Product' || item['@type']?.includes?.('Product')) {
+              const name = item.name;
+              
+              // Normalize image URL: handle array, object, or string
+              let imageUrl = null;
+              if (Array.isArray(item.image)) {
+                const first = item.image[0];
+                imageUrl = typeof first === 'string' ? first : first?.url;
+              } else if (typeof item.image === 'object' && item.image !== null) {
+                imageUrl = item.image.url;
+              } else if (typeof item.image === 'string') {
+                imageUrl = item.image;
+              }
+              
+              // Validate image URL starts with http/https
+              if (imageUrl && !imageUrl.startsWith('http')) {
+                imageUrl = null;
+              }
+              
+              // Extract offers data
+              const offers = Array.isArray(item.offers) ? item.offers[0] : item.offers;
+              if (offers) {
+                const salePrice = parseFloat(offers.price);
+                const originalPrice = offers.priceSpecification?.price || offers.highPrice || null;
+                
+                if (name && imageUrl && !isNaN(salePrice)) {
+                  const finalOriginalPrice = originalPrice && !isNaN(parseFloat(originalPrice)) ? parseFloat(originalPrice) : null;
+                  let percentOff = 0;
+                  
+                  if (finalOriginalPrice && finalOriginalPrice > salePrice) {
+                    percentOff = Math.round(((finalOriginalPrice - salePrice) / finalOriginalPrice) * 100);
+                  }
+                  
+                  console.log('✅ Extracted from JSON-LD (confidence: 95):', { name, salePrice, originalPrice: finalOriginalPrice });
+                  
+                  return res.json({
+                    success: true,
+                    product: {
+                      name,
+                      imageUrl,
+                      originalPrice: finalOriginalPrice,
+                      salePrice,
+                      percentOff,
+                      url,
+                      confidence: 95
+                    }
+                  });
+                }
+              }
+            }
+          }
+        } catch (parseError) {
+          continue;
+        }
+      }
+    }
     
-    // Use OpenAI to extract product data
+    console.log('⚠️  No JSON-LD data found, falling back to AI extraction...');
+    
+    // ===== PHASE 2: Smart HTML Snippet Extraction =====
+    // Extract only relevant sections instead of sending 200KB
+    const pricePatterns = [
+      /<[^>]*class="[^"]*price[^"]*"[^>]*>[\s\S]{0,500}<\/[^>]+>/gi,
+      /<[^>]*class="[^"]*product[^"]*"[^>]*>[\s\S]{0,1000}<\/[^>]+>/gi,
+      /<script type="application\/json"[^>]*>[\s\S]{0,5000}<\/script>/gi,
+      /<meta[^>]*property="og:(?:title|image|price)"[^>]*>/gi,
+      /<h1[^>]*>[\s\S]{0,200}<\/h1>/gi
+    ];
+    
+    let extractedSnippets = [];
+    for (const pattern of pricePatterns) {
+      const matches = html.match(pattern);
+      if (matches) {
+        extractedSnippets.push(...matches);
+      }
+    }
+    
+    // Combine snippets (max 50KB total), fallback to raw HTML if no patterns matched
+    let htmlSnippet = extractedSnippets.length > 0 
+      ? extractedSnippets.join('\n').substring(0, 50000)
+      : html.substring(0, 50000);
+    
+    console.log(`📝 Extracted ${extractedSnippets.length} relevant sections (${htmlSnippet.length} chars)`);
+    
+    // ===== PHASE 3: AI Extraction with Confidence Scoring =====
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -355,7 +455,7 @@ CRITICAL INSTRUCTIONS FOR PRICE EXTRACTION:
    - <s>, <del>, <strike> tags with higher price
    - Classes: "compare-price", "was-price", "original-price", "line-through"
    - Text: "Was $X", "Originally $X", "Compare at $X", "Regular price $X"
-   - JSON-LD: "price" and "compareAtPrice"
+   - Meta tags: og:price, product:price
 
 4. If BOTH prices exist, originalPrice MUST be HIGHER than salePrice
 5. If only ONE price exists, set originalPrice to null and percentOff to 0
@@ -366,7 +466,8 @@ Return this exact structure:
   "imageUrl": "https://cdn.example.com/image.jpg",
   "originalPrice": 435.00,
   "salePrice": 131.00,
-  "percentOff": 70
+  "percentOff": 70,
+  "confidence": 85
 }
 
 Rules:
@@ -375,6 +476,7 @@ Rules:
 - originalPrice: The HIGHER regular/compare-at price. Set to null if only one price exists.
 - salePrice: The CURRENT selling price (required)
 - percentOff: Calculate as Math.round(((originalPrice - salePrice) / originalPrice) * 100). Set to 0 if originalPrice is null.
+- confidence: Rate your confidence 1-100. Use 90-100 for prices clearly visible in structured data, 70-89 for prices in HTML with clear patterns, 50-69 for estimates, below 50 for highly uncertain.
 - For Shopify JSON prices in cents, divide by 100 to get dollar amounts
 - NEVER set originalPrice equal to salePrice
 - Return ONLY the JSON object, no markdown, no explanations
@@ -406,33 +508,72 @@ Rules:
     }
     
     // Validate required fields
-    if (!productData.name || !productData.imageUrl || !productData.salePrice) {
+    if (!productData.name || !productData.imageUrl || productData.salePrice === undefined) {
       return res.status(400).json({ success: false, message: 'Missing required product fields' });
     }
     
     // Parse prices - originalPrice can be null if not on sale, salePrice is always required
-    let originalPrice = productData.originalPrice !== null ? parseFloat(productData.originalPrice) : null;
+    let originalPrice = productData.originalPrice !== null && productData.originalPrice !== undefined ? parseFloat(productData.originalPrice) : null;
     const salePrice = parseFloat(productData.salePrice);
-    let percentOff = productData.percentOff !== null && productData.percentOff !== undefined ? parseFloat(productData.percentOff) : 0;
+    let percentOff = 0;
+    let confidence = productData.confidence ? parseInt(productData.confidence) : 50;
     
     if (isNaN(salePrice) || (originalPrice !== null && isNaN(originalPrice))) {
       return res.status(400).json({ success: false, message: 'Invalid price data' });
     }
     
-    // Defensive validation: originalPrice must be HIGHER than salePrice
-    // If they're equal or originalPrice is lower, the item is not on sale
+    // ===== PHASE 4: Validation =====
+    // Verify originalPrice must be HIGHER than salePrice
     if (originalPrice !== null && originalPrice <= salePrice) {
       console.log(`⚠️  Invalid discount: originalPrice (${originalPrice}) <= salePrice (${salePrice}). Setting originalPrice to null.`);
       originalPrice = null;
       percentOff = 0;
+      confidence = Math.max(30, confidence - 20); // Reduce confidence
     }
     
-    // Recalculate percentOff to ensure accuracy
+    // Recalculate and validate percentOff math
     if (originalPrice !== null && originalPrice > salePrice) {
-      percentOff = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
+      const calculatedPercentOff = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
+      
+      // Check if AI's calculation matches
+      if (productData.percentOff && Math.abs(calculatedPercentOff - productData.percentOff) > 2) {
+        console.log(`⚠️  Percent off mismatch: AI said ${productData.percentOff}%, calculated ${calculatedPercentOff}%`);
+        confidence = Math.max(40, confidence - 15);
+      }
+      
+      percentOff = calculatedPercentOff;
     }
     
-    console.log('✅ Extracted product:', productData);
+    // Verify prices exist in HTML (prevent hallucination)
+    // Check multiple price formats: $59.99, $1,299.99, 59.99, $50, 50, 5999 (cents), etc.
+    const priceVariants = [
+      `$${salePrice.toFixed(2)}`,  // $59.99
+      salePrice.toFixed(2),         // 59.99
+      `$${salePrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,  // $1,299.99 (with commas)
+      salePrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}),  // 1,299.99
+      `${salePrice.toFixed(2).replace('.', ',')}`,  // 59,99 (European)
+      String(Math.round(salePrice * 100)),  // 5999 (cents)
+      `${Math.floor(salePrice)}.${String(Math.round((salePrice % 1) * 100)).padStart(2, '0')}`,  // Explicit 59.99
+      `$${Math.round(salePrice)}`,  // $50 (whole dollars)
+      `$${Math.round(salePrice).toLocaleString('en-US')}`,  // $1,299 (whole dollars with commas)
+      String(Math.round(salePrice)),  // 50 (whole number)
+    ];
+    
+    const foundInHtml = priceVariants.some(variant => html.includes(variant));
+    if (!foundInHtml) {
+      console.log(`⚠️  Sale price ${salePrice} not found in HTML (checked variants: ${priceVariants.join(', ')}), possible hallucination`);
+      confidence = Math.max(30, confidence - 20);  // Reduced penalty from -30 to -20
+    }
+    
+    // Reject low confidence results
+    if (confidence < 50) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Low confidence (${confidence}%) - prices may be inaccurate. Please verify manually.` 
+      });
+    }
+    
+    console.log(`✅ Extracted product (confidence: ${confidence}%):`, { name: productData.name, salePrice, originalPrice, percentOff });
     
     res.json({ 
       success: true, 
@@ -442,7 +583,8 @@ Rules:
         originalPrice: originalPrice,
         salePrice: salePrice,
         percentOff: percentOff,
-        url: url
+        url: url,
+        confidence: confidence
       }
     });
     
@@ -494,6 +636,11 @@ app.post('/admin/picks', async (req, res) => {
       }
       if (pick.salePrice) {
         fields.SalePrice = pick.salePrice;
+      }
+      
+      // Add confidence score if available
+      if (pick.confidence !== undefined && pick.confidence !== null) {
+        fields.Confidence = pick.confidence;
       }
       
       return { fields };
