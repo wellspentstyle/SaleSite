@@ -1,0 +1,53 @@
+{
+  "testCatalog": [
+    {
+      "category": "Shopbop",
+      "urls": [
+        {
+          "url": "https://www.shopbop.com/active-knit-winslow-pant-tibi/vp/v=1/1524556513.htm",
+          "expectedName": "Winslow",
+          "expectedImageHost": "media-amazon.com",
+          "minConfidence": 50,
+          "notes": "Tibi pants - test name='og:image' format"
+        }
+      ]
+    },
+    {
+      "category": "Shopify",
+      "urls": [
+        {
+          "url": "",
+          "expectedName": "",
+          "expectedImageHost": "",
+          "minConfidence": 50,
+          "notes": "Add Shopify store URLs here - test JSON price extraction"
+        }
+      ]
+    },
+    {
+      "category": "Department Stores",
+      "urls": [
+        {
+          "url": "",
+          "expectedName": "",
+          "expectedImageHost": "",
+          "minConfidence": 50,
+          "notes": "Add Nordstrom, Saks, Neiman Marcus, etc. URLs here"
+        }
+      ]
+    },
+    {
+      "category": "Independent Brands",
+      "urls": [
+        {
+          "url": "",
+          "expectedName": "",
+          "expectedImageHost": "",
+          "minConfidence": 50,
+          "notes": "Add independent designer brand URLs here"
+        }
+      ]
+    }
+  ],
+  "instructions": "For each URL, fill in: 1) url (full product URL), 2) expectedName (substring that should appear in product name), 3) expectedImageHost (domain that should be in image URL), 4) minConfidence (typically 50-95), 5) notes (optional description)"
+}

@@ -267,7 +267,7 @@ app.post('/admin/clean-urls', async (req, res) => {
 // Scrape product data from URL using OpenAI
 app.post('/admin/scrape-product', async (req, res) => {
   const { auth } = req.headers;
-  const { url } = req.body;
+  const { url, test } = req.body;  // Added test mode parameter
   
   if (auth !== ADMIN_PASSWORD) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -276,6 +276,20 @@ app.post('/admin/scrape-product', async (req, res) => {
   if (!url) {
     return res.status(400).json({ success: false, message: 'URL is required' });
   }
+  
+  // Test mode metadata (track extraction phases for automated testing)
+  const testMetadata = {
+    phaseUsed: null,
+    priceValidation: {
+      foundInHtml: false,
+      checkedFormats: []
+    },
+    imageExtraction: {
+      source: null,
+      preExtracted: false
+    },
+    confidenceAdjustments: []
+  };
   
   // Comprehensive URL validation to prevent SSRF
   try {
@@ -383,7 +397,11 @@ app.post('/admin/scrape-product', async (req, res) => {
                   
                   console.log('✅ Extracted from JSON-LD (confidence: 95):', { name, salePrice, originalPrice: finalOriginalPrice });
                   
-                  return res.json({
+                  // Track extraction phase
+                  testMetadata.phaseUsed = 'json-ld';
+                  testMetadata.imageExtraction.source = 'json-ld';
+                  
+                  const response = {
                     success: true,
                     product: {
                       name,
@@ -394,7 +412,13 @@ app.post('/admin/scrape-product', async (req, res) => {
                       url,
                       confidence: 95
                     }
-                  });
+                  };
+                  
+                  if (test) {
+                    response.testMetadata = testMetadata;
+                  }
+                  
+                  return res.json(response);
                 }
               }
             }
@@ -418,9 +442,13 @@ app.post('/admin/scrape-product', async (req, res) => {
     
     if (ogImageMatch && ogImageMatch[1] && ogImageMatch[1].startsWith('http')) {
       preExtractedImage = ogImageMatch[1];
+      testMetadata.imageExtraction.preExtracted = true;
+      testMetadata.imageExtraction.source = 'og:image';
       console.log(`🖼️  Pre-extracted og:image: ${preExtractedImage}`);
     } else if (twitterImageMatch && twitterImageMatch[1] && twitterImageMatch[1].startsWith('http')) {
       preExtractedImage = twitterImageMatch[1];
+      testMetadata.imageExtraction.preExtracted = true;
+      testMetadata.imageExtraction.source = 'twitter:image';
       console.log(`🖼️  Pre-extracted twitter:image: ${preExtractedImage}`);
     }
     
@@ -597,13 +625,21 @@ Rules:
     ];
     
     const foundInHtml = priceVariants.some(variant => html.includes(variant));
+    testMetadata.priceValidation.foundInHtml = foundInHtml;
+    testMetadata.priceValidation.checkedFormats = priceVariants;
+    
     if (!foundInHtml) {
       console.log(`⚠️  Sale price ${salePrice} not found in HTML (checked variants: ${priceVariants.join(', ')}), possible hallucination`);
+      const originalConfidence = confidence;
       confidence = Math.max(30, confidence - 20);  // Reduced penalty from -30 to -20
+      testMetadata.confidenceAdjustments.push({
+        reason: 'price_not_found_in_html',
+        adjustment: confidence - originalConfidence
+      });
     }
     
-    // Reject low confidence results
-    if (confidence < 50) {
+    // Reject low confidence results (but allow in test mode for analysis)
+    if (confidence < 50 && !test) {
       return res.status(400).json({ 
         success: false, 
         message: `Low confidence (${confidence}%) - prices may be inaccurate. Please verify manually.` 
@@ -612,7 +648,12 @@ Rules:
     
     console.log(`✅ Extracted product (confidence: ${confidence}%):`, { name: productData.name, salePrice, originalPrice, percentOff });
     
-    res.json({ 
+    // Track that AI extraction was used (Phase 3)
+    if (!testMetadata.phaseUsed) {
+      testMetadata.phaseUsed = 'ai-extraction';
+    }
+    
+    const response = { 
       success: true, 
       product: {
         name: productData.name,
@@ -623,7 +664,14 @@ Rules:
         url: url,
         confidence: confidence
       }
-    });
+    };
+    
+    // Include test metadata if in test mode
+    if (test) {
+      response.testMetadata = testMetadata;
+    }
+    
+    res.json(response);
     
   } catch (error) {
     console.error('❌ Product scraping error:', error);
