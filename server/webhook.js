@@ -265,53 +265,72 @@ app.post('/admin/clean-urls', async (req, res) => {
   }
 });
 
-// Scrape product data from URL using intelligent orchestrator (fast scraper + Playwright fallback)
+// Scrape product data from URL(s) using intelligent orchestrator (fast scraper + Playwright fallback)
 app.post('/admin/scrape-product', async (req, res) => {
   const { auth } = req.headers;
-  const { url, test } = req.body;
+  const { url, urls, test } = req.body;
   
   if (auth !== ADMIN_PASSWORD) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   
-  if (!url) {
-    return res.status(400).json({ success: false, message: 'URL is required' });
+  const urlsToScrape = urls || (url ? [url] : []);
+  
+  if (!urlsToScrape || urlsToScrape.length === 0) {
+    return res.status(400).json({ success: false, message: 'URL or URLs array is required' });
   }
   
   try {
-    console.log(`🔍 Scraping product: ${url}`);
+    console.log(`🔍 Scraping ${urlsToScrape.length} product(s)`);
     
-    const result = await scrapeProduct(url, {
-      openai,
-      enableTestMetadata: test || false,
-      logger: console
-    });
+    const successes = [];
+    const failures = [];
     
-    if (!result.success) {
-      const errorMsg = result.error || 'Could not extract product data';
-      console.error('❌ Product scraping failed:', errorMsg);
-      return res.status(400).json({ 
-        success: false, 
-        message: errorMsg,
-        meta: result.meta
-      });
+    for (const productUrl of urlsToScrape) {
+      try {
+        console.log(`  → ${productUrl}`);
+        
+        const result = await scrapeProduct(productUrl, {
+          openai,
+          enableTestMetadata: test || false,
+          logger: console
+        });
+        
+        if (!result.success) {
+          const errorMsg = result.error || 'Could not extract product data';
+          console.error(`  ❌ Failed: ${errorMsg}`);
+          failures.push({
+            url: productUrl,
+            error: errorMsg,
+            meta: result.meta
+          });
+        } else {
+          console.log(`  ✅ Success via ${result.meta.extractionMethod} (confidence: ${result.meta.confidence}%)`);
+          successes.push({
+            url: productUrl,
+            product: result.product,
+            extractionMethod: result.meta.extractionMethod,
+            confidence: result.meta.confidence,
+            ...(test && { testMetadata: result.meta.testMetadata, attempts: result.meta.attempts })
+          });
+        }
+      } catch (error) {
+        console.error(`  ❌ Error scraping ${productUrl}:`, error.message);
+        failures.push({
+          url: productUrl,
+          error: error.message
+        });
+      }
     }
     
-    console.log(`✅ Extracted product via ${result.meta.extractionMethod} (confidence: ${result.meta.confidence}%)`);
+    console.log(`\n📊 Results: ${successes.length} succeeded, ${failures.length} failed`);
     
-    const response = {
+    res.json({
       success: true,
-      product: result.product,
-      extractionMethod: result.meta.extractionMethod,
-      confidence: result.meta.confidence
-    };
-    
-    if (test) {
-      response.testMetadata = result.meta.testMetadata;
-      response.attempts = result.meta.attempts;
-    }
-    
-    res.json(response);
+      successes,
+      failures,
+      total: urlsToScrape.length
+    });
     
   } catch (error) {
     console.error('❌ Product scraping error:', error);
@@ -363,9 +382,14 @@ app.post('/admin/picks', async (req, res) => {
         fields.SalePrice = pick.salePrice;
       }
       
-      // Add confidence score if available
+      // Add confidence score if available (manual entries always get 100)
       if (pick.confidence !== undefined && pick.confidence !== null) {
         fields.Confidence = pick.confidence;
+      }
+      
+      // Add entry type (manual vs automatic)
+      if (pick.entryType) {
+        fields.EntryType = pick.entryType;
       }
       
       return { fields };
