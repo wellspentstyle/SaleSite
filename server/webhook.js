@@ -409,9 +409,12 @@ app.post('/admin/scrape-product', async (req, res) => {
     
     // ===== PHASE 2: Smart HTML Snippet Extraction + Image Pre-extraction =====
     // Extract image from meta tags first (fast and reliable)
+    // Note: Some sites use property="og:image", others use name="og:image"
     let preExtractedImage = null;
-    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
-    const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
+    const ogImageMatch = html.match(/<meta[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["']/i);
+    const twitterImageMatch = html.match(/<meta[^>]*(?:property|name)=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) ||
+                               html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']twitter:image["']/i);
     
     if (ogImageMatch && ogImageMatch[1] && ogImageMatch[1].startsWith('http')) {
       preExtractedImage = ogImageMatch[1];
@@ -475,13 +478,13 @@ CRITICAL INSTRUCTIONS FOR IMAGE EXTRACTION:
 - The imageUrl MUST be a real, working URL from the actual website
 - If you can't find a real image URL, use the first large image you can find
 
-Return this exact structure:
+Return this exact structure (do NOT copy these example values, extract REAL data):
 {
-  "name": "Product Name",
-  "imageUrl": "https://www.actualwebsite.com/real-product-image.jpg",
-  "originalPrice": 435.00,
-  "salePrice": 131.00,
-  "percentOff": 70,
+  "name": "ACTUAL_PRODUCT_NAME_FROM_PAGE",
+  "imageUrl": "ACTUAL_IMAGE_URL_FROM_PAGE",
+  "originalPrice": 999.99,
+  "salePrice": 499.99,
+  "percentOff": 50,
   "confidence": 85
 }
 
