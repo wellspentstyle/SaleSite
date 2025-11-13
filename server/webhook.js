@@ -407,7 +407,20 @@ app.post('/admin/scrape-product', async (req, res) => {
     
     console.log('⚠️  No JSON-LD data found, falling back to AI extraction...');
     
-    // ===== PHASE 2: Smart HTML Snippet Extraction =====
+    // ===== PHASE 2: Smart HTML Snippet Extraction + Image Pre-extraction =====
+    // Extract image from meta tags first (fast and reliable)
+    let preExtractedImage = null;
+    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+    const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
+    
+    if (ogImageMatch && ogImageMatch[1] && ogImageMatch[1].startsWith('http')) {
+      preExtractedImage = ogImageMatch[1];
+      console.log(`🖼️  Pre-extracted og:image: ${preExtractedImage}`);
+    } else if (twitterImageMatch && twitterImageMatch[1] && twitterImageMatch[1].startsWith('http')) {
+      preExtractedImage = twitterImageMatch[1];
+      console.log(`🖼️  Pre-extracted twitter:image: ${preExtractedImage}`);
+    }
+    
     // Extract only relevant sections instead of sending 200KB
     const pricePatterns = [
       /<[^>]*class="[^"]*price[^"]*"[^>]*>[\s\S]{0,500}<\/[^>]+>/gi,
@@ -433,12 +446,7 @@ app.post('/admin/scrape-product', async (req, res) => {
     console.log(`📝 Extracted ${extractedSnippets.length} relevant sections (${htmlSnippet.length} chars)`);
     
     // ===== PHASE 3: AI Extraction with Confidence Scoring =====
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a product page parser. Extract product information from HTML and return ONLY valid JSON.
+    const systemPrompt = `You are a product page parser. Extract product information from HTML and return ONLY valid JSON.
 
 CRITICAL INSTRUCTIONS FOR PRICE EXTRACTION:
 1. Look for TWO distinct prices on the page:
@@ -460,10 +468,17 @@ CRITICAL INSTRUCTIONS FOR PRICE EXTRACTION:
 4. If BOTH prices exist, originalPrice MUST be HIGHER than salePrice
 5. If only ONE price exists, set originalPrice to null and percentOff to 0
 
+CRITICAL INSTRUCTIONS FOR IMAGE EXTRACTION:
+- Look for <meta property="og:image"> or <meta name="twitter:image"> tags FIRST
+- Then look for large product images in <img> tags
+- NEVER use placeholder domains like example.com, placeholder.com, cdn.example.com, or similar
+- The imageUrl MUST be a real, working URL from the actual website
+- If you can't find a real image URL, use the first large image you can find
+
 Return this exact structure:
 {
   "name": "Product Name",
-  "imageUrl": "https://cdn.example.com/image.jpg",
+  "imageUrl": "https://www.actualwebsite.com/real-product-image.jpg",
   "originalPrice": 435.00,
   "salePrice": 131.00,
   "percentOff": 70,
@@ -472,7 +487,7 @@ Return this exact structure:
 
 Rules:
 - name: Extract product title/name (required)
-- imageUrl: Find the main product image URL - must be a full absolute URL starting with http:// or https:// (required)
+- imageUrl: Find the main product image URL - must be a REAL absolute URL from the website, NOT a placeholder (required)
 - originalPrice: The HIGHER regular/compare-at price. Set to null if only one price exists.
 - salePrice: The CURRENT selling price (required)
 - percentOff: Calculate as Math.round(((originalPrice - salePrice) / originalPrice) * 100). Set to 0 if originalPrice is null.
@@ -480,11 +495,22 @@ Rules:
 - For Shopify JSON prices in cents, divide by 100 to get dollar amounts
 - NEVER set originalPrice equal to salePrice
 - Return ONLY the JSON object, no markdown, no explanations
-- If you can't extract basic product info, return: {"error": "Could not extract product data"}`
+- If you can't extract basic product info, return: {"error": "Could not extract product data"}`;
+
+    const userPrompt = preExtractedImage 
+      ? `${htmlSnippet}\n\nNOTE: The product image URL has been pre-extracted as: ${preExtractedImage} - use this for imageUrl.`
+      : htmlSnippet;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
         },
         {
           role: 'user',
-          content: htmlSnippet
+          content: userPrompt
         }
       ],
       temperature: 0.1,
@@ -510,6 +536,14 @@ Rules:
     // Validate required fields
     if (!productData.name || !productData.imageUrl || productData.salePrice === undefined) {
       return res.status(400).json({ success: false, message: 'Missing required product fields' });
+    }
+    
+    // Reject placeholder image URLs
+    const placeholderDomains = ['example.com', 'placeholder.com', 'via.placeholder.com', 'placehold.it', 'dummyimage.com'];
+    const imageUrl = productData.imageUrl.toLowerCase();
+    if (placeholderDomains.some(domain => imageUrl.includes(domain))) {
+      console.log(`⚠️  Rejected placeholder image URL: ${productData.imageUrl}`);
+      return res.status(400).json({ success: false, message: 'AI returned placeholder image URL instead of real product image' });
     }
     
     // Parse prices - originalPrice can be null if not on sale, salePrice is always required
