@@ -624,9 +624,16 @@ Rules:
       String(Math.round(salePrice)),  // 50 (whole number)
     ];
     
-    const foundInHtml = priceVariants.some(variant => html.includes(variant));
+    // Check which price formats exist in HTML
+    const matchedFormat = priceVariants.find(variant => html.includes(variant));
+    const foundInHtml = matchedFormat !== undefined;
+    
     testMetadata.priceValidation.foundInHtml = foundInHtml;
-    testMetadata.priceValidation.checkedFormats = priceVariants;
+    testMetadata.priceValidation.checkedFormats = priceVariants.map((variant, idx) => ({
+      format: variant,
+      matched: html.includes(variant)
+    }));
+    testMetadata.priceValidation.matchedFormat = matchedFormat || null;
     
     if (!foundInHtml) {
       console.log(`⚠️  Sale price ${salePrice} not found in HTML (checked variants: ${priceVariants.join(', ')}), possible hallucination`);
@@ -653,7 +660,7 @@ Rules:
       testMetadata.phaseUsed = 'ai-extraction';
     }
     
-    const response = { 
+    const finalResponse = { 
       success: true, 
       product: {
         name: productData.name,
@@ -668,10 +675,10 @@ Rules:
     
     // Include test metadata if in test mode
     if (test) {
-      response.testMetadata = testMetadata;
+      finalResponse.testMetadata = testMetadata;
     }
     
-    res.json(response);
+    res.json(finalResponse);
     
   } catch (error) {
     console.error('❌ Product scraping error:', error);

@@ -41,6 +41,11 @@ The project is configured to run on port 5000 in Replit:
   main.tsx         - Application entry point
   index.css        - Pre-compiled Tailwind CSS
   vite-env.d.ts    - Vite environment type definitions
+/tests
+  scraper-test-urls.json  - Test URL catalog for automated testing
+  run-scraper-tests.js    - Automated test runner script
+  README.md               - Testing system documentation
+  /results                - Test results (JSON format with timestamps)
 ```
 
 ## Dependencies
@@ -90,6 +95,15 @@ The project is configured to run on port 5000 in Replit:
     - Strong anti-placeholder instructions in AI prompt (uses non-copyable example values)
     - Validation layer rejects common placeholder domains
     - No performance impact - uses regex extraction (instant)
+  - **Automated Testing System**:
+    - Test URL catalog (`tests/scraper-test-urls.json`) for diverse site types
+    - Categories: Shopbop, Shopify, department stores, independent brands
+    - Test mode support (`test: true` parameter) returns extraction metadata
+    - Automated test runner script (`npm run test:scraper`)
+    - Validates: product name, image URL, prices, confidence scores
+    - Phase tracking (JSON-LD, AI extraction) for analytics
+    - Results reporting with pass/fail by category and phase statistics
+    - Saves detailed JSON results to `tests/results/` with timestamps
 
 - **2025-11-05**: Admin System & Product Picks Management
   - **Admin Interface** (`/admin`): Password-protected admin panel for managing product picks
