@@ -1,0 +1,985 @@
+{
+  "timestamp": "2025-11-13T19:14:45.902Z",
+  "summary": {
+    "total": 11,
+    "passed": 5,
+    "failed": 6,
+    "passRate": 45.5
+  },
+  "byCategory": {
+    "Shopbop": {
+      "passed": 5,
+      "failed": 0,
+      "total": 5
+    },
+    "Shopify (Hiut Denim)": {
+      "passed": 0,
+      "failed": 3,
+      "total": 3
+    },
+    "Shopify (Tentree)": {
+      "passed": 0,
+      "failed": 3,
+      "total": 3
+    }
+  },
+  "phaseStats": {
+    "ai-extraction": 8
+  },
+  "results": [
+    {
+      "passed": true,
+      "url": "https://www.shopbop.com/cloudrunner-on/vp/v=1/1536674220.htm",
+      "category": "Shopbop",
+      "product": {
+        "name": "Cloudrunner 2 Sneakers",
+        "imageUrl": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/onrun/onrun306282387d/onrun306282387d_1734622202615_2-0.jpg",
+        "originalPrice": 160,
+        "salePrice": 96,
+        "percentOff": 40,
+        "url": "https://www.shopbop.com/cloudrunner-on/vp/v=1/1536674220.htm",
+        "confidence": 85
+      },
+      "testMetadata": {
+        "phaseUsed": "ai-extraction",
+        "priceValidation": {
+          "foundInHtml": true,
+          "checkedFormats": [
+            {
+              "format": "$96.00",
+              "matched": true
+            },
+            {
+              "format": "96.00",
+              "matched": true
+            },
+            {
+              "format": "$96.00",
+              "matched": true
+            },
+            {
+              "format": "96.00",
+              "matched": true
+            },
+            {
+              "format": "96,00",
+              "matched": false
+            },
+            {
+              "format": "9600",
+              "matched": true
+            },
+            {
+              "format": "96.00",
+              "matched": true
+            },
+            {
+              "format": "$96",
+              "matched": true
+            },
+            {
+              "format": "$96",
+              "matched": true
+            },
+            {
+              "format": "96",
+              "matched": true
+            }
+          ],
+          "matchedFormat": "$96.00"
+        },
+        "imageExtraction": {
+          "source": "og:image",
+          "preExtracted": true
+        },
+        "confidenceAdjustments": []
+      },
+      "validations": [
+        {
+          "check": "Product name",
+          "passed": true,
+          "expected": "Cloudrunner",
+          "actual": "Cloudrunner 2 Sneakers"
+        },
+        {
+          "check": "Image URL valid",
+          "passed": true,
+          "expected": "http(s)://...",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/onrun/onrun306282387d/onrun306282387d_1734622202615_2-0.jpg"
+        },
+        {
+          "check": "Image host",
+          "passed": true,
+          "expected": "media-amazon.com",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/onrun/onrun306282387d/onrun306282387d_1734622202615_2-0.jpg"
+        },
+        {
+          "check": "Sale price valid",
+          "passed": true,
+          "expected": "> 0",
+          "actual": 96
+        },
+        {
+          "check": "Confidence score",
+          "passed": true,
+          "expected": ">= 70",
+          "actual": 85
+        },
+        {
+          "check": "Not placeholder image",
+          "passed": true,
+          "expected": "real image",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/onrun/onrun306282387d/onrun306282387d_1734622202615_2-0.jpg"
+        }
+      ],
+      "expected": {
+        "url": "https://www.shopbop.com/cloudrunner-on/vp/v=1/1536674220.htm",
+        "expectedName": "Cloudrunner",
+        "expectedImageHost": "media-amazon.com",
+        "minConfidence": 70,
+        "notes": "On Running sneakers - tests name='og:image' meta tag format",
+        "category": "Shopbop"
+      }
+    },
+    {
+      "passed": true,
+      "url": "https://www.shopbop.com/parker-long-loose-vintage-short/vp/v=1/1574573996.htm",
+      "category": "Shopbop",
+      "product": {
+        "name": "Parker Long Shorts",
+        "imageUrl": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/agole/agole3049067425/agole3049067425_1721918537353_2-0.jpg",
+        "originalPrice": 148,
+        "salePrice": 44.4,
+        "percentOff": 70,
+        "url": "https://www.shopbop.com/parker-long-loose-vintage-short/vp/v=1/1574573996.htm",
+        "confidence": 85
+      },
+      "testMetadata": {
+        "phaseUsed": "ai-extraction",
+        "priceValidation": {
+          "foundInHtml": true,
+          "checkedFormats": [
+            {
+              "format": "$44.40",
+              "matched": true
+            },
+            {
+              "format": "44.40",
+              "matched": true
+            },
+            {
+              "format": "$44.40",
+              "matched": true
+            },
+            {
+              "format": "44.40",
+              "matched": true
+            },
+            {
+              "format": "44,40",
+              "matched": false
+            },
+            {
+              "format": "4440",
+              "matched": true
+            },
+            {
+              "format": "44.40",
+              "matched": true
+            },
+            {
+              "format": "$44",
+              "matched": true
+            },
+            {
+              "format": "$44",
+              "matched": true
+            },
+            {
+              "format": "44",
+              "matched": true
+            }
+          ],
+          "matchedFormat": "$44.40"
+        },
+        "imageExtraction": {
+          "source": "og:image",
+          "preExtracted": true
+        },
+        "confidenceAdjustments": []
+      },
+      "validations": [
+        {
+          "check": "Product name",
+          "passed": true,
+          "expected": "Parker",
+          "actual": "Parker Long Shorts"
+        },
+        {
+          "check": "Image URL valid",
+          "passed": true,
+          "expected": "http(s)://...",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/agole/agole3049067425/agole3049067425_1721918537353_2-0.jpg"
+        },
+        {
+          "check": "Image host",
+          "passed": true,
+          "expected": "media-amazon.com",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/agole/agole3049067425/agole3049067425_1721918537353_2-0.jpg"
+        },
+        {
+          "check": "Sale price valid",
+          "passed": true,
+          "expected": "> 0",
+          "actual": 44.4
+        },
+        {
+          "check": "Confidence score",
+          "passed": true,
+          "expected": ">= 70",
+          "actual": 85
+        },
+        {
+          "check": "Not placeholder image",
+          "passed": true,
+          "expected": "real image",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/agole/agole3049067425/agole3049067425_1721918537353_2-0.jpg"
+        }
+      ],
+      "expected": {
+        "url": "https://www.shopbop.com/parker-long-loose-vintage-short/vp/v=1/1574573996.htm",
+        "expectedName": "Parker",
+        "expectedImageHost": "media-amazon.com",
+        "minConfidence": 70,
+        "notes": "AGOLDE shorts - tests Shopbop sale pricing with EXTRA10 code",
+        "category": "Shopbop"
+      }
+    },
+    {
+      "passed": true,
+      "url": "https://www.shopbop.com/colt-shirt-jenni-kayne/vp/v=1/1526162200.htm",
+      "category": "Shopbop",
+      "product": {
+        "name": "Colt Shirt",
+        "imageUrl": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/jkayn/jkayn3033513003/jkayn3033513003_1758554046219_2-0.jpg",
+        "originalPrice": 345,
+        "salePrice": 258.75,
+        "percentOff": 25,
+        "url": "https://www.shopbop.com/colt-shirt-jenni-kayne/vp/v=1/1526162200.htm",
+        "confidence": 90
+      },
+      "testMetadata": {
+        "phaseUsed": "ai-extraction",
+        "priceValidation": {
+          "foundInHtml": true,
+          "checkedFormats": [
+            {
+              "format": "$258.75",
+              "matched": true
+            },
+            {
+              "format": "258.75",
+              "matched": true
+            },
+            {
+              "format": "$258.75",
+              "matched": true
+            },
+            {
+              "format": "258.75",
+              "matched": true
+            },
+            {
+              "format": "258,75",
+              "matched": false
+            },
+            {
+              "format": "25875",
+              "matched": true
+            },
+            {
+              "format": "258.75",
+              "matched": true
+            },
+            {
+              "format": "$259",
+              "matched": false
+            },
+            {
+              "format": "$259",
+              "matched": false
+            },
+            {
+              "format": "259",
+              "matched": true
+            }
+          ],
+          "matchedFormat": "$258.75"
+        },
+        "imageExtraction": {
+          "source": "og:image",
+          "preExtracted": true
+        },
+        "confidenceAdjustments": []
+      },
+      "validations": [
+        {
+          "check": "Product name",
+          "passed": true,
+          "expected": "Colt",
+          "actual": "Colt Shirt"
+        },
+        {
+          "check": "Image URL valid",
+          "passed": true,
+          "expected": "http(s)://...",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/jkayn/jkayn3033513003/jkayn3033513003_1758554046219_2-0.jpg"
+        },
+        {
+          "check": "Image host",
+          "passed": true,
+          "expected": "media-amazon.com",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/jkayn/jkayn3033513003/jkayn3033513003_1758554046219_2-0.jpg"
+        },
+        {
+          "check": "Sale price valid",
+          "passed": true,
+          "expected": "> 0",
+          "actual": 258.75
+        },
+        {
+          "check": "Confidence score",
+          "passed": true,
+          "expected": ">= 70",
+          "actual": 90
+        },
+        {
+          "check": "Not placeholder image",
+          "passed": true,
+          "expected": "real image",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/jkayn/jkayn3033513003/jkayn3033513003_1758554046219_2-0.jpg"
+        }
+      ],
+      "expected": {
+        "url": "https://www.shopbop.com/colt-shirt-jenni-kayne/vp/v=1/1526162200.htm",
+        "expectedName": "Colt",
+        "expectedImageHost": "media-amazon.com",
+        "minConfidence": 70,
+        "notes": "Jenni Kayne shirt - tests high-end designer on Shopbop",
+        "category": "Shopbop"
+      }
+    },
+    {
+      "passed": true,
+      "url": "https://www.shopbop.com/emmy-vgn-leather-button-flared/vp/v=1/1597283808.htm",
+      "category": "Shopbop",
+      "product": {
+        "name": "Emmy Faux Leather Flared Mini Dress",
+        "imageUrl": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/alice/alice471541a3ac/alice471541a3ac_1755007739490_2-0.jpg",
+        "originalPrice": 495,
+        "salePrice": 346.5,
+        "percentOff": 30,
+        "url": "https://www.shopbop.com/emmy-vgn-leather-button-flared/vp/v=1/1597283808.htm",
+        "confidence": 90
+      },
+      "testMetadata": {
+        "phaseUsed": "ai-extraction",
+        "priceValidation": {
+          "foundInHtml": true,
+          "checkedFormats": [
+            {
+              "format": "$346.50",
+              "matched": true
+            },
+            {
+              "format": "346.50",
+              "matched": true
+            },
+            {
+              "format": "$346.50",
+              "matched": true
+            },
+            {
+              "format": "346.50",
+              "matched": true
+            },
+            {
+              "format": "346,50",
+              "matched": false
+            },
+            {
+              "format": "34650",
+              "matched": false
+            },
+            {
+              "format": "346.50",
+              "matched": true
+            },
+            {
+              "format": "$347",
+              "matched": false
+            },
+            {
+              "format": "$347",
+              "matched": false
+            },
+            {
+              "format": "347",
+              "matched": true
+            }
+          ],
+          "matchedFormat": "$346.50"
+        },
+        "imageExtraction": {
+          "source": "og:image",
+          "preExtracted": true
+        },
+        "confidenceAdjustments": []
+      },
+      "validations": [
+        {
+          "check": "Product name",
+          "passed": true,
+          "expected": "Emmy",
+          "actual": "Emmy Faux Leather Flared Mini Dress"
+        },
+        {
+          "check": "Image URL valid",
+          "passed": true,
+          "expected": "http(s)://...",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/alice/alice471541a3ac/alice471541a3ac_1755007739490_2-0.jpg"
+        },
+        {
+          "check": "Image host",
+          "passed": true,
+          "expected": "media-amazon.com",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/alice/alice471541a3ac/alice471541a3ac_1755007739490_2-0.jpg"
+        },
+        {
+          "check": "Sale price valid",
+          "passed": true,
+          "expected": "> 0",
+          "actual": 346.5
+        },
+        {
+          "check": "Confidence score",
+          "passed": true,
+          "expected": ">= 70",
+          "actual": 90
+        },
+        {
+          "check": "Not placeholder image",
+          "passed": true,
+          "expected": "real image",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/alice/alice471541a3ac/alice471541a3ac_1755007739490_2-0.jpg"
+        }
+      ],
+      "expected": {
+        "url": "https://www.shopbop.com/emmy-vgn-leather-button-flared/vp/v=1/1597283808.htm",
+        "expectedName": "Emmy",
+        "expectedImageHost": "media-amazon.com",
+        "minConfidence": 70,
+        "notes": "alice + olivia dress - tests faux leather product descriptions",
+        "category": "Shopbop"
+      }
+    },
+    {
+      "passed": true,
+      "url": "https://www.shopbop.com/shrunken-snap-cardigan-vince/vp/v=1/1563468824.htm",
+      "category": "Shopbop",
+      "product": {
+        "name": "Shrunken Snap Cardigan",
+        "imageUrl": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/vince/vince5295113626/vince5295113626_1752016540739_2-0.jpg",
+        "originalPrice": 468,
+        "salePrice": 327.6,
+        "percentOff": 30,
+        "url": "https://www.shopbop.com/shrunken-snap-cardigan-vince/vp/v=1/1563468824.htm",
+        "confidence": 85
+      },
+      "testMetadata": {
+        "phaseUsed": "ai-extraction",
+        "priceValidation": {
+          "foundInHtml": true,
+          "checkedFormats": [
+            {
+              "format": "$327.60",
+              "matched": true
+            },
+            {
+              "format": "327.60",
+              "matched": true
+            },
+            {
+              "format": "$327.60",
+              "matched": true
+            },
+            {
+              "format": "327.60",
+              "matched": true
+            },
+            {
+              "format": "327,60",
+              "matched": false
+            },
+            {
+              "format": "32760",
+              "matched": false
+            },
+            {
+              "format": "327.60",
+              "matched": true
+            },
+            {
+              "format": "$328",
+              "matched": true
+            },
+            {
+              "format": "$328",
+              "matched": true
+            },
+            {
+              "format": "328",
+              "matched": true
+            }
+          ],
+          "matchedFormat": "$327.60"
+        },
+        "imageExtraction": {
+          "source": "og:image",
+          "preExtracted": true
+        },
+        "confidenceAdjustments": []
+      },
+      "validations": [
+        {
+          "check": "Product name",
+          "passed": true,
+          "expected": "Cardigan",
+          "actual": "Shrunken Snap Cardigan"
+        },
+        {
+          "check": "Image URL valid",
+          "passed": true,
+          "expected": "http(s)://...",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/vince/vince5295113626/vince5295113626_1752016540739_2-0.jpg"
+        },
+        {
+          "check": "Image host",
+          "passed": true,
+          "expected": "media-amazon.com",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/vince/vince5295113626/vince5295113626_1752016540739_2-0.jpg"
+        },
+        {
+          "check": "Sale price valid",
+          "passed": true,
+          "expected": "> 0",
+          "actual": 327.6
+        },
+        {
+          "check": "Confidence score",
+          "passed": true,
+          "expected": ">= 70",
+          "actual": 85
+        },
+        {
+          "check": "Not placeholder image",
+          "passed": true,
+          "expected": "real image",
+          "actual": "https://m.media-amazon.com/images/G/01/Shopbop/p/prod/products/vince/vince5295113626/vince5295113626_1752016540739_2-0.jpg"
+        }
+      ],
+      "expected": {
+        "url": "https://www.shopbop.com/shrunken-snap-cardigan-vince/vp/v=1/1563468824.htm",
+        "expectedName": "Cardigan",
+        "expectedImageHost": "media-amazon.com",
+        "minConfidence": 70,
+        "notes": "Vince cardigan - tests knitwear category",
+        "category": "Shopbop"
+      }
+    },
+    {
+      "passed": false,
+      "url": "https://hiutdenim.co.uk/products/red-dot-balance-the-hack-slim-fit-super-zero-double-black-selvedge",
+      "category": "Shopify (Hiut Denim)",
+      "error": "Could not extract product data",
+      "expected": {
+        "url": "https://hiutdenim.co.uk/products/red-dot-balance-the-hack-slim-fit-super-zero-double-black-selvedge",
+        "expectedName": "Hack",
+        "expectedImageHost": "cdn.shopify.com",
+        "minConfidence": 80,
+        "notes": "Hiut Denim slim fit jeans - tests Shopify JSON-LD structured data",
+        "category": "Shopify (Hiut Denim)"
+      }
+    },
+    {
+      "passed": false,
+      "url": "https://hiutdenim.co.uk/products/the-work-regular-fit-super-zero-double-black-selvedge",
+      "category": "Shopify (Hiut Denim)",
+      "error": "Could not extract product data",
+      "expected": {
+        "url": "https://hiutdenim.co.uk/products/the-work-regular-fit-super-zero-double-black-selvedge",
+        "expectedName": "Work",
+        "expectedImageHost": "cdn.shopify.com",
+        "minConfidence": 80,
+        "notes": "Hiut Denim regular fit - tests Shopify product schema",
+        "category": "Shopify (Hiut Denim)"
+      }
+    },
+    {
+      "passed": false,
+      "url": "https://hiutdenim.co.uk/products/lavenham-x-hiut-unisex-straight-leg-ecru",
+      "category": "Shopify (Hiut Denim)",
+      "error": "Could not extract product data",
+      "expected": {
+        "url": "https://hiutdenim.co.uk/products/lavenham-x-hiut-unisex-straight-leg-ecru",
+        "expectedName": "Lavenham",
+        "expectedImageHost": "cdn.shopify.com",
+        "minConfidence": 80,
+        "notes": "Hiut collaboration jeans - tests multi-brand product naming",
+        "category": "Shopify (Hiut Denim)"
+      }
+    },
+    {
+      "passed": false,
+      "url": "https://www.tentree.com/products/harwood-puffer-meteorite-black-agave-green-forest-pine",
+      "category": "Shopify (Tentree)",
+      "product": {
+        "name": "Multi Relax Primaloft Insulted Puffer Jacket",
+        "imageUrl": "https://cdn.shopify.com/s/files/1/2341/3995/files/Multi-Relax-Primaloft-Insulted-Puffer-Jacket-TCW6270-5648_1.jpg?v=1753902779",
+        "originalPrice": null,
+        "salePrice": 0,
+        "percentOff": 0,
+        "url": "https://www.tentree.com/products/harwood-puffer-meteorite-black-agave-green-forest-pine",
+        "confidence": 50
+      },
+      "testMetadata": {
+        "phaseUsed": "ai-extraction",
+        "priceValidation": {
+          "foundInHtml": true,
+          "checkedFormats": [
+            {
+              "format": "$0.00",
+              "matched": true
+            },
+            {
+              "format": "0.00",
+              "matched": true
+            },
+            {
+              "format": "$0.00",
+              "matched": true
+            },
+            {
+              "format": "0.00",
+              "matched": true
+            },
+            {
+              "format": "0,00",
+              "matched": false
+            },
+            {
+              "format": "0",
+              "matched": true
+            },
+            {
+              "format": "0.00",
+              "matched": true
+            },
+            {
+              "format": "$0",
+              "matched": true
+            },
+            {
+              "format": "$0",
+              "matched": true
+            },
+            {
+              "format": "0",
+              "matched": true
+            }
+          ],
+          "matchedFormat": "$0.00"
+        },
+        "imageExtraction": {
+          "source": "og:image",
+          "preExtracted": true
+        },
+        "confidenceAdjustments": []
+      },
+      "validations": [
+        {
+          "check": "Product name",
+          "passed": false,
+          "expected": "Harwood",
+          "actual": "Multi Relax Primaloft Insulted Puffer Jacket"
+        },
+        {
+          "check": "Image URL valid",
+          "passed": true,
+          "expected": "http(s)://...",
+          "actual": "https://cdn.shopify.com/s/files/1/2341/3995/files/Multi-Relax-Primaloft-Insulted-Puffer-Jacket-TCW6270-5648_1.jpg?v=1753902779"
+        },
+        {
+          "check": "Image host",
+          "passed": true,
+          "expected": "cdn.shopify.com",
+          "actual": "https://cdn.shopify.com/s/files/1/2341/3995/files/Multi-Relax-Primaloft-Insulted-Puffer-Jacket-TCW6270-5648_1.jpg?v=1753902779"
+        },
+        {
+          "check": "Sale price valid",
+          "passed": 0,
+          "expected": "> 0",
+          "actual": 0
+        },
+        {
+          "check": "Confidence score",
+          "passed": false,
+          "expected": ">= 80",
+          "actual": 50
+        },
+        {
+          "check": "Not placeholder image",
+          "passed": true,
+          "expected": "real image",
+          "actual": "https://cdn.shopify.com/s/files/1/2341/3995/files/Multi-Relax-Primaloft-Insulted-Puffer-Jacket-TCW6270-5648_1.jpg?v=1753902779"
+        }
+      ],
+      "expected": {
+        "url": "https://www.tentree.com/products/harwood-puffer-meteorite-black-agave-green-forest-pine",
+        "expectedName": "Harwood",
+        "expectedImageHost": "cdn.shopify.com",
+        "minConfidence": 80,
+        "notes": "Tentree puffer jacket - tests multi-color variant naming",
+        "category": "Shopify (Tentree)"
+      }
+    },
+    {
+      "passed": false,
+      "url": "https://www.tentree.com/products/pinnacle-sweater-smokey-violet-heather",
+      "category": "Shopify (Tentree)",
+      "product": {
+        "name": "Pinnacle Sweater",
+        "imageUrl": "https://cdn.shopify.com/s/files/1/2341/3995/files/Purple-Regular-Cotton-Yarn-Sweater-TCW6321-5620_3.jpg?v=1758934421",
+        "originalPrice": null,
+        "salePrice": 0,
+        "percentOff": 0,
+        "url": "https://www.tentree.com/products/pinnacle-sweater-smokey-violet-heather",
+        "confidence": 50
+      },
+      "testMetadata": {
+        "phaseUsed": "ai-extraction",
+        "priceValidation": {
+          "foundInHtml": true,
+          "checkedFormats": [
+            {
+              "format": "$0.00",
+              "matched": true
+            },
+            {
+              "format": "0.00",
+              "matched": true
+            },
+            {
+              "format": "$0.00",
+              "matched": true
+            },
+            {
+              "format": "0.00",
+              "matched": true
+            },
+            {
+              "format": "0,00",
+              "matched": false
+            },
+            {
+              "format": "0",
+              "matched": true
+            },
+            {
+              "format": "0.00",
+              "matched": true
+            },
+            {
+              "format": "$0",
+              "matched": true
+            },
+            {
+              "format": "$0",
+              "matched": true
+            },
+            {
+              "format": "0",
+              "matched": true
+            }
+          ],
+          "matchedFormat": "$0.00"
+        },
+        "imageExtraction": {
+          "source": "og:image",
+          "preExtracted": true
+        },
+        "confidenceAdjustments": []
+      },
+      "validations": [
+        {
+          "check": "Product name",
+          "passed": true,
+          "expected": "Pinnacle",
+          "actual": "Pinnacle Sweater"
+        },
+        {
+          "check": "Image URL valid",
+          "passed": true,
+          "expected": "http(s)://...",
+          "actual": "https://cdn.shopify.com/s/files/1/2341/3995/files/Purple-Regular-Cotton-Yarn-Sweater-TCW6321-5620_3.jpg?v=1758934421"
+        },
+        {
+          "check": "Image host",
+          "passed": true,
+          "expected": "cdn.shopify.com",
+          "actual": "https://cdn.shopify.com/s/files/1/2341/3995/files/Purple-Regular-Cotton-Yarn-Sweater-TCW6321-5620_3.jpg?v=1758934421"
+        },
+        {
+          "check": "Sale price valid",
+          "passed": 0,
+          "expected": "> 0",
+          "actual": 0
+        },
+        {
+          "check": "Confidence score",
+          "passed": false,
+          "expected": ">= 80",
+          "actual": 50
+        },
+        {
+          "check": "Not placeholder image",
+          "passed": true,
+          "expected": "real image",
+          "actual": "https://cdn.shopify.com/s/files/1/2341/3995/files/Purple-Regular-Cotton-Yarn-Sweater-TCW6321-5620_3.jpg?v=1758934421"
+        }
+      ],
+      "expected": {
+        "url": "https://www.tentree.com/products/pinnacle-sweater-smokey-violet-heather",
+        "expectedName": "Pinnacle",
+        "expectedImageHost": "cdn.shopify.com",
+        "minConfidence": 80,
+        "notes": "Tentree sweater - tests Shopify price extraction",
+        "category": "Shopify (Tentree)"
+      }
+    },
+    {
+      "passed": false,
+      "url": "https://www.tentree.com/products/lookout-long-puffer-birchwood",
+      "category": "Shopify (Tentree)",
+      "product": {
+        "name": "Brown Cloud Shell Long Puffer",
+        "imageUrl": "https://cdn.shopify.com/s/files/1/2341/3995/files/Brown-Cloud-Shell-Long-Puffer-TCW3532-5582_6.jpg?v=1749230444",
+        "originalPrice": null,
+        "salePrice": 0,
+        "percentOff": 0,
+        "url": "https://www.tentree.com/products/lookout-long-puffer-birchwood",
+        "confidence": 50
+      },
+      "testMetadata": {
+        "phaseUsed": "ai-extraction",
+        "priceValidation": {
+          "foundInHtml": true,
+          "checkedFormats": [
+            {
+              "format": "$0.00",
+              "matched": true
+            },
+            {
+              "format": "0.00",
+              "matched": true
+            },
+            {
+              "format": "$0.00",
+              "matched": true
+            },
+            {
+              "format": "0.00",
+              "matched": true
+            },
+            {
+              "format": "0,00",
+              "matched": false
+            },
+            {
+              "format": "0",
+              "matched": true
+            },
+            {
+              "format": "0.00",
+              "matched": true
+            },
+            {
+              "format": "$0",
+              "matched": true
+            },
+            {
+              "format": "$0",
+              "matched": true
+            },
+            {
+              "format": "0",
+              "matched": true
+            }
+          ],
+          "matchedFormat": "$0.00"
+        },
+        "imageExtraction": {
+          "source": "og:image",
+          "preExtracted": true
+        },
+        "confidenceAdjustments": []
+      },
+      "validations": [
+        {
+          "check": "Product name",
+          "passed": false,
+          "expected": "Lookout",
+          "actual": "Brown Cloud Shell Long Puffer"
+        },
+        {
+          "check": "Image URL valid",
+          "passed": true,
+          "expected": "http(s)://...",
+          "actual": "https://cdn.shopify.com/s/files/1/2341/3995/files/Brown-Cloud-Shell-Long-Puffer-TCW3532-5582_6.jpg?v=1749230444"
+        },
+        {
+          "check": "Image host",
+          "passed": true,
+          "expected": "cdn.shopify.com",
+          "actual": "https://cdn.shopify.com/s/files/1/2341/3995/files/Brown-Cloud-Shell-Long-Puffer-TCW3532-5582_6.jpg?v=1749230444"
+        },
+        {
+          "check": "Sale price valid",
+          "passed": 0,
+          "expected": "> 0",
+          "actual": 0
+        },
+        {
+          "check": "Confidence score",
+          "passed": false,
+          "expected": ">= 80",
+          "actual": 50
+        },
+        {
+          "check": "Not placeholder image",
+          "passed": true,
+          "expected": "real image",
+          "actual": "https://cdn.shopify.com/s/files/1/2341/3995/files/Brown-Cloud-Shell-Long-Puffer-TCW3532-5582_6.jpg?v=1749230444"
+        }
+      ],
+      "expected": {
+        "url": "https://www.tentree.com/products/lookout-long-puffer-birchwood",
+        "expectedName": "Lookout",
+        "expectedImageHost": "cdn.shopify.com",
+        "minConfidence": 80,
+        "notes": "Tentree outerwear - tests higher price point items on Shopify",
+        "category": "Shopify (Tentree)"
+      }
+    }
+  ]
+}
