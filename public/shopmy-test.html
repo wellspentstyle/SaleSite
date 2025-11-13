@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShopMy Auto-Link Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #333;
+    }
+    .test-link {
+      display: block;
+      margin: 20px 0;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+    a {
+      color: #0066cc;
+      text-decoration: underline;
+      font-weight: 500;
+    }
+    .note {
+      background: #fffbea;
+      border-left: 4px solid #f59e0b;
+      padding: 15px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>ShopMy Auto-Linking Test Page</h1>
+  
+  <div class="note">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Open browser developer tools (right-click → Inspect)</li>
+      <li>Click on one of the links below</li>
+      <li>Check the "Network" tab to see the actual URL that gets called</li>
+      <li>ShopMy should automatically convert these regular URLs into affiliate links</li>
+    </ol>
+  </div>
+
+  <h2>Test Links (Clean URLs):</h2>
+  
+  <div class="test-link">
+    <strong>1. SPANX Sale:</strong><br>
+    <a href="https://spanx.com/collections/sale">Shop SPANX Sale</a>
+  </div>
+
+  <div class="test-link">
+    <strong>2. Rachel Comey Sale:</strong><br>
+    <a href="https://rachelcomey.com/sale">Shop Rachel Comey Sale</a>
+  </div>
+
+  <div class="test-link">
+    <strong>3. Universal Standard Sale:</strong><br>
+    <a href="https://www.universalstandard.com/collections/final-few">Shop Universal Standard Sale</a>
+  </div>
+
+  <div class="test-link">
+    <strong>4. TeePublic T-Shirts:</strong><br>
+    <a href="https://www.teepublic.com/t-shirts">Shop TeePublic T-Shirts</a>
+  </div>
+
+  <h2>What Should Happen:</h2>
+  <p>After the ShopMy script loads, clicking these links should redirect through:</p>
+  <code>https://go.shopmy.us/ap/karitek?url=ENCODED_URL</code>
+
+  <!-- ShopMy Auto-Linking Script -->
+  <script defer src="https://static.shopmy.us/Auto/l9N1lH.js" data-sms="l9N1lH"></script>
+</body>
+</html>

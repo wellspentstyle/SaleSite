@@ -1,0 +1,1020 @@
+Implement the following design in React. Use the following files generated from a Figma design as a specification and guide:
+
+```src/styles/Screenshot_2025_11_06At_7_53_26AmPng.module.css
+@import "https://fonts.googleapis.com/css?family=Inter:0,400&display=swap";
+.Screenshot_2025_11_06At_7_53_26AmPng_16_4 {
+  background: #fff;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  display: flex;
+}
+.HeaderPageHeader_16_5 {
+  background: #fff;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 0 80px;
+  display: flex;
+}
+.Container_16_6 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1280px;
+  padding: 0 32px;
+  display: flex;
+}
+.Container_16_7 {
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 32px 0;
+  display: flex;
+}
+.WellspendstyleLogo_16_8 {
+  flex-direction: column;
+  align-items: flex-start;
+  display: flex;
+}
+.Wellspendstyle_16_9 {
+  color: #1f2937;
+  letter-spacing: -1.5px;
+  font-family: Inter;
+  font-size: 28px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 42px;
+  display: inline-block;
+}
+.LinkSignOut_16_10 {
+  flex-direction: column;
+  align-items: flex-start;
+  display: flex;
+}
+.SignOut_16_11 {
+  color: #374151;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.HorizontalDivider_16_12 {
+  box-sizing: border-box;
+  border-bottom: 1px solid #e5e7eb;
+  height: 1px;
+}
+.MainMainContent_16_13 {
+  width: 1280px;
+  max-width: 1280px;
+  height: 1618px;
+}
+.Section_16_14 {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 1216px;
+  display: flex;
+}
+.Heading_1_16_15 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  display: flex;
+}
+.FinalizePicks_16_16 {
+  color: #111827;
+  letter-spacing: -0.9px;
+  font-family: Inter;
+  font-size: 36px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 40px;
+  display: inline-block;
+}
+.Container_16_17 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  display: flex;
+}
+.ReviewAndEditYourCuratedPicksBeforeLaunching_16_18 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 24px;
+  display: inline-block;
+}
+.SectionProductPicks_16_19 {
+  flex-shrink: 0;
+  width: 1248px;
+  height: 1308px;
+}
+.ProductCardTropicalWoolCollarlessBlazerNavyMargin_16_20 {
+  flex-direction: column;
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: flex-start;
+  width: 416px;
+  height: 654px;
+  padding-bottom: 48px;
+  display: flex;
+}
+.ProductCardTropicalWoolCollarlessBlazerNavy_16_21 {
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: flex-start;
+  width: 100%;
+  height: 606px;
+  padding: 0 16px;
+  display: flex;
+}
+.Border_16_22 {
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 1px;
+  display: flex;
+}
+.APersonSHandHoldingABrownBomberJacketOnAWhiteHangerAgainstALightGreyBackground_16_23 {
+  background: #d3d3d3 url(<path-to-image>) 50% / cover no-repeat;
+  width: 100%;
+  max-width: 384px;
+  height: 450px;
+  overflow: hidden;
+}
+.Container_16_24 {
+  width: 100%;
+  height: 154px;
+}
+.Heading_2_16_25 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.TropicalWoolCollarlessBlazerNavy_16_26 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_27 {
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Margin_16_28 {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-right: 8px;
+  display: flex;
+}
+.generated_595_16_29 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  text-decoration-line: line-through;
+  display: inline-block;
+}
+._5_16_30 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_31 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Off_16_32 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 16px;
+  display: inline-block;
+}
+.ButtonEditTropicalWoolCollarlessBlazerNavy_16_33 {
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  justify-content: center;
+  align-items: center;
+  width: 350px;
+  padding: 9px 1px;
+  display: flex;
+}
+.Edit_16_34 {
+  color: #1f2937;
+  text-align: center;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.ProductCardCrepeKnitTieFrontDressMargin_16_35 {
+  flex-direction: column;
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: flex-start;
+  width: 416px;
+  height: 654px;
+  padding-bottom: 48px;
+  display: flex;
+}
+.ProductCardCrepeKnitTieFrontDress_16_36 {
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: flex-start;
+  width: 100%;
+  height: 606px;
+  padding: 0 16px;
+  display: flex;
+}
+.Border_16_37 {
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 1px;
+  display: flex;
+}
+.AModelWearingDustyPinkCrepeKnitTieFrontPantsAndWhiteHeelsStandingAgainstAWhiteBackground_16_38 {
+  background: #d3d3d3 url(<path-to-image>) 50% / cover no-repeat;
+  width: 100%;
+  max-width: 384px;
+  height: 450px;
+  overflow: hidden;
+}
+.Container_16_39 {
+  width: 100%;
+  height: 154px;
+}
+.Heading_2_16_40 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.CrepeKnitTieFrontDress_16_41 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_42 {
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Margin_16_43 {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-right: 8px;
+  display: flex;
+}
+.generated_495_16_44 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  text-decoration-line: line-through;
+  display: inline-block;
+}
+._5_16_45 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_46 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Off_16_47 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 16px;
+  display: inline-block;
+}
+.ButtonEditCrepeKnitTieFrontDress_16_48 {
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  justify-content: center;
+  align-items: center;
+  width: 350px;
+  padding: 9px 1px;
+  display: flex;
+}
+.Edit_16_49 {
+  color: #1f2937;
+  text-align: center;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.ProductCardPleatedMidiSkirtBlackMargin_16_50 {
+  flex-direction: column;
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: flex-start;
+  width: 416px;
+  height: 654px;
+  padding-bottom: 48px;
+  display: flex;
+}
+.ProductCardPleatedMidiSkirtBlack_16_51 {
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: flex-start;
+  width: 100%;
+  height: 606px;
+  padding: 0 16px;
+  display: flex;
+}
+.Border_16_52 {
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 1px;
+  display: flex;
+}
+.AModelWearingABrightYellowCroppedHoodieAndMatchingSweatpantsPosingOnABasketballCourtWithACurvedWhiteStructureInTheBackground_16_53 {
+  background: #d3d3d3 url(<path-to-image>) 50% / cover no-repeat;
+  width: 100%;
+  max-width: 384px;
+  height: 450px;
+  overflow: hidden;
+}
+.Container_16_54 {
+  width: 100%;
+  height: 154px;
+}
+.Heading_2_16_55 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.PleatedMidiSkirtBlack_16_56 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_57 {
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Margin_16_58 {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-right: 8px;
+  display: flex;
+}
+.generated_395_16_59 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  text-decoration-line: line-through;
+  display: inline-block;
+}
+._5_16_60 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_61 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Off_16_62 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 16px;
+  display: inline-block;
+}
+.ButtonEditPleatedMidiSkirtBlack_16_63 {
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  justify-content: center;
+  align-items: center;
+  width: 350px;
+  padding: 9px 1px;
+  display: flex;
+}
+.Edit_16_64 {
+  color: #1f2937;
+  text-align: center;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.ProductCardSilkCharmeuseButtonDownMargin_16_65 {
+  flex-direction: column;
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: flex-start;
+  width: 416px;
+  height: 654px;
+  padding-bottom: 48px;
+  display: flex;
+}
+.ProductCardSilkCharmeuseButtonDown_16_66 {
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: flex-start;
+  width: 100%;
+  height: 606px;
+  padding: 0 16px;
+  display: flex;
+}
+.Border_16_67 {
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 1px;
+  display: flex;
+}
+.ACloseUpOfAClothingRackWithVariousJacketsAndShirtsIncludingABlackLeatherJacketAWhiteTexturedSweaterAndADenimJacket_16_68 {
+  background: #d3d3d3 url(<path-to-image>) 50% / cover no-repeat;
+  width: 100%;
+  max-width: 384px;
+  height: 450px;
+  overflow: hidden;
+}
+.Container_16_69 {
+  width: 100%;
+  height: 154px;
+}
+.Heading_2_16_70 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.SilkCharmeuseButtonDown_16_71 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_72 {
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Margin_16_73 {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-right: 8px;
+  display: flex;
+}
+.generated_425_16_74 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  text-decoration-line: line-through;
+  display: inline-block;
+}
+._5_16_75 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_76 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Off_16_77 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 16px;
+  display: inline-block;
+}
+.ButtonEditSilkCharmeuseButtonDown_16_78 {
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  justify-content: center;
+  align-items: center;
+  width: 350px;
+  padding: 9px 1px;
+  display: flex;
+}
+.Edit_16_79 {
+  color: #1f2937;
+  text-align: center;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.ProductCardWideLegTrouserIvoryMargin_16_80 {
+  flex-direction: column;
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: flex-start;
+  width: 416px;
+  height: 654px;
+  padding-bottom: 48px;
+  display: flex;
+}
+.ProductCardWideLegTrouserIvory_16_81 {
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: flex-start;
+  width: 100%;
+  height: 606px;
+  padding: 0 16px;
+  display: flex;
+}
+.Border_16_82 {
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 1px;
+  display: flex;
+}
+.AFlatLayOfAutumnThemedClothingIncludingARustColoredSweaterADarkBrownCableKnitSweaterAPlaidSkirtAndBrownSuedeBootsArrangedOnADarkTexturedSurface_16_83 {
+  background: #d3d3d3 url(<path-to-image>) 50% / cover no-repeat;
+  width: 100%;
+  max-width: 384px;
+  height: 450px;
+  overflow: hidden;
+}
+.Container_16_84 {
+  width: 100%;
+  height: 154px;
+}
+.Heading_2_16_85 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.WideLegTrouserIvory_16_86 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_87 {
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Margin_16_88 {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-right: 8px;
+  display: flex;
+}
+.generated_450_16_89 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  text-decoration-line: line-through;
+  display: inline-block;
+}
+.generated_315_16_90 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_91 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Off_16_92 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 16px;
+  display: inline-block;
+}
+.ButtonEditWideLegTrouserIvory_16_93 {
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  justify-content: center;
+  align-items: center;
+  width: 350px;
+  padding: 9px 1px;
+  display: flex;
+}
+.Edit_16_94 {
+  color: #1f2937;
+  text-align: center;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.ProductCardCashmerePulloverCamelMargin_16_95 {
+  flex-direction: column;
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: flex-start;
+  width: 416px;
+  height: 654px;
+  padding-bottom: 48px;
+  display: flex;
+}
+.ProductCardCashmerePulloverCamel_16_96 {
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: flex-start;
+  width: 100%;
+  height: 606px;
+  padding: 0 16px;
+  display: flex;
+}
+.Border_16_97 {
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 1px;
+  display: flex;
+}
+.AWomanWithSunglassesOnHerHeadWearingABeltedCreamColoredShirtDressStandingInASunnyRusticOutdoorSettingWithStoneWalls_16_98 {
+  background: #d3d3d3 url(<path-to-image>) 50% / cover no-repeat;
+  width: 100%;
+  max-width: 384px;
+  height: 450px;
+  overflow: hidden;
+}
+.Container_16_99 {
+  width: 100%;
+  height: 154px;
+}
+.Heading_2_16_100 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.CashmerePulloverCamel_16_101 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_102 {
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Margin_16_103 {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-right: 8px;
+  display: flex;
+}
+.generated_550_16_104 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  text-decoration-line: line-through;
+  display: inline-block;
+}
+.generated_385_16_105 {
+  color: #111827;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.Container_16_106 {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 350px;
+  display: flex;
+}
+.Off_16_107 {
+  color: #6b7280;
+  font-family: Inter;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 16px;
+  display: inline-block;
+}
+.ButtonEditCashmerePulloverCamel_16_108 {
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  justify-content: center;
+  align-items: center;
+  width: 350px;
+  padding: 9px 1px;
+  display: flex;
+}
+.Edit_16_109 {
+  color: #1f2937;
+  text-align: center;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.SectionActionButtons_16_110 {
+  justify-content: center;
+  align-items: center;
+  width: 1216px;
+  padding: 16px 0 64px;
+  display: flex;
+}
+.ButtonGoBack_16_111 {
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 13px 49px;
+  display: flex;
+  box-shadow: 0 1px 2px #0000000d;
+}
+.Back_16_112 {
+  color: #000;
+  text-align: center;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.ButtonLaunchPicksMargin_16_113 {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-left: 16px;
+  display: flex;
+}
+.ButtonLaunchPicks_16_114 {
+  background: #000;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 48px;
+  display: flex;
+  box-shadow: 0 1px 2px #0000000d;
+}
+.Launch_16_115 {
+  color: #fff;
+  text-align: center;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-block;
+}
+.FooterPageFooter_16_116 {
+  background: #7c6876;
+  height: 16px;
+}
+
+```
+
+---
+
+```src/components/Screenshot_2025_11_06At_7_53_26AmPng.tsx
+import React from 'react';
+import styles from '../styles/Screenshot_2025_11_06At_7_53_26AmPng.module.css';
+
+
+export default function Screenshot_2025_11_06At_7_53_26AmPng() {
+  return (
+    <div className={styles.Screenshot_2025_11_06At_7_53_26AmPng_16_4}>
+      <div className={styles.HeaderPageHeader_16_5}>
+        <div className={styles.Container_16_6}>
+          <div className={styles.Container_16_7}>
+            <div className={styles.WellspendstyleLogo_16_8}><span className={styles.Wellspendstyle_16_9}>wellspendstyle</span></div>
+            <div className={styles.LinkSignOut_16_10}><span className={styles.SignOut_16_11}>Sign Out</span></div>
+          </div>
+          <div className={styles.HorizontalDivider_16_12}></div>
+        </div>
+      </div>
+      <div className={styles.MainMainContent_16_13}>
+        <div className={styles.Section_16_14}>
+          <div className={styles.Heading_1_16_15}><span className={styles.FinalizePicks_16_16}>Finalize Picks</span></div>
+          <div className={styles.Container_16_17}><span className={styles.ReviewAndEditYourCuratedPicksBeforeLaunching_16_18}>Review and edit your curated picks before launching.</span></div>
+        </div>
+        <div className={styles.SectionProductPicks_16_19}>
+          <div className={styles.ProductCardTropicalWoolCollarlessBlazerNavyMargin_16_20}>
+            <div className={styles.ProductCardTropicalWoolCollarlessBlazerNavy_16_21}>
+              <div className={styles.Border_16_22}>
+                <div className={styles.APersonSHandHoldingABrownBomberJacketOnAWhiteHangerAgainstALightGreyBackground_16_23}></div>
+                <div className={styles.Container_16_24}>
+                  <div className={styles.Heading_2_16_25}><span className={styles.TropicalWoolCollarlessBlazerNavy_16_26}>Tropical Wool Collarless Blazer Navy</span></div>
+                  <div className={styles.Container_16_27}>
+                    <div className={styles.Margin_16_28}><span className={styles.generated_595_16_29}>$595</span></div><span className={styles._5_16_30}>$416.5</span>
+                  </div>
+                  <div className={styles.Container_16_31}><span className={styles.Off_16_32}>30% OFF</span></div>
+                  <div className={styles.ButtonEditTropicalWoolCollarlessBlazerNavy_16_33}><span className={styles.Edit_16_34}>Edit</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className={styles.ProductCardCrepeKnitTieFrontDressMargin_16_35}>
+            <div className={styles.ProductCardCrepeKnitTieFrontDress_16_36}>
+              <div className={styles.Border_16_37}>
+                <div className={styles.AModelWearingDustyPinkCrepeKnitTieFrontPantsAndWhiteHeelsStandingAgainstAWhiteBackground_16_38}></div>
+                <div className={styles.Container_16_39}>
+                  <div className={styles.Heading_2_16_40}><span className={styles.CrepeKnitTieFrontDress_16_41}>Crepe Knit Tie Front Dress</span></div>
+                  <div className={styles.Container_16_42}>
+                    <div className={styles.Margin_16_43}><span className={styles.generated_495_16_44}>$495</span></div><span className={styles._5_16_45}>$346.5</span>
+                  </div>
+                  <div className={styles.Container_16_46}><span className={styles.Off_16_47}>30% OFF</span></div>
+                  <div className={styles.ButtonEditCrepeKnitTieFrontDress_16_48}><span className={styles.Edit_16_49}>Edit</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className={styles.ProductCardPleatedMidiSkirtBlackMargin_16_50}>
+            <div className={styles.ProductCardPleatedMidiSkirtBlack_16_51}>
+              <div className={styles.Border_16_52}>
+                <div className={styles.AModelWearingABrightYellowCroppedHoodieAndMatchingSweatpantsPosingOnABasketballCourtWithACurvedWhiteStructureInTheBackground_16_53}></div>
+                <div className={styles.Container_16_54}>
+                  <div className={styles.Heading_2_16_55}><span className={styles.PleatedMidiSkirtBlack_16_56}>Pleated Midi Skirt Black</span></div>
+                  <div className={styles.Container_16_57}>
+                    <div className={styles.Margin_16_58}><span className={styles.generated_395_16_59}>$395</span></div><span className={styles._5_16_60}>$276.5</span>
+                  </div>
+                  <div className={styles.Container_16_61}><span className={styles.Off_16_62}>30% OFF</span></div>
+                  <div className={styles.ButtonEditPleatedMidiSkirtBlack_16_63}><span className={styles.Edit_16_64}>Edit</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className={styles.ProductCardSilkCharmeuseButtonDownMargin_16_65}>
+            <div className={styles.ProductCardSilkCharmeuseButtonDown_16_66}>
+              <div className={styles.Border_16_67}>
+                <div className={styles.ACloseUpOfAClothingRackWithVariousJacketsAndShirtsIncludingABlackLeatherJacketAWhiteTexturedSweaterAndADenimJacket_16_68}></div>
+                <div className={styles.Container_16_69}>
+                  <div className={styles.Heading_2_16_70}><span className={styles.SilkCharmeuseButtonDown_16_71}>Silk Charmeuse Button Down</span></div>
+                  <div className={styles.Container_16_72}>
+                    <div className={styles.Margin_16_73}><span className={styles.generated_425_16_74}>$425</span></div><span className={styles._5_16_75}>$297.5</span>
+                  </div>
+                  <div className={styles.Container_16_76}><span className={styles.Off_16_77}>30% OFF</span></div>
+                  <div className={styles.ButtonEditSilkCharmeuseButtonDown_16_78}><span className={styles.Edit_16_79}>Edit</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className={styles.ProductCardWideLegTrouserIvoryMargin_16_80}>
+            <div className={styles.ProductCardWideLegTrouserIvory_16_81}>
+              <div className={styles.Border_16_82}>
+                <div className={styles.AFlatLayOfAutumnThemedClothingIncludingARustColoredSweaterADarkBrownCableKnitSweaterAPlaidSkirtAndBrownSuedeBootsArrangedOnADarkTexturedSurface_16_83}></div>
+                <div className={styles.Container_16_84}>
+                  <div className={styles.Heading_2_16_85}><span className={styles.WideLegTrouserIvory_16_86}>Wide Leg Trouser Ivory</span></div>
+                  <div className={styles.Container_16_87}>
+                    <div className={styles.Margin_16_88}><span className={styles.generated_450_16_89}>$450</span></div><span className={styles.generated_315_16_90}>$315</span>
+                  </div>
+                  <div className={styles.Container_16_91}><span className={styles.Off_16_92}>30% OFF</span></div>
+                  <div className={styles.ButtonEditWideLegTrouserIvory_16_93}><span className={styles.Edit_16_94}>Edit</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className={styles.ProductCardCashmerePulloverCamelMargin_16_95}>
+            <div className={styles.ProductCardCashmerePulloverCamel_16_96}>
+              <div className={styles.Border_16_97}>
+                <div className={styles.AWomanWithSunglassesOnHerHeadWearingABeltedCreamColoredShirtDressStandingInASunnyRusticOutdoorSettingWithStoneWalls_16_98}></div>
+                <div className={styles.Container_16_99}>
+                  <div className={styles.Heading_2_16_100}><span className={styles.CashmerePulloverCamel_16_101}>Cashmere Pullover Camel</span></div>
+                  <div className={styles.Container_16_102}>
+                    <div className={styles.Margin_16_103}><span className={styles.generated_550_16_104}>$550</span></div><span className={styles.generated_385_16_105}>$385</span>
+                  </div>
+                  <div className={styles.Container_16_106}><span className={styles.Off_16_107}>30% OFF</span></div>
+                  <div className={styles.ButtonEditCashmerePulloverCamel_16_108}><span className={styles.Edit_16_109}>Edit</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className={styles.SectionActionButtons_16_110}>
+          <div className={styles.ButtonGoBack_16_111}><span className={styles.Back_16_112}>Back</span></div>
+          <div className={styles.ButtonLaunchPicksMargin_16_113}>
+            <div className={styles.ButtonLaunchPicks_16_114}><span className={styles.Launch_16_115}>Launch</span></div>
+          </div>
+        </div>
+      </div>
+      <div className={styles.FooterPageFooter_16_116}></div>
+    </div>
+  );
+}
+```
+
