@@ -23,7 +23,7 @@ interface Sale {
 
 interface PicksAdminProps {
   onSignOut: () => void;
-  onNavigateToFinalize: (products: any[], saleId: string) => void;
+  onNavigateToFinalize: (products: any[], saleId: string, failures?: any[]) => void;
 }
 
 export function PicksAdmin({ onSignOut, onNavigateToFinalize }: PicksAdminProps) {
@@ -72,38 +72,32 @@ export function PicksAdmin({ onSignOut, onNavigateToFinalize }: PicksAdminProps)
 
     const auth = sessionStorage.getItem('adminAuth');
     const urlList = urls.split('\n').filter(url => url.trim() !== '');
-    const scrapedProducts: any[] = [];
 
     try {
-      // Scrape each URL
-      for (const url of urlList) {
-        try {
-          const response = await fetch(`${API_BASE}/admin/scrape-product`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'auth': auth || ''
-            },
-            body: JSON.stringify({ url: url.trim() })
-          });
+      const response = await fetch(`${API_BASE}/admin/scrape-product`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'auth': auth || ''
+        },
+        body: JSON.stringify({ urls: urlList })
+      });
 
-          const data = await response.json();
-          
-          if (data.success && data.product) {
-            scrapedProducts.push(data.product);
-          } else {
-            console.error(`Failed to scrape ${url}:`, data.message);
-          }
-        } catch (error) {
-          console.error(`Error scraping ${url}:`, error);
-        }
-      }
-
-      if (scrapedProducts.length > 0) {
-        // Navigate to finalize page with scraped products
-        onNavigateToFinalize(scrapedProducts, selectedSaleId);
+      const data = await response.json();
+      
+      if (data.success) {
+        const successes = data.successes || [];
+        const failures = data.failures || [];
+        
+        const scrapedProducts = successes.map((s: any) => ({
+          ...s.product,
+          confidence: s.confidence,
+          extractionMethod: s.extractionMethod
+        }));
+        
+        onNavigateToFinalize(scrapedProducts, selectedSaleId, failures);
       } else {
-        alert('No products were successfully scraped. Please check the URLs and try again.');
+        alert('An error occurred while scraping. Please try again.');
         setIsLoading(false);
       }
     } catch (error) {

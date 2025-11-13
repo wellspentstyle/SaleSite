@@ -18,16 +18,15 @@ const API_BASE = '/api';
 export function Admin({ onBackToSite }: AdminProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  // DEV MODE: Auto-login enabled for development
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    sessionStorage.setItem('adminAuth', '1234');
-    return true;
+    return !!sessionStorage.getItem('adminAuth');
   });
   const [currentPage, setCurrentPage] = useState<AdminPage>('picks-admin');
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [scrapedProducts, setScrapedProducts] = useState<any[]>([]);
   const [selectedSaleId, setSelectedSaleId] = useState('');
+  const [failures, setFailures] = useState<any[]>([]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,14 +64,16 @@ export function Admin({ onBackToSite }: AdminProps) {
     setSelectedSaleId('');
   };
 
-  const handleNavigateToFinalize = (products: any[], saleId: string) => {
+  const handleNavigateToFinalize = (products: any[], saleId: string, failuresList: any[] = []) => {
     setScrapedProducts(products);
     setSelectedSaleId(saleId);
+    setFailures(failuresList);
     setCurrentPage('finalize-picks');
   };
 
   const handleBackToPicksAdmin = () => {
     setCurrentPage('picks-admin');
+    setFailures([]);
   };
 
   const handleBackToSite = () => {
@@ -92,6 +93,7 @@ export function Admin({ onBackToSite }: AdminProps) {
           onBack={handleBackToPicksAdmin}
           scrapedProducts={scrapedProducts}
           selectedSaleId={selectedSaleId}
+          failures={failures}
         />
       );
     }

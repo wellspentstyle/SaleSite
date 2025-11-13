@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Loader2, Trash2 } from 'lucide-react';
+import { ManualEntryForm, ManualProductData } from '../components/ManualEntryForm';
 
 interface Product {
   url: string;
@@ -9,6 +10,12 @@ interface Product {
   salePrice: number;
   percentOff: number;
   confidence?: number;
+  entryType?: string;
+}
+
+interface Failure {
+  url: string;
+  error: string;
 }
 
 interface FinalizePicksProps {
@@ -16,20 +23,52 @@ interface FinalizePicksProps {
   onBack: () => void;
   scrapedProducts: Product[];
   selectedSaleId: string;
+  failures?: Failure[];
 }
 
 const API_BASE = '/api';
 
-export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSaleId }: FinalizePicksProps) {
+export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSaleId, failures = [] }: FinalizePicksProps) {
   const [picks, setPicks] = useState<Product[]>(scrapedProducts);
+  const [manualEntries, setManualEntries] = useState<Map<string, ManualProductData>>(new Map());
+  const [failedUrls, setFailedUrls] = useState<string[]>(failures.map(f => f.url));
   const [isSaving, setIsSaving] = useState(false);
 
   const handleDelete = (index: number) => {
     setPicks(picks.filter((_, i) => i !== index));
   };
 
+  const handleManualDataChange = (url: string, data: ManualProductData) => {
+    setManualEntries(new Map(manualEntries.set(url, data)));
+  };
+
+  const handleRemoveManualEntry = (url: string) => {
+    const newEntries = new Map(manualEntries);
+    newEntries.delete(url);
+    setManualEntries(newEntries);
+    setFailedUrls(failedUrls.filter(u => u !== url));
+  };
+
   const handleLaunch = async () => {
-    if (picks.length === 0) {
+    const manualPicks = Array.from(manualEntries.values()).map(data => ({
+      url: data.url,
+      name: data.name,
+      imageUrl: data.imageUrl,
+      originalPrice: data.originalPrice,
+      salePrice: data.salePrice,
+      percentOff: data.percentOff,
+      confidence: 100,
+      entryType: 'manual'
+    }));
+
+    const autoPicks = picks.map(pick => ({
+      ...pick,
+      entryType: 'automatic'
+    }));
+
+    const allPicks = [...manualPicks, ...autoPicks];
+
+    if (allPicks.length === 0) {
       alert('No picks to save');
       return;
     }
@@ -46,14 +85,14 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
         },
         body: JSON.stringify({
           saleId: selectedSaleId,
-          picks: picks
+          picks: allPicks
         })
       });
 
       const data = await response.json();
 
       if (data.success) {
-        alert(`Successfully saved ${picks.length} picks!`);
+        alert(`Successfully saved ${allPicks.length} picks!`);
         onBack();
       } else {
         alert(`Failed to save picks: ${data.message}`);
@@ -128,11 +167,63 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
               color: '#999'
             }}
           >
-            {picks.length} out of {scrapedProducts.length} picks uploaded.
+            {picks.length} auto-scraped, {failedUrls.length} manual {failedUrls.length === 1 ? 'entry' : 'entries'}
           </p>
         </div>
 
-        {picks.length === 0 ? (
+        {/* Manual Entry Forms (for failed scrapes) */}
+        {failedUrls.length > 0 && (
+          <div style={{ marginBottom: '60px' }}>
+            <h2 
+              style={{ 
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '20px',
+                fontWeight: 700,
+                marginBottom: '16px',
+                color: '#000'
+              }}
+            >
+              Manual Entries ({failedUrls.length})
+            </h2>
+            <p 
+              style={{ 
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '14px',
+                color: '#666',
+                marginBottom: '24px'
+              }}
+            >
+              These URLs couldn't be scraped automatically. Fill in the product details manually:
+            </p>
+            {failedUrls.map(url => (
+              <ManualEntryForm
+                key={url}
+                url={url}
+                onDataChange={(data) => handleManualDataChange(url, data)}
+                onRemove={() => handleRemoveManualEntry(url)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Auto-Scraped Products */}
+        {picks.length > 0 && (
+          <div style={{ marginBottom: '40px' }}>
+            <h2 
+              style={{ 
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '20px',
+                fontWeight: 700,
+                marginBottom: '24px',
+                color: '#000'
+              }}
+            >
+              Auto-Scraped Products ({picks.length})
+            </h2>
+          </div>
+        )}
+
+        {picks.length === 0 && failedUrls.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-muted-foreground mb-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
               No picks to display. Go back and scrape some products.
