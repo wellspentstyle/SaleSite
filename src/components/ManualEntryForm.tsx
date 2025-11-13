@@ -46,7 +46,8 @@ export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryForm
       salePrice: parseFloat(salePrice) || 0,
       percentOff
     });
-  }, [url, name, imageUrl, originalPrice, salePrice, percentOff, onDataChange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, name, imageUrl, originalPrice, salePrice, percentOff]);
 
   return (
     <div className="border border-border bg-white p-6 mb-4 relative">
