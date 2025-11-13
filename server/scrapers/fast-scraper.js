@@ -37,7 +37,7 @@ export async function scrapeProduct(url, options = {}) {
     logger.log(`📄 [Fast Scraper] Fetched HTML: ${html.length} characters`);
 
     const jsonLdResult = await extractFromJsonLd(html, url, testMetadata, logger);
-    if (jsonLdResult) {
+    if (jsonLdResult && jsonLdResult.complete) {
       return {
         success: true,
         product: jsonLdResult,
@@ -51,9 +51,13 @@ export async function scrapeProduct(url, options = {}) {
       };
     }
 
-    logger.log('⚠️  No JSON-LD data found, falling back to AI extraction...');
+    if (jsonLdResult && !jsonLdResult.complete) {
+      logger.log('📊 Found partial JSON-LD data, using it for AI extraction...');
+    } else {
+      logger.log('⚠️  No JSON-LD data found, falling back to AI extraction...');
+    }
 
-    const aiResult = await extractWithAI(html, url, openai, testMetadata, logger);
+    const aiResult = await extractWithAI(html, url, openai, testMetadata, logger, jsonLdResult);
     
     return {
       success: true,
@@ -130,6 +134,8 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
 
   logger.log(`📊 Found ${jsonLdMatch.length} JSON-LD scripts, trying structured data extraction...`);
 
+  let allJsonLdData = [];
+  
   for (const scriptTag of jsonLdMatch) {
     try {
       const jsonContent = scriptTag.replace(/<script[^>]*>/, '').replace(/<\/script>/, '').trim();
@@ -144,6 +150,8 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
 
       for (const item of items) {
         if (item['@type'] === 'Product' || item['@type']?.includes?.('Product')) {
+          allJsonLdData.push(item);
+          
           const name = item.name;
 
           let imageUrl = null;
@@ -185,7 +193,8 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
                 salePrice,
                 percentOff,
                 url,
-                confidence: 95
+                confidence: 95,
+                complete: true
               };
             }
           }
@@ -196,10 +205,18 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
     }
   }
 
+  if (allJsonLdData.length > 0) {
+    logger.log(`📊 Found ${allJsonLdData.length} JSON-LD product objects (incomplete data, will use for AI)`);
+    return {
+      rawJsonLd: allJsonLdData,
+      complete: false
+    };
+  }
+
   return null;
 }
 
-async function extractWithAI(html, url, openai, testMetadata, logger) {
+async function extractWithAI(html, url, openai, testMetadata, logger, jsonLdResult = null) {
   let preExtractedImage = null;
   const ogImageMatch = html.match(/<meta[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
     html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["']/i);
@@ -218,29 +235,68 @@ async function extractWithAI(html, url, openai, testMetadata, logger) {
     logger.log(`🖼️  Pre-extracted twitter:image: ${preExtractedImage}`);
   }
 
-  const pricePatterns = [
-    /<[^>]*class="[^"]*price[^"]*"[^>]*>[\s\S]{0,500}<\/[^>]+>/gi,
-    /<[^>]*class="[^"]*product[^"]*"[^>]*>[\s\S]{0,1000}<\/[^>]+>/gi,
-    /<script type="application\/json"[^>]*>[\s\S]{0,5000}<\/script>/gi,
-    /<meta[^>]*property="og:(?:title|image|price)"[^>]*>/gi,
-    /<h1[^>]*>[\s\S]{0,200}<\/h1>/gi
-  ];
+  let contentToSend;
+  let isJsonLd = false;
 
-  let extractedSnippets = [];
-  for (const pattern of pricePatterns) {
-    const matches = html.match(pattern);
-    if (matches) {
-      extractedSnippets.push(...matches);
+  if (jsonLdResult && jsonLdResult.rawJsonLd) {
+    contentToSend = JSON.stringify(jsonLdResult.rawJsonLd, null, 2);
+    isJsonLd = true;
+    logger.log(`📊 Sending JSON-LD to OpenAI (${contentToSend.length} chars) - saving ~${Math.round((1 - contentToSend.length / 50000) * 100)}% tokens`);
+  } else {
+    const pricePatterns = [
+      /<[^>]*class="[^"]*price[^"]*"[^>]*>[\s\S]{0,500}<\/[^>]+>/gi,
+      /<[^>]*class="[^"]*product[^"]*"[^>]*>[\s\S]{0,1000}<\/[^>]+>/gi,
+      /<script type="application\/json"[^>]*>[\s\S]{0,5000}<\/script>/gi,
+      /<meta[^>]*property="og:(?:title|image|price)"[^>]*>/gi,
+      /<h1[^>]*>[\s\S]{0,200}<\/h1>/gi
+    ];
+
+    let extractedSnippets = [];
+    for (const pattern of pricePatterns) {
+      const matches = html.match(pattern);
+      if (matches) {
+        extractedSnippets.push(...matches);
+      }
     }
+
+    contentToSend = extractedSnippets.length > 0
+      ? extractedSnippets.join('\n').substring(0, 50000)
+      : html.substring(0, 50000);
+
+    logger.log(`📝 Extracted ${extractedSnippets.length} relevant HTML sections (${contentToSend.length} chars)`);
   }
 
-  let htmlSnippet = extractedSnippets.length > 0
-    ? extractedSnippets.join('\n').substring(0, 50000)
-    : html.substring(0, 50000);
+  const systemPrompt = isJsonLd 
+    ? `You are a product data parser. You will receive structured JSON-LD product data (schema.org Product format). Extract the product information and return ONLY valid JSON.
 
-  logger.log(`📝 Extracted ${extractedSnippets.length} relevant sections (${htmlSnippet.length} chars)`);
+INSTRUCTIONS FOR JSON-LD PARSING:
+1. Look for Product objects with @type: "Product"
+2. Extract name, image, and offers data
+3. For prices:
+   - offers.price or offers[0].price = salePrice (current price)
+   - offers.highPrice or offers.priceSpecification.price = originalPrice (compare-at price)
+   - If only one price exists, set originalPrice to null
+4. For images:
+   - Use image field (can be string, object with url, or array)
+   - Ensure it's a valid absolute URL
+5. Calculate percentOff if both prices exist and originalPrice > salePrice
 
-  const systemPrompt = `You are a product page parser. Extract product information from HTML and return ONLY valid JSON.
+Return this exact structure:
+{
+  "name": "Product Name",
+  "imageUrl": "https://...",
+  "originalPrice": 999.99,
+  "salePrice": 499.99,
+  "percentOff": 50,
+  "confidence": 90
+}
+
+Rules:
+- confidence: Use 85-95 for JSON-LD data (it's highly reliable)
+- If originalPrice is null or equals salePrice, set percentOff to 0
+- Return ONLY the JSON object, no markdown, no explanations
+- If you can't extract basic product info, return: {"error": "Could not extract product data"}`
+    : `You are a product page parser. Extract product information from HTML and return ONLY valid JSON.
 
 CRITICAL INSTRUCTIONS FOR PRICE EXTRACTION:
 1. Look for TWO distinct prices on the page:
@@ -291,9 +347,18 @@ Rules:
 - Return ONLY the JSON object, no markdown, no explanations
 - If you can't extract basic product info, return: {"error": "Could not extract product data"}`;
 
-  const userPrompt = preExtractedImage
-    ? `${htmlSnippet}\n\nNOTE: The product image URL has been pre-extracted as: ${preExtractedImage} - use this for imageUrl.`
-    : htmlSnippet;
+  let userPrompt = contentToSend;
+  
+  if (isJsonLd) {
+    userPrompt = `Here is the JSON-LD structured product data:\n\n${contentToSend}`;
+    if (preExtractedImage) {
+      userPrompt += `\n\nNOTE: The product image URL has been pre-extracted as: ${preExtractedImage} - use this for imageUrl if the JSON-LD image is missing or invalid.`;
+    }
+  } else {
+    if (preExtractedImage) {
+      userPrompt = `${contentToSend}\n\nNOTE: The product image URL has been pre-extracted as: ${preExtractedImage} - use this for imageUrl.`;
+    }
+  }
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
