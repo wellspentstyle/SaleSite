@@ -59,7 +59,9 @@ The project is configured to run on port 5000 in Replit:
       - Handles @graph containers and nested product arrays
       - Normalizes image URLs (supports string, object, array formats)
       - Validates absolute URLs (http/https only)
-    - **Phase 2 - Smart HTML Extraction**:
+    - **Phase 2 - Smart HTML Extraction + Image Pre-extraction**:
+      - Pre-extracts product images from og:image and twitter:image meta tags (instant, free)
+      - Passes pre-extracted image to AI as context for better accuracy
       - Targets price/product-related sections (50KB max)
       - Falls back to raw HTML when no patterns match
       - Reduces AI processing time and cost
@@ -67,10 +69,12 @@ The project is configured to run on port 5000 in Replit:
       - OpenAI gpt-4o-mini extracts product data when structured data unavailable
       - Returns confidence score (1-100) with each extraction
       - Minimum 50% confidence required to accept results
+      - Fixed prompt to prevent placeholder image URLs (example.com, placeholder.com)
     - **Phase 4 - Comprehensive Validation**:
       - Verifies prices exist in HTML (10 format variants)
       - Supports: $59.99, $1,299.99, 59.99, 1,299.99, 59,99, 5999 cents, $50, etc.
       - Validates percent-off math (tolerance: ±2%)
+      - Rejects placeholder image domains
       - Applies -20 confidence penalty for validation failures
   - **Confidence Score Display**: New Airtable "Confidence" field
     - Saved with each scraped product
@@ -79,6 +83,11 @@ The project is configured to run on port 5000 in Replit:
       - Yellow (60-79%): Medium confidence
       - Red (50-59%): Low confidence (review recommended)
     - Helps identify uncertain extractions requiring manual review
+  - **Image Extraction Improvements**:
+    - Pre-extracts images from meta tags before AI call (fast, reliable)
+    - Strong anti-placeholder instructions in AI prompt
+    - Validation layer rejects common placeholder domains
+    - No performance impact - uses regex extraction (instant)
 
 - **2025-11-05**: Admin System & Product Picks Management
   - **Admin Interface** (`/admin`): Password-protected admin panel for managing product picks
