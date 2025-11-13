@@ -57,7 +57,7 @@ export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryForm
     
     try {
       const password = sessionStorage.getItem('adminToken');
-      const response = await fetch('http://localhost:3001/admin/extract-image', {
+      const response = await fetch('/api/admin/extract-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
