@@ -92,6 +92,7 @@ The project is configured to run on port 5000 in Replit:
     - One-click auto-population of image URLs without full scraping
     - Works even on bot-protected sites (only reads meta tags, no AI needed)
     - Loading states and error messages for UX clarity
+    - Uses Vite proxy (`/api/admin/extract-image`) for proper routing in all environments
     - Note: Only supports absolute URLs (http/https) - relative URLs require manual entry
 
 - **2025-11-13**: Product Scraper Speed & Accuracy Improvements
