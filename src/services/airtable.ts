@@ -65,30 +65,44 @@ interface AirtablePicksResponse {
 
 async function fetchPicksFromAirtable(): Promise<Map<string, SalePick[]>> {
   try {
-    // Only fetch the fields we need to reduce payload size
-    const fields = ['ProductURL', 'ProductName', 'ImageURL', 'OriginalPrice', 'SalePrice', 'PercentOff', 'SaleID', 'ShopMyURL'];
-    const params = new URLSearchParams({
-      fields: fields.join(','),
-      pageSize: '100'
-    });
+    // Fetch ALL picks with pagination
+    const allRecords: AirtablePickRecord[] = [];
+    let offset: string | undefined = undefined;
     
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?${params}`;
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`,
-      },
-    });
+    const fields = ['ProductURL', 'ProductName', 'ImageURL', 'OriginalPrice', 'SalePrice', 'PercentOff', 'SaleID', 'ShopMyURL'];
+    
+    do {
+      const params = new URLSearchParams({
+        fields: fields.join(','),
+        pageSize: '100'
+      });
+      
+      if (offset) {
+        params.set('offset', offset);
+      }
+      
+      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?${params}`;
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(`Airtable API error: ${response.status} ${response.statusText}`);
-    }
+      if (!response.ok) {
+        throw new Error(`Airtable API error: ${response.status} ${response.statusText}`);
+      }
 
-    const data: AirtablePicksResponse = await response.json();
+      const data: AirtablePicksResponse = await response.json();
+      allRecords.push(...data.records);
+      offset = data.offset;
+      
+      console.log(`📦 Fetched ${data.records.length} picks (total: ${allRecords.length})`);
+    } while (offset);
 
     // Group picks by SaleID
     const picksBySale = new Map<string, SalePick[]>();
     
-    data.records.forEach(record => {
+    allRecords.forEach(record => {
       const fields = record.fields;
       const saleIds = fields.SaleID || [];
       

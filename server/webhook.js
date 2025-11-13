@@ -40,6 +40,39 @@ function cleanUrl(url) {
   }
 }
 
+// Helper function to fetch all records from Airtable with automatic pagination
+async function fetchAllAirtableRecords(tableName, params = {}) {
+  const allRecords = [];
+  let offset = null;
+  
+  do {
+    // Build URL with params and offset
+    const urlParams = new URLSearchParams(params);
+    if (offset) {
+      urlParams.set('offset', offset);
+    }
+    
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}?${urlParams}`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Airtable error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    allRecords.push(...data.records);
+    offset = data.offset || null;
+    
+    console.log(`📦 Fetched ${data.records.length} records from ${tableName} (total: ${allRecords.length})`);
+  } while (offset);
+  
+  return allRecords;
+}
+
 // Verify CloudMailin HMAC signature to prevent fake webhook requests
 function verifyCloudMailSignature(requestBody, signature) {
   if (!CLOUDMAIL_SECRET) {
@@ -101,39 +134,20 @@ app.get('/health', (req, res) => {
 // Get live sales with picks (no auth required - for public homepage)
 app.get('/sales', async (req, res) => {
   try {
-    // Build filter to only get Live=YES sales
-    // Fetch all fields (including formula fields like ShopMyURL)
-    const filterFormula = `{Live}='YES'`;
-    const params = new URLSearchParams({
-      filterByFormula: filterFormula,
+    // Fetch ALL live sales with pagination
+    const salesRecords = await fetchAllAirtableRecords(TABLE_NAME, {
+      filterByFormula: `{Live}='YES'`,
       pageSize: '100'
     });
     
-    // Fetch sales (all fields including ShopMyURL)
-    const salesResponse = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`
-      }
+    // Fetch ALL picks with pagination
+    const picksRecords = await fetchAllAirtableRecords(PICKS_TABLE_NAME, {
+      pageSize: '100'
     });
-    
-    if (!salesResponse.ok) {
-      throw new Error(`Airtable error: ${salesResponse.status}`);
-    }
-    
-    const salesData = await salesResponse.json();
-    
-    // Fetch all picks
-    const picksResponse = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}`, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`
-      }
-    });
-    
-    const picksData = picksResponse.ok ? await picksResponse.json() : { records: [] };
     
     // Group picks by SaleID
     const picksBySale = new Map();
-    picksData.records.forEach(record => {
+    picksRecords.forEach(record => {
       const saleIds = record.fields.SaleID || [];
       saleIds.forEach(saleId => {
         if (!picksBySale.has(saleId)) {
@@ -153,7 +167,7 @@ app.get('/sales', async (req, res) => {
     });
     
     // Map sales to frontend format
-    const sales = salesData.records.map(record => {
+    const sales = salesRecords.map(record => {
       // Generate clean ShopMy URL by stripping tracking params
       let saleUrl = '#';
       const rawUrl = record.fields.CleanURL || record.fields.SaleURL;
@@ -201,22 +215,22 @@ app.post('/admin/auth', (req, res) => {
 });
 
 // Get all sales for admin
-app.get('/admin/sales', (req, res) => {
+app.get('/admin/sales', async (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   
-  // Fetch all sales from Airtable, sorted by created time (newest first)
-  fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?sort%5B0%5D%5Bfield%5D=Created&sort%5B0%5D%5Bdirection%5D=desc`, {
-    headers: {
-      'Authorization': `Bearer ${AIRTABLE_PAT}`
-    }
-  })
-  .then(response => response.json())
-  .then(data => {
-    const sales = data.records.map(record => ({
+  try {
+    // Fetch ALL sales from Airtable with pagination, sorted by created time (newest first)
+    const salesRecords = await fetchAllAirtableRecords(TABLE_NAME, {
+      'sort[0][field]': 'Created',
+      'sort[0][direction]': 'desc',
+      pageSize: '100'
+    });
+    
+    const sales = salesRecords.map(record => ({
       id: record.id,
       saleName: record.fields.SaleName || record.fields.Company || 'Unnamed Sale',
       company: record.fields.Company,
@@ -225,12 +239,12 @@ app.get('/admin/sales', (req, res) => {
       endDate: record.fields.EndDate,
       live: record.fields.Live
     }));
+    
     res.json({ success: true, sales });
-  })
-  .catch(error => {
+  } catch (error) {
     console.error('Error fetching sales:', error);
     res.status(500).json({ success: false, message: error.message });
-  });
+  }
 });
 
 // Clean all CleanURL fields in Airtable (remove tracking parameters)
@@ -244,22 +258,15 @@ app.post('/admin/clean-urls', async (req, res) => {
   try {
     console.log('🧹 Starting URL cleanup process...');
     
-    // Fetch all sales
-    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`
-      }
+    // Fetch ALL sales with pagination
+    const salesRecords = await fetchAllAirtableRecords(TABLE_NAME, {
+      pageSize: '100'
     });
     
-    if (!response.ok) {
-      throw new Error(`Failed to fetch sales: ${response.status}`);
-    }
-    
-    const data = await response.json();
     const updates = [];
     
     // Process each sale
-    for (const record of data.records) {
+    for (const record of salesRecords) {
       const saleUrl = record.fields.SaleURL;
       const currentCleanUrl = record.fields.CleanURL;
       
