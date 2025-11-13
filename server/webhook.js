@@ -3,6 +3,7 @@ import cors from 'cors';
 import multer from 'multer';
 import OpenAI from 'openai';
 import { execSync } from 'child_process';
+import { scrapeProduct } from './scrapers/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -264,10 +265,10 @@ app.post('/admin/clean-urls', async (req, res) => {
   }
 });
 
-// Scrape product data from URL using OpenAI
+// Scrape product data from URL using intelligent orchestrator (fast scraper + Playwright fallback)
 app.post('/admin/scrape-product', async (req, res) => {
   const { auth } = req.headers;
-  const { url, test } = req.body;  // Added test mode parameter
+  const { url, test } = req.body;
   
   if (auth !== ADMIN_PASSWORD) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -277,408 +278,40 @@ app.post('/admin/scrape-product', async (req, res) => {
     return res.status(400).json({ success: false, message: 'URL is required' });
   }
   
-  // Test mode metadata (track extraction phases for automated testing)
-  const testMetadata = {
-    phaseUsed: null,
-    priceValidation: {
-      foundInHtml: false,
-      checkedFormats: []
-    },
-    imageExtraction: {
-      source: null,
-      preExtracted: false
-    },
-    confidenceAdjustments: []
-  };
-  
-  // Comprehensive URL validation to prevent SSRF
-  try {
-    const urlObj = new URL(url);
-    
-    // Only allow HTTP(S)
-    if (!['http:', 'https:'].includes(urlObj.protocol)) {
-      return res.status(400).json({ success: false, message: 'Invalid URL protocol' });
-    }
-    
-    // Block private/internal IPs and hostnames
-    const hostname = urlObj.hostname.toLowerCase();
-    
-    // Block common localhost/loopback names
-    const blockedHosts = ['localhost', 'localhost.localdomain', '0.0.0.0'];
-    if (blockedHosts.includes(hostname)) {
-      return res.status(400).json({ success: false, message: 'Private URLs not allowed' });
-    }
-    
-    // Block IPv4 private ranges (10.x, 127.x, 169.254.x, 172.16-31.x, 192.168.x)
-    const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-    const ipMatch = hostname.match(ipv4Pattern);
-    if (ipMatch) {
-      const [, a, b, c, d] = ipMatch.map(Number);
-      if (a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254)) {
-        return res.status(400).json({ success: false, message: 'Private URLs not allowed' });
-      }
-    }
-    
-    // Block IPv6 loopback and link-local (::1, fe80::, etc.)
-    if (hostname.includes(':')) {
-      if (hostname === '::1' || hostname.startsWith('fe80:') || hostname.startsWith('::ffff:127')) {
-        return res.status(400).json({ success: false, message: 'Private URLs not allowed' });
-      }
-    }
-    
-  } catch (e) {
-    return res.status(400).json({ success: false, message: 'Invalid URL format' });
-  }
-  
   try {
     console.log(`🔍 Scraping product: ${url}`);
     
-    // Fetch the product page HTML
-    const response = await fetch(url, { 
-      redirect: 'follow',
-      timeout: 10000
-    });
-    const html = await response.text();
-    console.log(`📄 Fetched HTML: ${html.length} characters`);
-    
-    // ===== PHASE 1: Try JSON-LD Structured Data (Fast & Accurate) =====
-    const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-    
-    if (jsonLdMatch && jsonLdMatch.length > 0) {
-      console.log(`📊 Found ${jsonLdMatch.length} JSON-LD scripts, trying structured data extraction...`);
-      
-      for (const scriptTag of jsonLdMatch) {
-        try {
-          const jsonContent = scriptTag.replace(/<script[^>]*>/, '').replace(/<\/script>/, '').trim();
-          const data = JSON.parse(jsonContent);
-          
-          // Handle @graph containers and regular items
-          let items = [];
-          if (data['@graph']) {
-            items = Array.isArray(data['@graph']) ? data['@graph'] : [data['@graph']];
-          } else {
-            items = Array.isArray(data) ? data : [data];
-          }
-          
-          for (const item of items) {
-            // Look for Product type in Schema.org data
-            if (item['@type'] === 'Product' || item['@type']?.includes?.('Product')) {
-              const name = item.name;
-              
-              // Normalize image URL: handle array, object, or string
-              let imageUrl = null;
-              if (Array.isArray(item.image)) {
-                const first = item.image[0];
-                imageUrl = typeof first === 'string' ? first : first?.url;
-              } else if (typeof item.image === 'object' && item.image !== null) {
-                imageUrl = item.image.url;
-              } else if (typeof item.image === 'string') {
-                imageUrl = item.image;
-              }
-              
-              // Validate image URL starts with http/https
-              if (imageUrl && !imageUrl.startsWith('http')) {
-                imageUrl = null;
-              }
-              
-              // Extract offers data
-              const offers = Array.isArray(item.offers) ? item.offers[0] : item.offers;
-              if (offers) {
-                const salePrice = parseFloat(offers.price);
-                const originalPrice = offers.priceSpecification?.price || offers.highPrice || null;
-                
-                if (name && imageUrl && !isNaN(salePrice)) {
-                  const finalOriginalPrice = originalPrice && !isNaN(parseFloat(originalPrice)) ? parseFloat(originalPrice) : null;
-                  let percentOff = 0;
-                  
-                  if (finalOriginalPrice && finalOriginalPrice > salePrice) {
-                    percentOff = Math.round(((finalOriginalPrice - salePrice) / finalOriginalPrice) * 100);
-                  }
-                  
-                  console.log('✅ Extracted from JSON-LD (confidence: 95):', { name, salePrice, originalPrice: finalOriginalPrice });
-                  
-                  // Track extraction phase
-                  testMetadata.phaseUsed = 'json-ld';
-                  testMetadata.imageExtraction.source = 'json-ld';
-                  
-                  const response = {
-                    success: true,
-                    product: {
-                      name,
-                      imageUrl,
-                      originalPrice: finalOriginalPrice,
-                      salePrice,
-                      percentOff,
-                      url,
-                      confidence: 95
-                    }
-                  };
-                  
-                  if (test) {
-                    response.testMetadata = testMetadata;
-                  }
-                  
-                  return res.json(response);
-                }
-              }
-            }
-          }
-        } catch (parseError) {
-          continue;
-        }
-      }
-    }
-    
-    console.log('⚠️  No JSON-LD data found, falling back to AI extraction...');
-    
-    // ===== PHASE 2: Smart HTML Snippet Extraction + Image Pre-extraction =====
-    // Extract image from meta tags first (fast and reliable)
-    // Note: Some sites use property="og:image", others use name="og:image"
-    let preExtractedImage = null;
-    const ogImageMatch = html.match(/<meta[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["']/i);
-    const twitterImageMatch = html.match(/<meta[^>]*(?:property|name)=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) ||
-                               html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']twitter:image["']/i);
-    
-    if (ogImageMatch && ogImageMatch[1] && ogImageMatch[1].startsWith('http')) {
-      preExtractedImage = ogImageMatch[1];
-      testMetadata.imageExtraction.preExtracted = true;
-      testMetadata.imageExtraction.source = 'og:image';
-      console.log(`🖼️  Pre-extracted og:image: ${preExtractedImage}`);
-    } else if (twitterImageMatch && twitterImageMatch[1] && twitterImageMatch[1].startsWith('http')) {
-      preExtractedImage = twitterImageMatch[1];
-      testMetadata.imageExtraction.preExtracted = true;
-      testMetadata.imageExtraction.source = 'twitter:image';
-      console.log(`🖼️  Pre-extracted twitter:image: ${preExtractedImage}`);
-    }
-    
-    // Extract only relevant sections instead of sending 200KB
-    const pricePatterns = [
-      /<[^>]*class="[^"]*price[^"]*"[^>]*>[\s\S]{0,500}<\/[^>]+>/gi,
-      /<[^>]*class="[^"]*product[^"]*"[^>]*>[\s\S]{0,1000}<\/[^>]+>/gi,
-      /<script type="application\/json"[^>]*>[\s\S]{0,5000}<\/script>/gi,
-      /<meta[^>]*property="og:(?:title|image|price)"[^>]*>/gi,
-      /<h1[^>]*>[\s\S]{0,200}<\/h1>/gi
-    ];
-    
-    let extractedSnippets = [];
-    for (const pattern of pricePatterns) {
-      const matches = html.match(pattern);
-      if (matches) {
-        extractedSnippets.push(...matches);
-      }
-    }
-    
-    // Combine snippets (max 50KB total), fallback to raw HTML if no patterns matched
-    let htmlSnippet = extractedSnippets.length > 0 
-      ? extractedSnippets.join('\n').substring(0, 50000)
-      : html.substring(0, 50000);
-    
-    console.log(`📝 Extracted ${extractedSnippets.length} relevant sections (${htmlSnippet.length} chars)`);
-    
-    // ===== PHASE 3: AI Extraction with Confidence Scoring =====
-    const systemPrompt = `You are a product page parser. Extract product information from HTML and return ONLY valid JSON.
-
-CRITICAL INSTRUCTIONS FOR PRICE EXTRACTION:
-1. Look for TWO distinct prices on the page:
-   - Original/Compare-at/Regular price (usually crossed out or higher price)
-   - Current/Sale price (the active selling price)
-
-2. SHOPIFY-SPECIFIC PATTERNS (check these FIRST):
-   - <compare-at-price> tags containing the regular price
-   - <sale-price> tags containing the sale price  
-   - JSON in <script type="application/json"> with "compare_at_price" and "price" fields (prices in CENTS, divide by 100)
-   - Example: "price":13100,"compare_at_price":43500 means salePrice=$131, originalPrice=$435
-
-3. OTHER HTML PATTERNS:
-   - <s>, <del>, <strike> tags with higher price
-   - Classes: "compare-price", "was-price", "original-price", "line-through"
-   - Text: "Was $X", "Originally $X", "Compare at $X", "Regular price $X"
-   - Meta tags: og:price, product:price
-
-4. If BOTH prices exist, originalPrice MUST be HIGHER than salePrice
-5. If only ONE price exists, set originalPrice to null and percentOff to 0
-
-CRITICAL INSTRUCTIONS FOR IMAGE EXTRACTION:
-- Look for <meta property="og:image"> or <meta name="twitter:image"> tags FIRST
-- Then look for large product images in <img> tags
-- NEVER use placeholder domains like example.com, placeholder.com, cdn.example.com, or similar
-- The imageUrl MUST be a real, working URL from the actual website
-- If you can't find a real image URL, use the first large image you can find
-
-Return this exact structure (do NOT copy these example values, extract REAL data):
-{
-  "name": "ACTUAL_PRODUCT_NAME_FROM_PAGE",
-  "imageUrl": "ACTUAL_IMAGE_URL_FROM_PAGE",
-  "originalPrice": 999.99,
-  "salePrice": 499.99,
-  "percentOff": 50,
-  "confidence": 85
-}
-
-Rules:
-- name: Extract product title/name (required)
-- imageUrl: Find the main product image URL - must be a REAL absolute URL from the website, NOT a placeholder (required)
-- originalPrice: The HIGHER regular/compare-at price. Set to null if only one price exists.
-- salePrice: The CURRENT selling price (required)
-- percentOff: Calculate as Math.round(((originalPrice - salePrice) / originalPrice) * 100). Set to 0 if originalPrice is null.
-- confidence: Rate your confidence 1-100. Use 90-100 for prices clearly visible in structured data, 70-89 for prices in HTML with clear patterns, 50-69 for estimates, below 50 for highly uncertain.
-- For Shopify JSON prices in cents, divide by 100 to get dollar amounts
-- NEVER set originalPrice equal to salePrice
-- Return ONLY the JSON object, no markdown, no explanations
-- If you can't extract basic product info, return: {"error": "Could not extract product data"}`;
-
-    const userPrompt = preExtractedImage 
-      ? `${htmlSnippet}\n\nNOTE: The product image URL has been pre-extracted as: ${preExtractedImage} - use this for imageUrl.`
-      : htmlSnippet;
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: userPrompt
-        }
-      ],
-      temperature: 0.1,
+    const result = await scrapeProduct(url, {
+      openai,
+      enableTestMetadata: test || false,
+      logger: console
     });
     
-    const aiResponse = completion.choices[0].message.content.trim();
-    console.log('🤖 AI Response:', aiResponse);
-    
-    // Parse the AI response
-    let productData;
-    try {
-      const jsonString = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      productData = JSON.parse(jsonString);
-    } catch (parseError) {
-      console.error('❌ Failed to parse AI response:', parseError);
-      return res.status(500).json({ success: false, message: 'Failed to parse product data' });
-    }
-    
-    if (productData.error) {
-      return res.status(400).json({ success: false, message: productData.error });
-    }
-    
-    // Validate required fields
-    if (!productData.name || !productData.imageUrl || productData.salePrice === undefined) {
-      return res.status(400).json({ success: false, message: 'Missing required product fields' });
-    }
-    
-    // Reject placeholder image URLs
-    const placeholderDomains = ['example.com', 'placeholder.com', 'via.placeholder.com', 'placehold.it', 'dummyimage.com'];
-    const imageUrl = productData.imageUrl.toLowerCase();
-    if (placeholderDomains.some(domain => imageUrl.includes(domain))) {
-      console.log(`⚠️  Rejected placeholder image URL: ${productData.imageUrl}`);
-      return res.status(400).json({ success: false, message: 'AI returned placeholder image URL instead of real product image' });
-    }
-    
-    // Parse prices - originalPrice can be null if not on sale, salePrice is always required
-    let originalPrice = productData.originalPrice !== null && productData.originalPrice !== undefined ? parseFloat(productData.originalPrice) : null;
-    const salePrice = parseFloat(productData.salePrice);
-    let percentOff = 0;
-    let confidence = productData.confidence ? parseInt(productData.confidence) : 50;
-    
-    if (isNaN(salePrice) || (originalPrice !== null && isNaN(originalPrice))) {
-      return res.status(400).json({ success: false, message: 'Invalid price data' });
-    }
-    
-    // ===== PHASE 4: Validation =====
-    // Verify originalPrice must be HIGHER than salePrice
-    if (originalPrice !== null && originalPrice <= salePrice) {
-      console.log(`⚠️  Invalid discount: originalPrice (${originalPrice}) <= salePrice (${salePrice}). Setting originalPrice to null.`);
-      originalPrice = null;
-      percentOff = 0;
-      confidence = Math.max(30, confidence - 20); // Reduce confidence
-    }
-    
-    // Recalculate and validate percentOff math
-    if (originalPrice !== null && originalPrice > salePrice) {
-      const calculatedPercentOff = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
-      
-      // Check if AI's calculation matches
-      if (productData.percentOff && Math.abs(calculatedPercentOff - productData.percentOff) > 2) {
-        console.log(`⚠️  Percent off mismatch: AI said ${productData.percentOff}%, calculated ${calculatedPercentOff}%`);
-        confidence = Math.max(40, confidence - 15);
-      }
-      
-      percentOff = calculatedPercentOff;
-    }
-    
-    // Verify prices exist in HTML (prevent hallucination)
-    // Check multiple price formats: $59.99, $1,299.99, 59.99, $50, 50, 5999 (cents), etc.
-    const priceVariants = [
-      `$${salePrice.toFixed(2)}`,  // $59.99
-      salePrice.toFixed(2),         // 59.99
-      `$${salePrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,  // $1,299.99 (with commas)
-      salePrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}),  // 1,299.99
-      `${salePrice.toFixed(2).replace('.', ',')}`,  // 59,99 (European)
-      String(Math.round(salePrice * 100)),  // 5999 (cents)
-      `${Math.floor(salePrice)}.${String(Math.round((salePrice % 1) * 100)).padStart(2, '0')}`,  // Explicit 59.99
-      `$${Math.round(salePrice)}`,  // $50 (whole dollars)
-      `$${Math.round(salePrice).toLocaleString('en-US')}`,  // $1,299 (whole dollars with commas)
-      String(Math.round(salePrice)),  // 50 (whole number)
-    ];
-    
-    // Check which price formats exist in HTML
-    const matchedFormat = priceVariants.find(variant => html.includes(variant));
-    const foundInHtml = matchedFormat !== undefined;
-    
-    testMetadata.priceValidation.foundInHtml = foundInHtml;
-    testMetadata.priceValidation.checkedFormats = priceVariants.map((variant, idx) => ({
-      format: variant,
-      matched: html.includes(variant)
-    }));
-    testMetadata.priceValidation.matchedFormat = matchedFormat || null;
-    
-    if (!foundInHtml) {
-      console.log(`⚠️  Sale price ${salePrice} not found in HTML (checked variants: ${priceVariants.join(', ')}), possible hallucination`);
-      const originalConfidence = confidence;
-      confidence = Math.max(30, confidence - 20);  // Reduced penalty from -30 to -20
-      testMetadata.confidenceAdjustments.push({
-        reason: 'price_not_found_in_html',
-        adjustment: confidence - originalConfidence
-      });
-    }
-    
-    // Reject low confidence results (but allow in test mode for analysis)
-    if (confidence < 50 && !test) {
+    if (!result.success) {
+      const errorMsg = result.error || 'Could not extract product data';
+      console.error('❌ Product scraping failed:', errorMsg);
       return res.status(400).json({ 
         success: false, 
-        message: `Low confidence (${confidence}%) - prices may be inaccurate. Please verify manually.` 
+        message: errorMsg,
+        meta: result.meta
       });
     }
     
-    console.log(`✅ Extracted product (confidence: ${confidence}%):`, { name: productData.name, salePrice, originalPrice, percentOff });
+    console.log(`✅ Extracted product via ${result.meta.extractionMethod} (confidence: ${result.meta.confidence}%)`);
     
-    // Track that AI extraction was used (Phase 3)
-    if (!testMetadata.phaseUsed) {
-      testMetadata.phaseUsed = 'ai-extraction';
-    }
-    
-    const finalResponse = { 
-      success: true, 
-      product: {
-        name: productData.name,
-        imageUrl: productData.imageUrl,
-        originalPrice: originalPrice,
-        salePrice: salePrice,
-        percentOff: percentOff,
-        url: url,
-        confidence: confidence
-      }
+    const response = {
+      success: true,
+      product: result.product,
+      extractionMethod: result.meta.extractionMethod,
+      confidence: result.meta.confidence
     };
     
-    // Include test metadata if in test mode
     if (test) {
-      finalResponse.testMetadata = testMetadata;
+      response.testMetadata = result.meta.testMetadata;
+      response.attempts = result.meta.attempts;
     }
     
-    res.json(finalResponse);
+    res.json(response);
     
   } catch (error) {
     console.error('❌ Product scraping error:', error);
