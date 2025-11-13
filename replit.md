@@ -86,6 +86,13 @@ The project is configured to run on port 5000 in Replit:
     - Hybrid scraper tries both methods, then fails gracefully
     - Failed URLs presented to admin for manual entry
     - No blocking or errors - smooth workflow continues
+  - **Find Image Button**: Quick image extraction for manual entries
+    - New lightweight endpoint `/admin/extract-image` extracts og:image/twitter:image meta tags
+    - "Find Image" button appears next to Image URL field in manual entry forms
+    - One-click auto-population of image URLs without full scraping
+    - Works even on bot-protected sites (only reads meta tags, no AI needed)
+    - Loading states and error messages for UX clarity
+    - Note: Only supports absolute URLs (http/https) - relative URLs require manual entry
 
 - **2025-11-13**: Product Scraper Speed & Accuracy Improvements
   - **Multi-Phase Extraction Pipeline**: Completely rewrote scraper for 3-5x speed improvement
