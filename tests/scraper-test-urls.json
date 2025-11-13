@@ -4,50 +4,48 @@
       "category": "Shopbop",
       "urls": [
         {
-          "url": "https://www.shopbop.com/active-knit-winslow-pant-tibi/vp/v=1/1524556513.htm",
-          "expectedName": "Winslow",
+          "url": "https://www.shopbop.com/cloudrunner-on/vp/v=1/1536674220.htm",
+          "expectedName": "Cloudrunner",
           "expectedImageHost": "media-amazon.com",
-          "minConfidence": 50,
-          "notes": "Tibi pants - test name='og:image' format"
-        }
-      ]
-    },
-    {
-      "category": "Shopify",
-      "urls": [
+          "minConfidence": 70,
+          "notes": "On Running sneakers - tests name='og:image' meta tag format"
+        },
         {
-          "url": "",
-          "expectedName": "",
-          "expectedImageHost": "",
-          "minConfidence": 50,
-          "notes": "Add Shopify store URLs here - test JSON price extraction"
-        }
-      ]
-    },
-    {
-      "category": "Department Stores",
-      "urls": [
+          "url": "https://www.shopbop.com/parker-long-loose-vintage-short/vp/v=1/1574573996.htm",
+          "expectedName": "Parker",
+          "expectedImageHost": "media-amazon.com",
+          "minConfidence": 70,
+          "notes": "AGOLDE shorts - tests Shopbop sale pricing with EXTRA10 code"
+        },
         {
-          "url": "",
-          "expectedName": "",
-          "expectedImageHost": "",
-          "minConfidence": 50,
-          "notes": "Add Nordstrom, Saks, Neiman Marcus, etc. URLs here"
-        }
-      ]
-    },
-    {
-      "category": "Independent Brands",
-      "urls": [
+          "url": "https://www.shopbop.com/colt-shirt-jenni-kayne/vp/v=1/1526162200.htm",
+          "expectedName": "Colt",
+          "expectedImageHost": "media-amazon.com",
+          "minConfidence": 70,
+          "notes": "Jenni Kayne shirt - tests high-end designer on Shopbop"
+        },
         {
-          "url": "",
-          "expectedName": "",
-          "expectedImageHost": "",
-          "minConfidence": 50,
-          "notes": "Add independent designer brand URLs here"
+          "url": "https://www.shopbop.com/emmy-vgn-leather-button-flared/vp/v=1/1597283808.htm",
+          "expectedName": "Emmy",
+          "expectedImageHost": "media-amazon.com",
+          "minConfidence": 70,
+          "notes": "alice + olivia dress - tests faux leather product descriptions"
+        },
+        {
+          "url": "https://www.shopbop.com/shrunken-snap-cardigan-vince/vp/v=1/1563468824.htm",
+          "expectedName": "Cardigan",
+          "expectedImageHost": "media-amazon.com",
+          "minConfidence": 70,
+          "notes": "Vince cardigan - tests knitwear category"
         }
       ]
     }
   ],
-  "instructions": "For each URL, fill in: 1) url (full product URL), 2) expectedName (substring that should appear in product name), 3) expectedImageHost (domain that should be in image URL), 4) minConfidence (typically 50-95), 5) notes (optional description)"
+  "instructions": "Test catalog with 5 working product URLs from Shopbop. Run 'npm run test:scraper' to test all URLs.",
+  "incompatibleSites": {
+    "Nordstrom": "Client-side rendered (React/SPA) - returns skeleton HTML without product data",
+    "TheOutnet": "Blocks automated requests with ETIMEDOUT errors",
+    "Saks": "Not tested - likely has similar bot protection",
+    "NeimanMarcus": "Not tested - likely has similar bot protection"
+  }
 }

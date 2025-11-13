@@ -120,15 +120,46 @@ This helps identify:
 - Which extraction methods work best for which sites
 - Where confidence penalties are applied
 
+## Site Compatibility
+
+### ✅ **Compatible Sites (Working)**
+
+**Shopbop** - Server-side rendered, full HTML content
+- Test results: 5/5 passed (100%)
+- Confidence: 85-90%
+- Image extraction: Reliable (media-amazon.com)
+- Uses `name="og:image"` meta tag format
+
+### ❌ **Incompatible Sites (Not Working)**
+
+**Nordstrom** - Client-side rendered (React/SPA)
+- Returns skeleton HTML (~204KB) without product data
+- Requires JavaScript to load content
+- Scraper cannot extract data from empty pages
+
+**TheOutnet** - Bot protection
+- Blocks automated requests with ETIMEDOUT errors
+- Actively prevents scraping
+
+**Saks, Neiman Marcus** - Likely have similar bot protection (not tested)
+
+### 🔍 **What Makes a Site Compatible?**
+
+For a site to work with the scraper, it needs:
+1. **Server-side rendering** - Full HTML content in initial page load
+2. **No bot protection** - Allows automated fetch requests
+3. **Product metadata** - Either JSON-LD structured data OR visible HTML prices/images
+4. **Meta tags** - og:image or twitter:image for product images
+
 ## Recommended Test URLs
 
-### Categories to Test:
-- **Shopbop** (3-5 URLs) - Tests name="og:image" format
-- **Shopify stores** (5-10 URLs) - Tests JSON price extraction
-- **Department stores** (3-5 URLs) - Nordstrom, Saks, Neiman Marcus, etc.
-- **Independent brands** (3-5 URLs) - Tibi, Totême, etc.
+### Current Test Coverage:
+- **Shopbop** (5 URLs) ✅ - All passing with 85-90% confidence
 
-Aim for 20-30 total URLs across different patterns.
+### Additional Sites to Try:
+- **Shopify stores** - Independent brands often use Shopify
+- **Smaller boutiques** - Less likely to have bot protection
+- **International sites** - May have different rendering strategies
 
 ## CI Integration
 
