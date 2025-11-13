@@ -265,6 +265,70 @@ app.post('/admin/clean-urls', async (req, res) => {
   }
 });
 
+// Extract just the og:image from a URL (lightweight, no AI)
+app.post('/admin/extract-image', async (req, res) => {
+  const { auth } = req.headers;
+  const { url } = req.body;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  if (!url) {
+    return res.status(400).json({ success: false, message: 'URL is required' });
+  }
+  
+  try {
+    console.log(`🖼️  Extracting image from: ${url}`);
+    
+    // Fetch the page
+    const response = await fetch(url, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; WellSpentStyle/1.0)'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch page: ${response.status}`);
+    }
+    
+    const html = await response.text();
+    
+    // Extract og:image or twitter:image using same logic as fast-scraper
+    const ogImageMatch = html.match(/<meta[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["']/i);
+    const twitterImageMatch = html.match(/<meta[^>]*(?:property|name)=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']twitter:image["']/i);
+    
+    let imageUrl = null;
+    
+    if (ogImageMatch && ogImageMatch[1] && ogImageMatch[1].startsWith('http')) {
+      imageUrl = ogImageMatch[1];
+      console.log(`✅ Found og:image: ${imageUrl}`);
+    } else if (twitterImageMatch && twitterImageMatch[1] && twitterImageMatch[1].startsWith('http')) {
+      imageUrl = twitterImageMatch[1];
+      console.log(`✅ Found twitter:image: ${imageUrl}`);
+    }
+    
+    if (!imageUrl) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No og:image or twitter:image found on page' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      imageUrl 
+    });
+    
+  } catch (error) {
+    console.error('❌ Image extraction error:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Scrape product data from URL(s) using intelligent orchestrator (fast scraper + Playwright fallback)
 app.post('/admin/scrape-product', async (req, res) => {
   const { auth } = req.headers;

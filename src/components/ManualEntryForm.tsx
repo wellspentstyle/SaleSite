@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { X } from 'lucide-react';
+import { X, Image as ImageIcon } from 'lucide-react';
 
 interface ManualEntryFormProps {
   url: string;
@@ -24,6 +24,8 @@ export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryForm
   const [originalPrice, setOriginalPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [percentOff, setPercentOff] = useState(0);
+  const [loadingImage, setLoadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   useEffect(() => {
     const orig = parseFloat(originalPrice) || 0;
@@ -48,6 +50,37 @@ export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryForm
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, name, imageUrl, originalPrice, salePrice, percentOff]);
+
+  const handleFindImage = async () => {
+    setLoadingImage(true);
+    setImageError(null);
+    
+    try {
+      const password = sessionStorage.getItem('adminToken');
+      const response = await fetch('http://localhost:3001/admin/extract-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'auth': password || ''
+        },
+        body: JSON.stringify({ url })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.imageUrl) {
+        setImageUrl(data.imageUrl);
+        setImageError(null);
+      } else {
+        setImageError(data.message || 'Could not find image');
+      }
+    } catch (error) {
+      setImageError('Failed to extract image');
+      console.error('Image extraction error:', error);
+    } finally {
+      setLoadingImage(false);
+    }
+  };
 
   return (
     <div className="border border-border bg-white p-6 mb-4 relative">
@@ -94,15 +127,32 @@ export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryForm
             >
               Image URL
             </Label>
-            <Input
-              id={`image-${url}`}
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-              className="h-10 font-mono text-sm"
-              required
-            />
+            <div className="flex gap-2">
+              <Input
+                id={`image-${url}`}
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://..."
+                className="h-10 font-mono text-sm flex-1"
+                required
+              />
+              <button
+                type="button"
+                onClick={handleFindImage}
+                disabled={loadingImage}
+                className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px' }}
+              >
+                <ImageIcon className="h-4 w-4" />
+                {loadingImage ? 'Finding...' : 'Find Image'}
+              </button>
+            </div>
+            {imageError && (
+              <p className="text-xs text-red-600 mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                {imageError}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
