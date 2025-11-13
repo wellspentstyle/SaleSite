@@ -140,10 +140,35 @@ app.get('/sales', async (req, res) => {
       pageSize: '100'
     });
     
-    // Fetch ALL picks with pagination
-    const picksRecords = await fetchAllAirtableRecords(PICKS_TABLE_NAME, {
-      pageSize: '100'
-    });
+    // Extract sale IDs to filter picks efficiently
+    const liveSaleIds = salesRecords.map(record => record.id);
+    
+    console.log(`📊 Found ${liveSaleIds.length} live sales, fetching only their picks...`);
+    
+    // Build filter formula to only fetch picks for live sales
+    // For linked record fields, use direct equality: {SaleID} = "rec123"
+    // Example: OR({SaleID} = "rec123", {SaleID} = "rec456", {SaleID} = "rec789")
+    let picksRecords = [];
+    
+    if (liveSaleIds.length > 0) {
+      const filterConditions = liveSaleIds.map(saleId => 
+        `{SaleID} = "${saleId}"`
+      ).join(', ');
+      
+      const picksFilter = liveSaleIds.length === 1 
+        ? filterConditions  // No OR needed for single sale
+        : `OR(${filterConditions})`;
+      
+      console.log(`🔍 Picks filter formula: ${picksFilter}`);
+      
+      // Fetch ONLY picks linked to live sales with pagination
+      picksRecords = await fetchAllAirtableRecords(PICKS_TABLE_NAME, {
+        filterByFormula: picksFilter,
+        pageSize: '100'
+      });
+    } else {
+      console.log('⚠️  No live sales found, skipping picks fetch');
+    }
     
     // Group picks by SaleID
     const picksBySale = new Map();
