@@ -67,11 +67,9 @@ export function SaleCard({ sale, onViewPicks }: SaleCardProps) {
         )}
 
         {/* Dates */}
-        {(sale.startDate || sale.endDate) && (
+        {(sale.startDate && sale.endDate) && (
           <div className="text-sm text-muted-foreground" style={{ fontFamily: 'Crimson Pro, serif' }}>
-            {sale.startDate && formatDate(sale.startDate)}
-            {sale.startDate && ' – '}
-            {sale.endDate ? formatDate(sale.endDate) : '???'}
+            {formatDate(sale.startDate)} – {formatDate(sale.endDate)}
           </div>
         )}
       </div>
