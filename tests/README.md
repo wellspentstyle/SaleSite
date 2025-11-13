@@ -129,19 +129,60 @@ This helps identify:
 - Confidence: 85-90%
 - Image extraction: Reliable (media-amazon.com)
 - Uses `name="og:image"` meta tag format
+- **Architecture**: Server-side rendered
+- **Why it works**: Full product data in initial HTML
+
+**Traditional Shopify Stores** - Server-side rendered with Liquid templates
+- **Not yet tested** - Need to find examples
+- **Expected to work**: Uses Liquid templates, product data in HTML
+- **What to look for**: Standard Shopify product pages without Hydrogen/Oxygen
 
 ### ❌ **Incompatible Sites (Not Working)**
 
 **Nordstrom** - Client-side rendered (React/SPA)
-- Returns skeleton HTML (~204KB) without product data
-- Requires JavaScript to load content
-- Scraper cannot extract data from empty pages
+- Test results: Returns skeleton HTML (~204KB) without product data
+- **Architecture**: React single-page application
+- **Why it fails**: Requires JavaScript to load content
+- **Solution**: Needs Playwright/headless browser
+
+**Shopify Hydrogen Stores** (e.g., Hiut Denim)
+- Test results: 0/3 passed (0%)
+- **Architecture**: Shopify Hydrogen/Oxygen (React-based framework)
+- **Why it fails**: Returns skeleton HTML with `window.__remixManifest` and JavaScript imports
+- **Example**: hiutdenim.co.uk - Uses React for rendering
+- **Solution**: Needs Playwright/headless browser
+- **Note**: This is Shopify's modern React framework, different from traditional Shopify
+
+**Tentree** - Likely client-side rendered
+- Test results: 0/3 passed (partial extraction, low confidence)
+- **What worked**: Extracted product names and images
+- **What failed**: Products not on sale (salePrice: $0)
+- **Architecture**: Likely client-side rendered
+- **Solution**: May need Playwright, or products need to be on sale to test properly
 
 **TheOutnet** - Bot protection
 - Blocks automated requests with ETIMEDOUT errors
 - Actively prevents scraping
+- **Solution**: May need Playwright with stealth mode
 
-**Saks, Neiman Marcus** - Likely have similar bot protection (not tested)
+**Saks, Neiman Marcus** - Likely have similar issues (not tested)
+
+### ⚠️ **Shopify: Two Architectures**
+
+**Important:** "Shopify" is not a single platform architecture. There are two types:
+
+1. **Traditional Shopify** (Liquid templates)
+   - Server-side rendered
+   - Full product data in HTML
+   - **Expected to work with scraper** ✅
+   - How to identify: Standard Shopify product page structure
+
+2. **Shopify Hydrogen/Oxygen** (React framework)
+   - Client-side rendered
+   - Returns skeleton HTML only
+   - **Won't work with scraper** ❌
+   - How to identify: Look for `window.__remixManifest` in page source
+   - Example sites: Hiut Denim
 
 ### 🔍 **What Makes a Site Compatible?**
 
@@ -151,14 +192,22 @@ For a site to work with the scraper, it needs:
 3. **Product metadata** - Either JSON-LD structured data OR visible HTML prices/images
 4. **Meta tags** - og:image or twitter:image for product images
 
+**Sites that need Playwright:**
+- Client-side rendered (React, Next.js, Hydrogen)
+- Heavy JavaScript-based rendering
+- Bot protection that blocks fetch requests
+
 ## Recommended Test URLs
 
 ### Current Test Coverage:
 - **Shopbop** (5 URLs) ✅ - All passing with 85-90% confidence
+- **Shopify Hydrogen** (3 Hiut Denim URLs) ❌ - 0% success (client-side rendered)
+- **Shopify** (3 Tentree URLs) ⚠️ - Low confidence, products not on sale
 
-### Additional Sites to Try:
-- **Shopify stores** - Independent brands often use Shopify
+### Additional Sites to Test:
+- **Traditional Shopify stores** - Need to find server-side rendered Shopify stores
 - **Smaller boutiques** - Less likely to have bot protection
+- **Independent brands** - Often use traditional e-commerce platforms
 - **International sites** - May have different rendering strategies
 
 ## CI Integration
