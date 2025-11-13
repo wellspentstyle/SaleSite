@@ -85,7 +85,9 @@ The project is configured to run on port 5000 in Replit:
     - Helps identify uncertain extractions requiring manual review
   - **Image Extraction Improvements**:
     - Pre-extracts images from meta tags before AI call (fast, reliable)
-    - Strong anti-placeholder instructions in AI prompt
+    - Supports both `property="og:image"` and `name="og:image"` formats (handles Shopbop, Amazon, etc.)
+    - Checks for both attribute orders: property-then-content and content-then-property
+    - Strong anti-placeholder instructions in AI prompt (uses non-copyable example values)
     - Validation layer rejects common placeholder domains
     - No performance impact - uses regex extraction (instant)
 
