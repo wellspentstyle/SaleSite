@@ -39,9 +39,61 @@
           "notes": "Vince cardigan - tests knitwear category"
         }
       ]
+    },
+    {
+      "category": "Shopify (Hiut Denim)",
+      "urls": [
+        {
+          "url": "https://hiutdenim.co.uk/products/red-dot-balance-the-hack-slim-fit-super-zero-double-black-selvedge",
+          "expectedName": "Hack",
+          "expectedImageHost": "cdn.shopify.com",
+          "minConfidence": 80,
+          "notes": "Hiut Denim slim fit jeans - tests Shopify JSON-LD structured data"
+        },
+        {
+          "url": "https://hiutdenim.co.uk/products/the-work-regular-fit-super-zero-double-black-selvedge",
+          "expectedName": "Work",
+          "expectedImageHost": "cdn.shopify.com",
+          "minConfidence": 80,
+          "notes": "Hiut Denim regular fit - tests Shopify product schema"
+        },
+        {
+          "url": "https://hiutdenim.co.uk/products/lavenham-x-hiut-unisex-straight-leg-ecru",
+          "expectedName": "Lavenham",
+          "expectedImageHost": "cdn.shopify.com",
+          "minConfidence": 80,
+          "notes": "Hiut collaboration jeans - tests multi-brand product naming"
+        }
+      ]
+    },
+    {
+      "category": "Shopify (Tentree)",
+      "urls": [
+        {
+          "url": "https://www.tentree.com/products/harwood-puffer-meteorite-black-agave-green-forest-pine",
+          "expectedName": "Harwood",
+          "expectedImageHost": "cdn.shopify.com",
+          "minConfidence": 80,
+          "notes": "Tentree puffer jacket - tests multi-color variant naming"
+        },
+        {
+          "url": "https://www.tentree.com/products/pinnacle-sweater-smokey-violet-heather",
+          "expectedName": "Pinnacle",
+          "expectedImageHost": "cdn.shopify.com",
+          "minConfidence": 80,
+          "notes": "Tentree sweater - tests Shopify price extraction"
+        },
+        {
+          "url": "https://www.tentree.com/products/lookout-long-puffer-birchwood",
+          "expectedName": "Lookout",
+          "expectedImageHost": "cdn.shopify.com",
+          "minConfidence": 80,
+          "notes": "Tentree outerwear - tests higher price point items on Shopify"
+        }
+      ]
     }
   ],
-  "instructions": "Test catalog with 5 working product URLs from Shopbop. Run 'npm run test:scraper' to test all URLs.",
+  "instructions": "Test catalog with 11 product URLs: 5 Shopbop + 6 Shopify stores (3 Hiut Denim, 3 Tentree). Run 'npm run test:scraper' to test all URLs.",
   "incompatibleSites": {
     "Nordstrom": "Client-side rendered (React/SPA) - returns skeleton HTML without product data",
     "TheOutnet": "Blocks automated requests with ETIMEDOUT errors",
