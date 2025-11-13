@@ -28,6 +28,37 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 // CloudMailin webhook secret for HMAC verification
 const CLOUDMAIL_SECRET = process.env.CLOUDMAIL_SECRET;
 
+// Simple in-memory cache for sales data
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const cache = {
+  sales: {
+    data: null,
+    expiresAt: 0
+  }
+};
+
+// Helper functions for cache management
+function getCachedSales() {
+  if (cache.sales.data && Date.now() < cache.sales.expiresAt) {
+    console.log('✨ Cache HIT - returning cached sales data');
+    return cache.sales.data;
+  }
+  console.log('💾 Cache MISS - fetching fresh data from Airtable');
+  return null;
+}
+
+function setCachedSales(data) {
+  cache.sales.data = data;
+  cache.sales.expiresAt = Date.now() + CACHE_TTL_MS;
+  console.log(`📦 Cached ${data.length} sales (expires in ${CACHE_TTL_MS / 1000}s)`);
+}
+
+function clearSalesCache() {
+  cache.sales.data = null;
+  cache.sales.expiresAt = 0;
+  console.log('🗑️  Sales cache cleared');
+}
+
 // Helper function to clean URLs (remove all tracking parameters)
 function cleanUrl(url) {
   if (!url) return url;
@@ -134,6 +165,12 @@ app.get('/health', (req, res) => {
 // Get live sales with picks (no auth required - for public homepage)
 app.get('/sales', async (req, res) => {
   try {
+    // Check cache first
+    const cachedSales = getCachedSales();
+    if (cachedSales) {
+      return res.json({ success: true, sales: cachedSales });
+    }
+    
     // Fetch ALL live sales with pagination
     const salesRecords = await fetchAllAirtableRecords(TABLE_NAME, {
       filterByFormula: `{Live}='YES'`,
@@ -216,6 +253,9 @@ app.get('/sales', async (req, res) => {
         picks: picksBySale.get(record.id) || []
       };
     });
+    
+    // Cache the sales data before returning
+    setCachedSales(sales);
     
     res.json({ success: true, sales });
   } catch (error) {
@@ -327,6 +367,12 @@ app.post('/admin/clean-urls', async (req, res) => {
     }
     
     console.log(`🎉 Cleanup complete! Updated ${updates.length} records.`);
+    
+    // Clear sales cache if any URLs were updated
+    if (updates.length > 0) {
+      clearSalesCache();
+    }
+    
     res.json({ 
       success: true, 
       message: `Cleaned ${updates.length} URLs`,
@@ -565,6 +611,9 @@ app.post('/admin/picks', async (req, res) => {
     }
     
     console.log(`✅ Total saved: ${allRecordIds.length} picks`);
+    
+    // Clear sales cache since picks changed
+    clearSalesCache();
     
     res.json({ 
       success: true, 

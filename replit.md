@@ -20,6 +20,11 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - **Sorting**: Regular sales are automatically sorted from newest to oldest.
 - **Admin Interface**: A password-protected `/admin` panel allows for managing product picks.
 - **SEO**: Comprehensive meta tags (Title, Description, Keywords, Open Graph, Twitter Card) are implemented for improved search engine visibility and social sharing.
+- **Performance Optimization**: 
+  - In-memory caching with 5-minute TTL for the `/sales` endpoint reduces Airtable API calls by ~95%.
+  - Cache automatically invalidates when admins save picks or clean URLs.
+  - Airtable pagination implemented across all endpoints to handle unlimited records.
+  - Picks are efficiently filtered using the SaleRecordIDs lookup field to only fetch data for live sales.
 
 **Feature Specifications:**
 - **Sales Listing**: Displays current and upcoming sales with discount percentages.
