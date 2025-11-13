@@ -197,6 +197,72 @@ For a site to work with the scraper, it needs:
 - Heavy JavaScript-based rendering
 - Bot protection that blocks fetch requests
 
+## Playwright Integration (Hybrid Scraper)
+
+### ✅ **WORKING** (as of 2024-11-13)
+
+The scraper now includes a hybrid orchestrator with automatic Playwright fallback:
+
+**Architecture:**
+1. **Fast Scraper** (default) - JSON-LD → AI extraction (2-3 seconds)
+2. **Playwright Fallback** (automatic) - Browser automation (10-15 seconds)
+
+**Fallback Triggers:**
+- Fast scraper fails
+- Missing required fields (name, salePrice, imageUrl)
+- Confidence score < 60%
+
+**System Setup:**
+- ✅ Playwright successfully launches with NixOS system Chromium
+- ✅ System dependencies installed (mesa, nss, xorg.libX11, cairo, etc.)
+- ✅ Browser automation functional
+- ✅ Pages load and DOM extraction works
+
+### Test Results (2024-11-13)
+
+**Shopbop** (Server-side rendered)
+- Fast scraper: ❌ Failed (AI couldn't extract from heavy HTML)
+- Playwright: ⚠️  Timeout (page too heavy, waits for networkidle)
+- **Recommendation**: Use fast scraper with optimized extraction
+
+**Nordstrom** (Client-side React SPA)
+- Fast scraper: ❌ Skeleton HTML only
+- Playwright: ❌ **Bot detection** - Returns "We've noticed some unusual activity" challenge page
+- **Recommendation**: Not suitable for automated scraping (bot protection active)
+
+**Hiut Denim** (Shopify Hydrogen)
+- Fast scraper: ❌ Minimal HTML (73 characters)
+- Playwright: ❌ **Bot protection** - Returns "Oops" error page (likely geo-blocking or bot detection)
+- **Recommendation**: Not suitable for automated scraping
+
+### Known Limitations
+
+1. **Bot Detection** - Major e-commerce sites (Nordstrom, high-value retailers) use sophisticated bot detection
+   - Cloudflare, PerimeterX, DataDome, etc.
+   - Detect automated browsers even with Playwright
+   - Show challenge pages or block access
+
+2. **Heavy Pages** - Sites with extensive JavaScript may timeout waiting for networkidle (30s limit)
+
+3. **Geo-Blocking** - Some sites block based on server location
+
+### Recommended Use Cases
+
+**When Playwright Helps:**
+- Smaller independent brands without bot protection
+- Boutique stores with client-side rendering
+- Sites that don't invest in anti-scraping measures
+
+**When Playwright Won't Help:**
+- Major department stores (Nordstrom, Saks, Bloomingdale's)
+- High-value retailers with aggressive protection
+- Sites using enterprise bot detection services
+
+**Best Approach:**
+1. Try fast scraper first (2-3s, works for most server-side rendered sites)
+2. Auto-fallback to Playwright if fast scraper fails
+3. Handle bot detection gracefully (return error to user)
+
 ## Recommended Test URLs
 
 ### Current Test Coverage:

@@ -1,4 +1,26 @@
+import { execSync } from 'child_process';
+
 let playwrightModule = null;
+let systemChromiumPath = null;
+
+function findSystemChromium(logger = console) {
+  if (systemChromiumPath) return systemChromiumPath;
+  
+  try {
+    const result = execSync('which chromium', {
+      encoding: 'utf8',
+      timeout: 2000
+    }).trim();
+    
+    if (result) {
+      systemChromiumPath = result;
+      return systemChromiumPath;
+    }
+  } catch (e) {
+  }
+  
+  return null;
+}
 
 async function loadPlaywright() {
   if (!playwrightModule) {
@@ -16,12 +38,27 @@ export async function scrapeWithPlaywright(url, options = {}) {
   try {
     logger.log('[Playwright] Launching browser for:', url);
     
-    const { chromium } = await loadPlaywright();
+    process.env.PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = 'true';
     
-    browser = await chromium.launch({
+    const { chromium } = await loadPlaywright();
+    const chromiumPath = findSystemChromium(logger);
+    
+    const launchOptions = {
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
+    };
+    
+    if (chromiumPath) {
+      logger.log('[Playwright] Using system Chromium:', chromiumPath);
+      launchOptions.executablePath = chromiumPath;
+    }
+    
+    browser = await chromium.launch(launchOptions);
     
     context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -31,12 +68,17 @@ export async function scrapeWithPlaywright(url, options = {}) {
     
     logger.log('[Playwright] Navigating to page...');
     await page.goto(url, { 
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: 30000
     });
     
-    logger.log('[Playwright] Waiting for content to load...');
-    await page.waitForTimeout(2000);
+    logger.log('[Playwright] Waiting for content to render...');
+    try {
+      await page.waitForSelector('body', { timeout: 5000 });
+      await page.waitForTimeout(3000);
+    } catch (e) {
+      logger.warn('[Playwright] Body selector timeout, continuing anyway');
+    }
     
     logger.log('[Playwright] Extracting product data...');
     const productData = await page.evaluate(() => {
