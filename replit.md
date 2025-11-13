@@ -57,6 +57,36 @@ The project is configured to run on port 5000 in Replit:
 - Misc: next-themes, recharts, sonner, vaul
 
 ## Recent Changes
+- **2025-11-13**: Manual Fallback UI for Failed Scrapes
+  - **Hybrid Scraper with Playwright**: Automatic fallback from fast scraper to Playwright browser automation
+    - Fast scraper tries JSON-LD → AI extraction first (2-3 seconds)
+    - Playwright fallback for client-side rendered sites (10-15 seconds)
+    - Returns `{ successes: [], failures: [] }` instead of failing entirely
+    - Both extraction methods tracked with metadata
+  - **Manual Entry Forms**: New UI for products that fail automated scraping
+    - Admin sees manual entry forms at top of Finalize Picks page
+    - Each failed URL gets its own form with fields:
+      - Product Name (text input)
+      - Image URL (URL input)
+      - Original Price (number, $)
+      - Sale Price (number, $)
+      - Percent Off (auto-calculated)
+    - Forms can be removed if URL is not needed
+    - Manual entries merged with auto-scraped products before saving
+  - **EntryType Field**: New Airtable "EntryType" field tracks data source
+    - `automatic` - Successfully scraped by AI/scraper
+    - `manual` - Manually entered by admin
+    - Manual entries always get Confidence = 100
+  - **Bulk URL Processing**: Updated scraper endpoint accepts arrays
+    - Single request processes all URLs in parallel
+    - Returns detailed successes/failures lists
+    - Each result includes extraction method and confidence
+  - **Bot Protection Handling**: Graceful degradation for protected sites
+    - Major retailers (Nordstrom, Saks) have bot detection
+    - Hybrid scraper tries both methods, then fails gracefully
+    - Failed URLs presented to admin for manual entry
+    - No blocking or errors - smooth workflow continues
+
 - **2025-11-13**: Product Scraper Speed & Accuracy Improvements
   - **Multi-Phase Extraction Pipeline**: Completely rewrote scraper for 3-5x speed improvement
     - **Phase 1 - JSON-LD Structured Data** (instant, 95% confidence):
