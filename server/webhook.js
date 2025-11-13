@@ -4,6 +4,7 @@ import multer from 'multer';
 import OpenAI from 'openai';
 import { execSync } from 'child_process';
 import { scrapeProduct } from './scrapers/index.js';
+import crypto from 'crypto';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,6 +25,9 @@ const PICKS_TABLE_NAME = 'Picks';
 // Admin password
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
+// CloudMailin webhook secret for HMAC verification
+const CLOUDMAIL_SECRET = process.env.CLOUDMAIL_SECRET;
+
 // Helper function to clean URLs (remove all tracking parameters)
 function cleanUrl(url) {
   if (!url) return url;
@@ -33,6 +37,44 @@ function cleanUrl(url) {
     return `${urlObj.origin}${urlObj.pathname}`;
   } catch (e) {
     return url;
+  }
+}
+
+// Verify CloudMailin HMAC signature to prevent fake webhook requests
+function verifyCloudMailSignature(requestBody, signature) {
+  if (!CLOUDMAIL_SECRET) {
+    console.warn('⚠️  CLOUDMAIL_SECRET not configured - skipping signature verification');
+    return true; // Allow during setup, but log warning
+  }
+  
+  if (!signature) {
+    console.error('❌ No signature provided in request');
+    return false;
+  }
+  
+  try {
+    // CloudMailin sends the request body as JSON
+    const payload = typeof requestBody === 'string' ? requestBody : JSON.stringify(requestBody);
+    
+    // Compute HMAC-SHA256 signature
+    const hmac = crypto.createHmac('sha256', CLOUDMAIL_SECRET);
+    hmac.update(payload);
+    const computedSignature = hmac.digest('hex');
+    
+    // Compare signatures (timing-safe comparison)
+    const isValid = crypto.timingSafeEqual(
+      Buffer.from(signature, 'hex'),
+      Buffer.from(computedSignature, 'hex')
+    );
+    
+    if (!isValid) {
+      console.error('❌ Invalid signature - possible fake webhook request');
+    }
+    
+    return isValid;
+  } catch (error) {
+    console.error('❌ Signature verification error:', error.message);
+    return false;
   }
 }
 
@@ -507,6 +549,36 @@ app.post('/admin/picks', async (req, res) => {
 // CloudMailin/AgentMail webhook endpoint - handle both JSON and multipart
 app.post('/webhook/agentmail', upload.none(), async (req, res) => {
   console.log('📧 Received email webhook');
+  
+  // SECURITY: Verify webhook authenticity
+  // CloudMailin recommends Basic Authentication over HTTPS
+  if (CLOUDMAIL_SECRET) {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Basic ')) {
+      console.error('❌ Unauthorized webhook request - missing Basic Auth');
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    
+    // Decode Basic Auth credentials
+    const base64Credentials = authHeader.split(' ')[1];
+    const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
+    // Split only on first colon to support passwords containing colons
+    const colonIndex = credentials.indexOf(':');
+    const username = credentials.substring(0, colonIndex);
+    const password = credentials.substring(colonIndex + 1);
+    
+    // Verify password matches CLOUDMAIL_SECRET
+    // (CloudMailin sends the secret as the password)
+    if (password !== CLOUDMAIL_SECRET) {
+      console.error('❌ Unauthorized webhook request - invalid credentials');
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    
+    console.log('✅ Webhook authenticated successfully');
+  } else {
+    console.warn('⚠️  CLOUDMAIL_SECRET not configured - webhook is UNPROTECTED!');
+  }
   
   try {
     // CloudMailin can send data as JSON or form-data
