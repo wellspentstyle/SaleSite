@@ -802,34 +802,40 @@ Rules:
     console.log('💾 Creating Airtable record...');
     const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
     
+    // Build fields object, only including fields with actual values
+    const fields = {
+      Company: saleData.company,
+      PercentOff: saleData.percentOff,
+      SaleURL: saleData.saleUrl,
+      CleanURL: cleanUrl !== saleData.saleUrl ? cleanUrl : saleData.saleUrl,
+      StartDate: saleData.startDate,
+      Confidence: saleData.confidence || 50, // AI confidence rating 1-100
+      Live: 'NO', // Default to NO - user will review and set to YES
+      Description: JSON.stringify({
+        source: 'email',
+        originalEmail: {
+          from: from,
+          subject: subject,
+          receivedAt: new Date().toISOString()
+        }
+      })
+    };
+    
+    // Only add optional fields if they have values
+    if (saleData.discountCode) {
+      fields.PromoCode = saleData.discountCode;
+    }
+    if (saleData.endDate) {
+      fields.EndDate = saleData.endDate;
+    }
+    
     const airtableResponse = await fetch(airtableUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${AIRTABLE_PAT}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        fields: {
-          Company: saleData.company,
-          PercentOff: saleData.percentOff,
-          SaleURL: saleData.saleUrl,
-          CleanURL: cleanUrl !== saleData.saleUrl ? cleanUrl : saleData.saleUrl,
-          PromoCode: saleData.discountCode || '',
-          StartDate: saleData.startDate,
-          EndDate: saleData.endDate || '',
-          Confidence: saleData.confidence || 50, // AI confidence rating 1-100
-          Live: 'NO', // Default to NO - user will review and set to YES
-          Featured: '', // User will set this manually
-          Description: JSON.stringify({
-            source: 'email',
-            originalEmail: {
-              from: from,
-              subject: subject,
-              receivedAt: new Date().toISOString()
-            }
-          })
-        }
-      })
+      body: JSON.stringify({ fields })
     });
     
     if (!airtableResponse.ok) {
