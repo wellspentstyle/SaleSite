@@ -26,7 +26,7 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
         <DialogHeader>
           <DialogTitle>{sale.brandName} Sale Picks</DialogTitle>
           <DialogDescription>
-            My curated selection from the {sale.discount} sale
+            Kari's curated selection from the {sale.discount} sale
           </DialogDescription>
         </DialogHeader>
         
@@ -41,15 +41,15 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div className="p-4 space-y-3">
-                  <h3 className="font-medium text-sm leading-tight">{pick.name}</h3>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-lg font-semibold text-red-600">${pick.salePrice}</span>
-                    <span className="text-sm text-muted-foreground line-through">${pick.originalPrice}</span>
+                <div className="p-5 space-y-3">
+                  <h3 className="font-semibold text-base leading-tight">{pick.name}</h3>
+                  <div className="flex items-baseline gap-2.5">
+                    <span className="text-lg text-red-600">${pick.salePrice}</span>
+                    <span className="text-sm text-gray-400 line-through">${pick.originalPrice}</span>
                     <span className="text-xs text-green-600 font-medium">{pick.percentOff}% off</span>
                   </div>
                   <Button
-                    className="w-full"
+                    className="w-full mt-4"
                     size="sm"
                     onClick={() => window.open(pick.shopMyUrl, '_blank')}
                   >
