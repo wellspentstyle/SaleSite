@@ -54,10 +54,26 @@ export async function scrapeProduct(url, options = {}) {
     if (jsonLdResult && !jsonLdResult.complete) {
       logger.log('📊 Found partial JSON-LD data, using it for AI extraction...');
     } else {
-      logger.log('⚠️  No JSON-LD data found, falling back to AI extraction...');
+      logger.log('⚠️  No JSON-LD data found, trying deterministic HTML extraction...');
     }
 
-    const aiResult = await extractWithAI(html, url, openai, testMetadata, logger, jsonLdResult);
+    const deterministicResult = await extractFromHtmlDeterministic(html, url, testMetadata, logger);
+    if (deterministicResult && deterministicResult.complete) {
+      return {
+        success: true,
+        product: deterministicResult,
+        meta: {
+          method: 'fast',
+          phase: 'html-deterministic',
+          confidence: deterministicResult.confidence,
+          durationMs: Date.now() - startTime,
+          testMetadata: enableTestMetadata ? testMetadata : undefined
+        }
+      };
+    }
+
+    logger.log('⚠️  Deterministic extraction incomplete, falling back to AI...');
+    const aiResult = await extractWithAI(html, url, openai, testMetadata, logger, jsonLdResult, deterministicResult);
     
     return {
       success: true,
@@ -216,7 +232,67 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
   return null;
 }
 
-async function extractWithAI(html, url, openai, testMetadata, logger, jsonLdResult = null) {
+async function extractFromHtmlDeterministic(html, url, testMetadata, logger) {
+  logger.log('🔬 Starting deterministic HTML extraction (Shopify only)...');
+  
+  let foundPrices = {
+    salePrice: null,
+    originalPrice: null,
+    source: null
+  };
+
+  // ONLY trust Shopify's data-product-json attribute (guaranteed to be main product)
+  // For other stores (Nordstrom, Saks, etc.), the AI handles extraction better
+  const shopifyJsonMatch = html.match(/<script[^>]*type=["']application\/json["'][^>]*data-product-json[^>]*>([\s\S]*?)<\/script>/i);
+  if (shopifyJsonMatch) {
+    try {
+      const productData = JSON.parse(shopifyJsonMatch[1]);
+      if (productData.price && productData.compare_at_price) {
+        foundPrices.salePrice = productData.price / 100;
+        foundPrices.originalPrice = productData.compare_at_price / 100;
+        foundPrices.source = 'shopify-json';
+        logger.log(`💰 Found Shopify JSON prices: $${foundPrices.salePrice} (was $${foundPrices.originalPrice})`);
+      } else if (productData.variants && Array.isArray(productData.variants) && productData.variants.length > 0) {
+        const firstVariant = productData.variants[0];
+        if (firstVariant.price && firstVariant.compare_at_price) {
+          foundPrices.salePrice = firstVariant.price / 100;
+          foundPrices.originalPrice = firstVariant.compare_at_price / 100;
+          foundPrices.source = 'shopify-json-variant';
+          logger.log(`💰 Found Shopify variant prices: $${foundPrices.salePrice} (was $${foundPrices.originalPrice})`);
+        }
+      }
+    } catch (e) {
+      logger.log('⚠️  Failed to parse Shopify JSON:', e.message);
+    }
+  }
+
+  // Note: We intentionally DO NOT scan for other JSON sources, strikethrough tags, or price classes
+  // because it's too risky to identify the correct product vs recommendation carousels.
+  // The AI extraction is more context-aware and handles non-Shopify stores better.
+
+  // Return results if we found valid prices
+  if (foundPrices.source && foundPrices.salePrice && foundPrices.originalPrice > foundPrices.salePrice) {
+    const percentOff = Math.round(((foundPrices.originalPrice - foundPrices.salePrice) / foundPrices.originalPrice) * 100);
+    
+    testMetadata.phaseUsed = 'html-deterministic';
+    testMetadata.priceValidation.foundInHtml = true;
+    testMetadata.priceValidation.checkedFormats.push(foundPrices.source);
+    
+    return {
+      originalPrice: foundPrices.originalPrice,
+      salePrice: foundPrices.salePrice,
+      percentOff: percentOff,
+      source: foundPrices.source,
+      complete: false, // Still need name and image from AI
+      confidence: 88 // High confidence for deterministic extraction
+    };
+  }
+
+  logger.log('⚠️  No deterministic prices found');
+  return null;
+}
+
+async function extractWithAI(html, url, openai, testMetadata, logger, jsonLdResult = null, deterministicResult = null) {
   let preExtractedImage = null;
   const ogImageMatch = html.match(/<meta[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
     html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["']/i);
@@ -359,6 +435,16 @@ Rules:
       userPrompt = `${contentToSend}\n\nNOTE: The product image URL has been pre-extracted as: ${preExtractedImage} - use this for imageUrl.`;
     }
   }
+  
+  // Add deterministic prices to the prompt if found
+  if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
+    userPrompt += `\n\nIMPORTANT - DETERMINISTIC PRICES FOUND:
+- Sale Price: ${deterministicResult.salePrice}
+- Original Price: ${deterministicResult.originalPrice}
+- Source: ${deterministicResult.source}
+
+These prices were extracted from reliable structured data (${deterministicResult.source}). You MUST use these exact prices in your response. Only extract the product name and image URL.`;
+  }
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -400,23 +486,38 @@ Rules:
     throw new Error('AI returned placeholder image URL instead of real product image');
   }
 
-  let originalPrice = productData.originalPrice !== null && productData.originalPrice !== undefined ? parseFloat(productData.originalPrice) : null;
-  const salePrice = parseFloat(productData.salePrice);
-  let percentOff = 0;
+  // Override AI prices with deterministic prices if found
+  let originalPrice, salePrice, percentOff = 0;
   let confidence = productData.confidence ? parseInt(productData.confidence) : 50;
+  
+  if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
+    // Use deterministic prices (highly reliable)
+    originalPrice = deterministicResult.originalPrice;
+    salePrice = deterministicResult.salePrice;
+    percentOff = deterministicResult.percentOff;
+    confidence = Math.max(confidence, 88); // Boost confidence for deterministic extraction
+    logger.log(`✅ Using deterministic prices: $${salePrice} (was $${originalPrice}) from ${deterministicResult.source}`);
+    testMetadata.priceValidation.foundInHtml = true;
+    testMetadata.priceValidation.checkedFormats.push(deterministicResult.source);
+  } else {
+    // Use AI-extracted prices
+    originalPrice = productData.originalPrice !== null && productData.originalPrice !== undefined ? parseFloat(productData.originalPrice) : null;
+    salePrice = parseFloat(productData.salePrice);
 
-  if (isNaN(salePrice) || (originalPrice !== null && isNaN(originalPrice))) {
-    throw new Error('Invalid price data');
+    if (isNaN(salePrice) || (originalPrice !== null && isNaN(originalPrice))) {
+      throw new Error('Invalid price data');
+    }
+
+    if (originalPrice !== null && originalPrice <= salePrice) {
+      logger.log(`⚠️  Invalid discount: originalPrice (${originalPrice}) <= salePrice (${salePrice}). Setting originalPrice to null.`);
+      originalPrice = null;
+      percentOff = 0;
+      confidence = Math.max(30, confidence - 20);
+    }
   }
 
-  if (originalPrice !== null && originalPrice <= salePrice) {
-    logger.log(`⚠️  Invalid discount: originalPrice (${originalPrice}) <= salePrice (${salePrice}). Setting originalPrice to null.`);
-    originalPrice = null;
-    percentOff = 0;
-    confidence = Math.max(30, confidence - 20);
-  }
-
-  if (originalPrice !== null && originalPrice > salePrice) {
+  // Calculate percentOff for AI prices (deterministic already has it)
+  if (!deterministicResult && originalPrice !== null && originalPrice > salePrice) {
     const calculatedPercentOff = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
 
     if (productData.percentOff && Math.abs(calculatedPercentOff - productData.percentOff) > 2) {
@@ -427,37 +528,40 @@ Rules:
     percentOff = calculatedPercentOff;
   }
 
-  const priceVariants = [
-    `$${salePrice.toFixed(2)}`,
-    salePrice.toFixed(2),
-    `$${salePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-    salePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    `${salePrice.toFixed(2).replace('.', ',')}`,
-    String(Math.round(salePrice * 100)),
-    `${Math.floor(salePrice)}.${String(Math.round((salePrice % 1) * 100)).padStart(2, '0')}`,
-    `$${Math.round(salePrice)}`,
-    `$${Math.round(salePrice).toLocaleString('en-US')}`,
-    String(Math.round(salePrice)),
-  ];
+  // Skip HTML validation for deterministic prices (already validated)
+  if (!deterministicResult) {
+    const priceVariants = [
+      `$${salePrice.toFixed(2)}`,
+      salePrice.toFixed(2),
+      `$${salePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      salePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      `${salePrice.toFixed(2).replace('.', ',')}`,
+      String(Math.round(salePrice * 100)),
+      `${Math.floor(salePrice)}.${String(Math.round((salePrice % 1) * 100)).padStart(2, '0')}`,
+      `$${Math.round(salePrice)}`,
+      `$${Math.round(salePrice).toLocaleString('en-US')}`,
+      String(Math.round(salePrice)),
+    ];
 
-  const matchedFormat = priceVariants.find(variant => html.includes(variant));
-  const foundInHtml = matchedFormat !== undefined;
+    const matchedFormat = priceVariants.find(variant => html.includes(variant));
+    const foundInHtml = matchedFormat !== undefined;
 
-  testMetadata.priceValidation.foundInHtml = foundInHtml;
-  testMetadata.priceValidation.checkedFormats = priceVariants.map((variant, idx) => ({
-    format: variant,
-    matched: html.includes(variant)
-  }));
-  testMetadata.priceValidation.matchedFormat = matchedFormat || null;
+    testMetadata.priceValidation.foundInHtml = foundInHtml;
+    testMetadata.priceValidation.checkedFormats = priceVariants.map((variant, idx) => ({
+      format: variant,
+      matched: html.includes(variant)
+    }));
+    testMetadata.priceValidation.matchedFormat = matchedFormat || null;
 
-  if (!foundInHtml) {
-    logger.log(`⚠️  Sale price ${salePrice} not found in HTML, possible hallucination`);
-    const originalConfidence = confidence;
-    confidence = Math.max(30, confidence - 20);
-    testMetadata.confidenceAdjustments.push({
-      reason: 'price_not_found_in_html',
-      adjustment: confidence - originalConfidence
-    });
+    if (!foundInHtml) {
+      logger.log(`⚠️  Sale price ${salePrice} not found in HTML, possible hallucination`);
+      const originalConfidence = confidence;
+      confidence = Math.max(30, confidence - 20);
+      testMetadata.confidenceAdjustments.push({
+        reason: 'price_not_found_in_html',
+        adjustment: confidence - originalConfidence
+      });
+    }
   }
 
   if (confidence < 50) {
