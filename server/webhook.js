@@ -802,6 +802,10 @@ Rules:
     console.log('💾 Creating Airtable record...');
     const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
     
+    // Determine if sale should be live based on start date
+    const today = new Date().toISOString().split('T')[0];
+    const isLive = saleData.startDate <= today ? 'YES' : 'NO';
+    
     // Build fields object, only including fields with actual values
     const fields = {
       Company: saleData.company,
@@ -810,7 +814,7 @@ Rules:
       CleanURL: cleanUrl !== saleData.saleUrl ? cleanUrl : saleData.saleUrl,
       StartDate: saleData.startDate,
       Confidence: saleData.confidence || 50, // AI confidence rating 1-100
-      Live: 'NO', // Default to NO - user will review and set to YES
+      Live: isLive, // YES if starting today or earlier, NO if future date
       Description: JSON.stringify({
         source: 'email',
         originalEmail: {
