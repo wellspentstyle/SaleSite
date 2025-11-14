@@ -119,7 +119,7 @@ async function fetchPicksFromAirtable(): Promise<Map<string, SalePick[]>> {
       if (fields.ShopMyURL) {
         shopMyUrl = fields.ShopMyURL;
       } else {
-        shopMyUrl = `https://go.shopmy.us/ap/l9N1lH?url=${encodeURIComponent(cleanedUrl)}`;
+        shopMyUrl = `https://go.shopmy.us/apx/l9N1lH?url=${encodeURIComponent(cleanedUrl)}`;
       }
 
       const pick: SalePick = {

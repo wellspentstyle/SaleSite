@@ -106,11 +106,21 @@ export default function App() {
       <header className="border-b border-border sticky top-0 z-20 bg-white/95 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <img 
-              src="/logo.png" 
-              alt="Well Spent Style" 
-              className="h-16"
-            />
+            <a 
+              href="/" 
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                window.history.pushState({}, '', '/');
+                setCurrentPath('/');
+              }}
+            >
+              <img 
+                src="/logo.png" 
+                alt="Well Spent Style" 
+                className="h-16"
+              />
+            </a>
           </div>
         </div>
       </header>

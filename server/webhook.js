@@ -248,7 +248,7 @@ app.get('/sales', async (req, res) => {
       const rawUrl = record.fields.CleanURL || record.fields.SaleURL;
       if (rawUrl) {
         const cleanedUrl = cleanUrl(rawUrl);
-        saleUrl = `https://go.shopmy.us/ap/l9N1lH?url=${encodeURIComponent(cleanedUrl)}`;
+        saleUrl = `https://go.shopmy.us/apx/l9N1lH?url=${encodeURIComponent(cleanedUrl)}`;
       }
       
       return {
@@ -551,21 +551,11 @@ app.post('/admin/picks', async (req, res) => {
   try {
     console.log(`💾 Saving ${picks.length} picks for sale ${saleId}`);
     
-    // Helper function to clean URLs
-    function cleanProductUrl(url) {
-      try {
-        const urlObj = new URL(url);
-        return `${urlObj.origin}${urlObj.pathname}`;
-      } catch (e) {
-        return url;
-      }
-    }
-    
     // Create records for each pick
     // Note: ShopMyURL and PercentOff are computed fields in Airtable, don't send them
     const records = picks.map(pick => {
       const fields = {
-        ProductURL: pick.url,
+        ProductURL: cleanUrl(pick.url), // Clean URL to remove tracking parameters
         ProductName: pick.name,
         ImageURL: pick.imageUrl,
         SaleID: [saleId] // Link to Sales table
