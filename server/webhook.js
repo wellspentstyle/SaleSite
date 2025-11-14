@@ -5,6 +5,11 @@ import OpenAI from 'openai';
 import { execSync } from 'child_process';
 import { scrapeProduct } from './scrapers/index.js';
 import crypto from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -147,6 +152,14 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.text({ type: 'text/*' }));
 
+// Strip /api prefix from requests (for production compatibility with frontend)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    req.url = req.url.replace(/^\/api/, '');
+  }
+  next();
+});
+
 // Debug middleware to log requests (excluding sensitive headers)
 app.use((req, res, next) => {
   console.log(`📨 ${req.method} ${req.path}`);
@@ -273,7 +286,7 @@ app.post('/admin/auth', (req, res) => {
   const { password } = req.body;
   
   if (password === ADMIN_PASSWORD) {
-    return res.json({ success: true, token: 'admin-authenticated' });
+    return res.json({ success: true });
   }
   
   return res.status(401).json({ success: false, message: 'Invalid password' });
@@ -855,7 +868,33 @@ Rules:
   }
 });
 
+// ============================================
+// SERVE REACT BUILD IN PRODUCTION
+// ============================================
+
+// Serve static files from the React build directory
+const buildPath = path.join(__dirname, '..', 'build');
+app.use(express.static(buildPath));
+
+// Handle client-side routing - serve index.html for all non-API/webhook routes
+// This must be the LAST route to avoid intercepting API calls
+app.use((req, res) => {
+  // Only serve index.html for GET requests
+  if (req.method !== 'GET') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  
+  // Don't serve index.html for /api or /webhook paths that didn't match earlier routes
+  if (req.path.startsWith('/api') || req.path.startsWith('/webhook')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  
+  // Everything else (/, /admin, etc.) is a SPA route and should get index.html
+  res.sendFile(path.join(buildPath, 'index.html'));
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Webhook server running on port ${PORT}`);
   console.log(`📬 AgentMail webhook endpoint: http://0.0.0.0:${PORT}/webhook/agentmail`);
+  console.log(`📦 Serving React build from: ${buildPath}`);
 });

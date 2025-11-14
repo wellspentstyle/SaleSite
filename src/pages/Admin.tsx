@@ -43,6 +43,7 @@ export function Admin({ onBackToSite }: AdminProps) {
       const data = await response.json();
 
       if (data.success) {
+        // Store the password for subsequent API calls
         sessionStorage.setItem('adminAuth', password);
         setIsAuthenticated(true);
       } else {

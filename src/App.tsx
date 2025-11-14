@@ -111,29 +111,6 @@ export default function App() {
               alt="Well Spent Style" 
               className="h-16"
             />
-            <nav className="hidden md:flex gap-10">
-              <a
-                href="#discount-codes"
-                className="text-sm text-foreground hover:opacity-60 transition-opacity"
-                style={{ fontFamily: 'DM Sans, sans-serif' }}
-              >
-                Discount Codes
-              </a>
-              <a
-                href="#articles"
-                className="text-sm text-foreground hover:opacity-60 transition-opacity"
-                style={{ fontFamily: 'DM Sans, sans-serif' }}
-              >
-                Articles
-              </a>
-              <a
-                href="#about"
-                className="text-sm text-foreground hover:opacity-60 transition-opacity"
-                style={{ fontFamily: 'DM Sans, sans-serif' }}
-              >
-                About
-              </a>
-            </nav>
           </div>
         </div>
       </header>
