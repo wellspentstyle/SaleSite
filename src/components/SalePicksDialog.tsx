@@ -24,7 +24,7 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '34px' }}>
+          <DialogTitle style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '32px' }}>
             {sale.brandName} Sale Picks
           </DialogTitle>
           <DialogDescription>
