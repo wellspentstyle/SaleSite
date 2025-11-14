@@ -8,8 +8,8 @@ import {
 } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { ExternalLink } from 'lucide-react';
 import { Button } from './ui/button';
+import type { MouseEvent } from 'react';
 
 interface SalePicksDialogProps {
   sale: Sale | null;
@@ -24,9 +24,12 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>{sale.brandName} Sale Picks</DialogTitle>
+          <DialogTitle className="text-2xl">{sale.brandName} Sale Picks</DialogTitle>
           <DialogDescription>
             Kari's curated selection from the {sale.discount} sale
+            {sale.discountCode && (
+              <div className="mt-1">Promo Code: {sale.discountCode}</div>
+            )}
           </DialogDescription>
         </DialogHeader>
         
@@ -38,14 +41,15 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
               return (
                 <div 
                   key={pick.id} 
+                  onClick={() => window.open(pick.shopMyUrl, '_blank')}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
                     border: '1px solid #e5e5e5',
-                    borderRadius: '8px',
                     overflow: 'hidden',
                     backgroundColor: '#fff',
-                    transition: 'box-shadow 0.2s'
+                    transition: 'box-shadow 0.2s',
+                    cursor: 'pointer'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'}
                   onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
@@ -116,7 +120,7 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
                             color: '#999'
                           }}
                         >
-                          {roundedPercentOff}% OFF
+                          {roundedPercentOff}% off
                         </span>
                       </div>
                     </div>
@@ -125,10 +129,17 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
                       <Button
                         className="w-full"
                         size="sm"
-                        onClick={() => window.open(pick.shopMyUrl, '_blank')}
+                        style={{
+                          fontFamily: 'DM Sans, sans-serif',
+                          fontSize: '14px',
+                          fontWeight: 600
+                        }}
+                        onClick={(e: MouseEvent) => {
+                          e.stopPropagation();
+                          window.open(pick.shopMyUrl, '_blank');
+                        }}
                       >
                         Shop Now
-                        <ExternalLink className="h-3 w-3 ml-2" />
                       </Button>
                     </div>
                   </div>
@@ -143,7 +154,6 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
             onClick={() => window.open(sale.saleUrl, '_blank')}
           >
             Shop All
-            <ExternalLink className="h-4 w-4 ml-2" />
           </Button>
         </div>
       </DialogContent>
