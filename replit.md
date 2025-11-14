@@ -9,11 +9,18 @@ I prefer simple language and clear, concise explanations. I want iterative devel
 ## System Architecture
 The application is built with React 18 and TypeScript, using Vite for a fast development experience. Styling is managed with a custom-themed Tailwind CSS v4, complemented by Radix UI primitives for accessible and customizable UI components. State management primarily utilizes React hooks.
 
+**Deployment Architecture:**
+- **Development**: Vite dev server (port 5000) + Backend server (port 3001) + Vite proxy for API requests
+- **Production**: Single unified Express server serves both React build and API endpoints on port 3001
+- **Routing**: Middleware strips `/api` prefix from requests for dev/prod compatibility, enabling SPA client-side routing (/, /admin, etc.)
+- **Configuration**: autoscale deployment with build step (`npm run build`) + run command (`node server/webhook.js`)
+
 **UI/UX Decisions:**
-- Clean, minimalist design with a responsive grid layout.
-- Custom fonts (DM Sans, Crimson Pro) for a modern aesthetic.
-- Sale cards display discount percentages, and featured sales include images.
-- Interactive dialogs for detailed product picks with "Shop Now" buttons.
+- Clean, minimalist design with a responsive grid layout
+- Custom fonts (DM Sans, Crimson Pro) for a modern aesthetic
+- Streamlined navigation with logo-only header (removed Discount Codes, Articles, About links)
+- Sale cards display discount percentages, and featured sales include images
+- Interactive dialogs for detailed product picks with "Shop Now" buttons
 
 **Technical Implementations:**
 - **Filtering**: Sales can be filtered by discount range (0-30%, 30-50%, 50%+) and active status.
