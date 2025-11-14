@@ -1,3 +1,4 @@
+import React, { type MouseEvent } from 'react';
 import { Sale } from '../types';
 import {
   Dialog,
@@ -9,7 +10,6 @@ import {
 import { ScrollArea } from './ui/scroll-area';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Button } from './ui/button';
-import type { MouseEvent } from 'react';
 
 interface SalePicksDialogProps {
   sale: Sale | null;
@@ -24,7 +24,9 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="text-2xl">{sale.brandName} Sale Picks</DialogTitle>
+          <DialogTitle className="text-3xl" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700 }}>
+            {sale.brandName} Sale Picks
+          </DialogTitle>
           <DialogDescription>
             Kari's curated selection from the {sale.discount} sale
             {sale.discountCode && (
@@ -36,23 +38,18 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
         <ScrollArea className="h-[60vh] pr-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {sale.picks.map((pick) => {
-              const roundedPercentOff = Math.round(pick.percentOff);
+              // Fix decimal percent off values from Airtable (e.g., 0.19 should be 19)
+              let percentOff = pick.percentOff;
+              if (percentOff < 1 && percentOff > 0) {
+                percentOff = percentOff * 100;
+              }
+              const roundedPercentOff = Math.round(percentOff);
               
               return (
                 <div 
                   key={pick.id} 
                   onClick={() => window.open(pick.shopMyUrl, '_blank')}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    border: '1px solid #e5e5e5',
-                    overflow: 'hidden',
-                    backgroundColor: '#fff',
-                    transition: 'box-shadow 0.2s',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+                  className="border border-border hover:border-foreground transition-colors bg-white flex flex-col overflow-hidden cursor-pointer"
                 >
                   <div 
                     style={{ 
@@ -127,13 +124,13 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
                     
                     <div style={{ marginTop: 'auto' }}>
                       <Button
-                        className="w-full"
+                        className="w-full h-10 text-sm transition-colors"
                         size="sm"
                         style={{
-                          fontFamily: 'DM Sans, sans-serif',
-                          fontSize: '14px',
-                          fontWeight: 600
+                          fontFamily: 'DM Sans, sans-serif'
                         }}
+                        onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => e.currentTarget.style.backgroundColor = '#374151'}
+                        onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => e.currentTarget.style.backgroundColor = ''}
                         onClick={(e: MouseEvent) => {
                           e.stopPropagation();
                           window.open(pick.shopMyUrl, '_blank');
@@ -151,6 +148,12 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
         
         <div className="flex justify-end pt-4 border-t">
           <Button
+            className="h-10 text-sm transition-colors"
+            style={{
+              fontFamily: 'DM Sans, sans-serif'
+            }}
+            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => e.currentTarget.style.backgroundColor = '#374151'}
+            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => e.currentTarget.style.backgroundColor = ''}
             onClick={() => window.open(sale.saleUrl, '_blank')}
           >
             Shop All
