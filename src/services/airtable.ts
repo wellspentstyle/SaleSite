@@ -50,6 +50,7 @@ interface AirtablePickRecord {
     PercentOff?: number;
     SaleID?: string[];
     ShopMyURL?: string;
+    CreateStory?: string;
   };
 }
 

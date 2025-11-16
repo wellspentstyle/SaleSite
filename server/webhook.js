@@ -7,6 +7,8 @@ import { scrapeProduct } from './scrapers/index.js';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { initializeTelegramBot } from './telegram-bot.js';
+import { startStoryWatcher } from './story-watcher.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,6 +34,10 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // CloudMailin webhook secret for HMAC verification
 const CLOUDMAIL_SECRET = process.env.CLOUDMAIL_SECRET;
+
+// Telegram configuration
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 // Simple in-memory cache for sales data
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -897,4 +903,14 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Webhook server running on port ${PORT}`);
   console.log(`📬 AgentMail webhook endpoint: http://0.0.0.0:${PORT}/webhook/agentmail`);
   console.log(`📦 Serving React build from: ${buildPath}`);
+  
+  if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+    console.log('📱 Initializing Telegram bot...');
+    initializeTelegramBot(TELEGRAM_BOT_TOKEN);
+    console.log('👀 Starting Instagram story watcher...');
+    startStoryWatcher();
+  } else {
+    console.log('⚠️  Telegram not configured - story generation disabled');
+    console.log('   Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to enable');
+  }
 });
