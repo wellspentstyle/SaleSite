@@ -86,10 +86,11 @@ export async function generateStoryImage(pick) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
+    const sanitizedName = (pick.name || 'product').replace(/[^a-z0-9 ]/gi, '').trim();
+    const filename = `${sanitizedName}.jpg`;
     const timestamp = Date.now();
-    const sanitizedName = (pick.name || 'product').replace(/[^a-z0-9]/gi, '_').substring(0, 30);
-    const filename = `story_${sanitizedName}_${timestamp}.jpg`;
-    const outputPath = path.join(outputDir, filename);
+    const localFilename = `${sanitizedName}_${timestamp}.jpg`;
+    const outputPath = path.join(outputDir, localFilename);
 
     fs.writeFileSync(outputPath, finalImage);
     
