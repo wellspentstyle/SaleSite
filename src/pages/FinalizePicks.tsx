@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Loader2, Trash2 } from 'lucide-react';
 import { ManualEntryForm, ManualProductData } from '../components/ManualEntryForm';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 
 interface Product {
   url: string;
   name: string;
+  brand?: string;
   imageUrl: string;
   originalPrice: number | null;
   salePrice: number;
@@ -38,6 +41,12 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
     setPicks(picks.filter((_, i) => i !== index));
   };
 
+  const handleBrandChange = (index: number, newBrand: string) => {
+    const updatedPicks = [...picks];
+    updatedPicks[index] = { ...updatedPicks[index], brand: newBrand || undefined };
+    setPicks(updatedPicks);
+  };
+
   const handleManualDataChange = (url: string, data: ManualProductData) => {
     setManualEntries(new Map(manualEntries.set(url, data)));
   };
@@ -53,6 +62,7 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
     const manualPicks = Array.from(manualEntries.values()).map(data => ({
       url: data.url,
       name: data.name,
+      brand: data.brand,
       imageUrl: data.imageUrl,
       originalPrice: data.originalPrice,
       salePrice: data.salePrice,
@@ -309,11 +319,37 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
 
                   {/* Product Info */}
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ marginBottom: '12px' }}>
+                      <Label 
+                        htmlFor={`brand-${index}`}
+                        style={{ 
+                          fontFamily: 'DM Sans, sans-serif', 
+                          fontWeight: 600, 
+                          fontSize: '11px',
+                          color: '#666',
+                          marginBottom: '4px',
+                          display: 'block'
+                        }}
+                      >
+                        Brand (Optional)
+                      </Label>
+                      <Input
+                        id={`brand-${index}`}
+                        value={pick.brand || ''}
+                        onChange={(e) => handleBrandChange(index, e.target.value)}
+                        placeholder="e.g., Proenza Schouler"
+                        className="h-8 text-xs"
+                        style={{ 
+                          fontFamily: 'DM Sans, sans-serif',
+                          fontSize: '12px'
+                        }}
+                      />
+                    </div>
                     <h3 
                       style={{ 
                         fontFamily: 'DM Sans, sans-serif',
                         fontSize: '14px',
-                        fontWeight: 400,
+                        fontWeight: 700,
                         lineHeight: '1.4',
                         marginBottom: '12px',
                         color: '#000'

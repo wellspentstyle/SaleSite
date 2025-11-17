@@ -12,6 +12,7 @@ interface ManualEntryFormProps {
 export interface ManualProductData {
   url: string;
   name: string;
+  brand?: string;
   imageUrl: string;
   originalPrice: number;
   salePrice: number;
@@ -20,6 +21,7 @@ export interface ManualProductData {
 
 export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryFormProps) {
   const [name, setName] = useState('');
+  const [brand, setBrand] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
@@ -43,13 +45,14 @@ export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryForm
     onDataChange({
       url,
       name,
+      brand: brand || undefined,
       imageUrl,
       originalPrice: parseFloat(originalPrice) || 0,
       salePrice: parseFloat(salePrice) || 0,
       percentOff
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, name, imageUrl, originalPrice, salePrice, percentOff]);
+  }, [url, name, brand, imageUrl, originalPrice, salePrice, percentOff]);
 
   const handleFindImage = async () => {
     setLoadingImage(true);
@@ -103,7 +106,7 @@ export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryForm
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2">
             <Label 
               htmlFor={`name-${url}`}
               style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px' }}
@@ -117,6 +120,22 @@ export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryForm
               placeholder="e.g., Wool Blend Coat"
               className="h-10"
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label 
+              htmlFor={`brand-${url}`}
+              style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px' }}
+            >
+              Brand (Optional)
+            </Label>
+            <Input
+              id={`brand-${url}`}
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="e.g., Proenza Schouler"
+              className="h-10"
             />
           </div>
 
