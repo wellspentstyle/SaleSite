@@ -805,17 +805,34 @@ app.post('/admin/sync-gem', async (req, res) => {
           id: el.id
         })));
         console.log('🔍 All buttons found on page:', JSON.stringify(buttons, null, 2));
-        throw new Error('Could not find submit button');
+        
+        // Also check for divs that might be styled as buttons
+        const divButtons = await page.$$eval('div[role="button"], div[onclick], a[role="button"]', els => els.map(el => ({
+          tagName: el.tagName,
+          textContent: el.textContent.trim(),
+          className: el.className,
+          role: el.getAttribute('role')
+        })));
+        console.log('🔍 Div/link elements that might be buttons:', JSON.stringify(divButtons, null, 2));
+        
+        // Try pressing Enter in the email field as alternative
+        console.log('⚠️ No button found, trying to press Enter in email field instead...');
+        await page.focus('input[type="email"]');
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(3000);
+        console.log('✅ Pressed Enter in email field');
+        await page.screenshot({ path: '/tmp/gem-login-3-submitted.png' });
+        console.log('📸 Screenshot saved: /tmp/gem-login-3-submitted.png');
+      } else {
+        // Click submit
+        console.log('🖱️ Clicking submit button...');
+        await page.click('button[type="submit"]');
+        
+        // Wait for submission to complete
+        await page.waitForTimeout(3000);
+        await page.screenshot({ path: '/tmp/gem-login-3-submitted.png' });
+        console.log('📸 Screenshot saved: /tmp/gem-login-3-submitted.png');
       }
-      
-      // Click submit
-      console.log('🖱️ Clicking submit button...');
-      await page.click('button[type="submit"]');
-      
-      // Wait for submission to complete
-      await page.waitForTimeout(3000);
-      await page.screenshot({ path: '/tmp/gem-login-3-submitted.png' });
-      console.log('📸 Screenshot saved: /tmp/gem-login-3-submitted.png');
       
       console.log('✅ Login email requested successfully');
     } catch (error) {
