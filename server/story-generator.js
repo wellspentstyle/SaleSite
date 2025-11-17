@@ -52,57 +52,140 @@ export async function generateStoryImage(pick) {
     const textPadding = 20;
     const charWidth = fontSize * 0.6;
     const maxBoxWidth = STORY_WIDTH - 80;
+    const lineGap = 10;
     
     const priceBoxWidth = Math.min(Math.ceil(priceText.length * charWidth) + (textPadding * 4), maxBoxWidth);
     const priceBoxHeight = fontSize + (textPadding * 2);
 
-    const pricePositionY = Math.floor(STORY_HEIGHT - (STORY_HEIGHT / 3));
-
-    const priceSvg = `
-      <svg width="${priceBoxWidth}" height="${priceBoxHeight}">
-        <rect width="100%" height="100%" fill="black"/>
-        <text 
-          x="${textPadding * 2}" 
-          y="${textPadding + fontSize * 0.8}" 
-          font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
-          font-size="${fontSize}" 
-          font-weight="400" 
-          fill="white"
-          textLength="${priceBoxWidth - (textPadding * 4)}"
-          lengthAdjust="spacingAndGlyphs"
-        >${escapeHtml(priceText)}</text>
-      </svg>
-    `;
-
-    const priceOverlay = Buffer.from(priceSvg);
+    const basePositionY = Math.floor(STORY_HEIGHT - (STORY_HEIGHT / 3));
 
     const productName = pick.name || 'Product';
-    const nameBoxWidth = Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth);
-    const nameBoxHeight = fontSize + (textPadding * 2);
-    const namePositionY = pricePositionY - priceBoxHeight - 10;
+    const brand = pick.brand;
+    const company = pick.company;
+    
+    const showBrand = brand && company && brand !== company;
 
-    const nameSvg = `
-      <svg width="${nameBoxWidth}" height="${nameBoxHeight}">
-        <rect width="100%" height="100%" fill="black"/>
-        <text 
-          x="${textPadding * 2}" 
-          y="${textPadding + fontSize * 0.8}" 
-          font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
-          font-size="${fontSize}" 
-          font-weight="400" 
-          fill="white"
-          textLength="${nameBoxWidth - (textPadding * 4)}"
-          lengthAdjust="spacingAndGlyphs"
-        >${escapeHtml(productName)}</text>
-      </svg>
-    `;
+    let compositeArray = [];
+    let currentY = basePositionY;
 
-    const nameOverlay = Buffer.from(nameSvg);
-
-    let compositeArray = [
-      { input: nameOverlay, top: namePositionY, left: 40 },
-      { input: priceOverlay, top: pricePositionY, left: 40 }
-    ];
+    if (showBrand) {
+      const brandBoxWidth = Math.min(Math.ceil(brand.length * charWidth) + (textPadding * 4), maxBoxWidth);
+      const brandBoxHeight = fontSize + (textPadding * 2);
+      
+      const brandSvg = `
+        <svg width="${brandBoxWidth}" height="${brandBoxHeight}">
+          <rect width="100%" height="100%" fill="black"/>
+          <text 
+            x="${textPadding * 2}" 
+            y="${textPadding + fontSize * 0.8}" 
+            font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+            font-size="${fontSize}" 
+            font-weight="400" 
+            fill="white"
+            textLength="${brandBoxWidth - (textPadding * 4)}"
+            lengthAdjust="spacingAndGlyphs"
+          >${escapeHtml(brand)}</text>
+        </svg>
+      `;
+      
+      const brandOverlay = Buffer.from(brandSvg);
+      
+      const nameBoxWidth = Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth);
+      const nameBoxHeight = fontSize + (textPadding * 2);
+      
+      const nameSvg = `
+        <svg width="${nameBoxWidth}" height="${nameBoxHeight}">
+          <rect width="100%" height="100%" fill="black"/>
+          <text 
+            x="${textPadding * 2}" 
+            y="${textPadding + fontSize * 0.8}" 
+            font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+            font-size="${fontSize}" 
+            font-weight="400" 
+            fill="white"
+            textLength="${nameBoxWidth - (textPadding * 4)}"
+            lengthAdjust="spacingAndGlyphs"
+          >${escapeHtml(productName)}</text>
+        </svg>
+      `;
+      
+      const nameOverlay = Buffer.from(nameSvg);
+      
+      const priceSvg = `
+        <svg width="${priceBoxWidth}" height="${priceBoxHeight}">
+          <rect width="100%" height="100%" fill="black"/>
+          <text 
+            x="${textPadding * 2}" 
+            y="${textPadding + fontSize * 0.8}" 
+            font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+            font-size="${fontSize}" 
+            font-weight="400" 
+            fill="white"
+            textLength="${priceBoxWidth - (textPadding * 4)}"
+            lengthAdjust="spacingAndGlyphs"
+          >${escapeHtml(priceText)}</text>
+        </svg>
+      `;
+      
+      const priceOverlay = Buffer.from(priceSvg);
+      
+      const brandPositionY = currentY;
+      const namePositionY = brandPositionY - brandBoxHeight - lineGap;
+      const pricePositionY = namePositionY - nameBoxHeight - lineGap;
+      
+      compositeArray = [
+        { input: priceOverlay, top: pricePositionY, left: 40 },
+        { input: nameOverlay, top: namePositionY, left: 40 },
+        { input: brandOverlay, top: brandPositionY, left: 40 }
+      ];
+    } else {
+      const nameBoxWidth = Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth);
+      const nameBoxHeight = fontSize + (textPadding * 2);
+      
+      const nameSvg = `
+        <svg width="${nameBoxWidth}" height="${nameBoxHeight}">
+          <rect width="100%" height="100%" fill="black"/>
+          <text 
+            x="${textPadding * 2}" 
+            y="${textPadding + fontSize * 0.8}" 
+            font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+            font-size="${fontSize}" 
+            font-weight="400" 
+            fill="white"
+            textLength="${nameBoxWidth - (textPadding * 4)}"
+            lengthAdjust="spacingAndGlyphs"
+          >${escapeHtml(productName)}</text>
+        </svg>
+      `;
+      
+      const nameOverlay = Buffer.from(nameSvg);
+      
+      const priceSvg = `
+        <svg width="${priceBoxWidth}" height="${priceBoxHeight}">
+          <rect width="100%" height="100%" fill="black"/>
+          <text 
+            x="${textPadding * 2}" 
+            y="${textPadding + fontSize * 0.8}" 
+            font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+            font-size="${fontSize}" 
+            font-weight="400" 
+            fill="white"
+            textLength="${priceBoxWidth - (textPadding * 4)}"
+            lengthAdjust="spacingAndGlyphs"
+          >${escapeHtml(priceText)}</text>
+        </svg>
+      `;
+      
+      const priceOverlay = Buffer.from(priceSvg);
+      
+      const pricePositionY = currentY;
+      const namePositionY = pricePositionY - priceBoxHeight - lineGap;
+      
+      compositeArray = [
+        { input: nameOverlay, top: namePositionY, left: 40 },
+        { input: priceOverlay, top: pricePositionY, left: 40 }
+      ];
+    }
 
     const finalImage = await sharp(backgroundImage)
       .composite(compositeArray)

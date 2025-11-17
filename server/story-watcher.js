@@ -47,6 +47,7 @@ export async function checkForStoryRequests() {
       const pick = {
         id: record.id,
         name: fields.ProductName || 'Product',
+        brand: fields.Brand || null,
         imageUrl: fields.ImageURL,
         originalPrice: fields.OriginalPrice,
         salePrice: fields.SalePrice,
