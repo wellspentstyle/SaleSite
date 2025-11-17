@@ -51,13 +51,13 @@ export async function generateStoryImage(pick) {
     const fontSize = 48;
     const textPadding = 20;
     const charWidth = fontSize * 0.6;
-    const boxWidth = Math.ceil(priceText.length * charWidth) + (textPadding * 4);
-    const boxHeight = fontSize + (textPadding * 2);
+    const priceBoxWidth = Math.ceil(priceText.length * charWidth) + (textPadding * 4);
+    const priceBoxHeight = fontSize + (textPadding * 2);
 
-    const positionY = Math.floor(STORY_HEIGHT - (STORY_HEIGHT / 3));
+    const pricePositionY = Math.floor(STORY_HEIGHT - (STORY_HEIGHT / 3));
 
     const priceSvg = `
-      <svg width="${boxWidth}" height="${boxHeight}">
+      <svg width="${priceBoxWidth}" height="${priceBoxHeight}">
         <rect width="100%" height="100%" fill="black"/>
         <text 
           x="${textPadding * 2}" 
@@ -72,8 +72,30 @@ export async function generateStoryImage(pick) {
 
     const priceOverlay = Buffer.from(priceSvg);
 
+    const productName = pick.name || 'Product';
+    const nameBoxWidth = Math.ceil(productName.length * charWidth) + (textPadding * 4);
+    const nameBoxHeight = fontSize + (textPadding * 2);
+    const namePositionY = pricePositionY - priceBoxHeight - 10;
+
+    const nameSvg = `
+      <svg width="${nameBoxWidth}" height="${nameBoxHeight}">
+        <rect width="100%" height="100%" fill="black"/>
+        <text 
+          x="${textPadding * 2}" 
+          y="${textPadding + fontSize * 0.8}" 
+          font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+          font-size="${fontSize}" 
+          font-weight="400" 
+          fill="white"
+        >${escapeHtml(productName)}</text>
+      </svg>
+    `;
+
+    const nameOverlay = Buffer.from(nameSvg);
+
     let compositeArray = [
-      { input: priceOverlay, top: positionY, left: 40 }
+      { input: nameOverlay, top: namePositionY, left: 40 },
+      { input: priceOverlay, top: pricePositionY, left: 40 }
     ];
 
     const finalImage = await sharp(backgroundImage)
