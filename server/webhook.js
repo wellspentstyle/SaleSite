@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeTelegramBot } from './telegram-bot.js';
 import { startStoryWatcher } from './story-watcher.js';
+import { scrapeGemItems } from './gem-scraper.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,6 +40,10 @@ const CLOUDMAIL_SECRET = process.env.CLOUDMAIL_SECRET;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
+// Gem configuration
+const GEM_EMAIL = process.env.GEM_EMAIL;
+const GEM_TABLE_NAME = 'Gem';
+
 // Simple in-memory cache for sales data
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const cache = {
@@ -46,6 +51,13 @@ const cache = {
     data: null,
     expiresAt: 0
   }
+};
+
+// In-memory storage for Gem magic links (expires after 5 minutes)
+const gemMagicLinks = {
+  link: null,
+  expiresAt: 0,
+  pendingRequest: null // Promise resolver for sync endpoint waiting for link
 };
 
 // Helper functions for cache management
@@ -677,6 +689,110 @@ app.post('/admin/picks', async (req, res) => {
   }
 });
 
+// Sync Gem items - trigger login email and scrape saved items
+app.post('/admin/sync-gem', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  if (!GEM_EMAIL) {
+    return res.status(500).json({ 
+      success: false, 
+      message: 'GEM_EMAIL not configured. Please set GEM_EMAIL environment variable.' 
+    });
+  }
+  
+  try {
+    console.log('💎 Starting Gem sync process...');
+    console.log('📧 Requesting login email from Gem...');
+    
+    // Trigger Gem login email by making a request to their login endpoint
+    const loginResponse = await fetch('https://gem.app/api/auth/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      body: JSON.stringify({
+        email: GEM_EMAIL,
+        callbackUrl: 'https://gem.app/my-gems'
+      })
+    });
+    
+    if (!loginResponse.ok) {
+      const errorText = await loginResponse.text();
+      console.error('❌ Failed to request Gem login email:', errorText);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to request login email from Gem' 
+      });
+    }
+    
+    console.log('✅ Login email requested successfully');
+    console.log('⏳ Waiting for magic link email (max 2 minutes)...');
+    
+    // Wait for magic link with timeout (2 minutes)
+    const magicLink = await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        gemMagicLinks.pendingRequest = null;
+        reject(new Error('Timeout waiting for magic link email'));
+      }, 120000); // 2 minutes
+      
+      // Store resolver so webhook can notify us when email arrives
+      gemMagicLinks.pendingRequest = {
+        resolve: (link) => {
+          clearTimeout(timeout);
+          resolve(link);
+        },
+        reject: (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      };
+      
+      // Check if we already have a valid link in memory
+      if (gemMagicLinks.link && Date.now() < gemMagicLinks.expiresAt) {
+        clearTimeout(timeout);
+        console.log('✅ Using existing magic link from memory');
+        resolve(gemMagicLinks.link);
+      }
+    });
+    
+    console.log('🔓 Magic link received, starting scraper...');
+    
+    // Clear the cached magic link since it's single-use
+    gemMagicLinks.link = null;
+    gemMagicLinks.expiresAt = 0;
+    
+    // Scrape Gem items using magic link
+    const scrapeResult = await scrapeGemItems(magicLink, {
+      maxItems: 5, // Limit to 5 items for initial test
+      logger: console
+    });
+    
+    if (!scrapeResult.success) {
+      return res.status(500).json({ 
+        success: false, 
+        message: scrapeResult.error || 'Scraping failed'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: scrapeResult.message,
+      itemsScraped: scrapeResult.itemsScraped,
+      itemsSaved: scrapeResult.itemsSaved,
+      items: scrapeResult.items
+    });
+    
+  } catch (error) {
+    console.error('❌ Gem sync error:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // CloudMailin/AgentMail webhook endpoint - handle both JSON and multipart
 app.post('/webhook/agentmail', upload.none(), async (req, res) => {
   console.log('📧 Received email webhook');
@@ -735,6 +851,49 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
     if (!emailContent) {
       console.log('⚠️  No email content found');
       return res.status(200).json({ success: false, message: 'No content' });
+    }
+    
+    // Check if this is a Gem login email
+    if (from.includes('gem.app') || subject.toLowerCase().includes('log in to gem')) {
+      console.log('🔐 Detected Gem login email');
+      
+      // Extract magic link from email content
+      // Gem sends links like: https://gem.app/auth/login?token=...
+      const magicLinkMatch = emailContent.match(/https:\/\/gem\.app\/auth\/login\?token=[^\s<>"']+/i);
+      
+      if (magicLinkMatch) {
+        const magicLink = magicLinkMatch[0];
+        console.log('✅ Extracted Gem magic link');
+        
+        // Store magic link in memory (expires in 5 minutes)
+        gemMagicLinks.link = magicLink;
+        gemMagicLinks.expiresAt = Date.now() + (5 * 60 * 1000);
+        
+        // Resolve pending request if sync endpoint is waiting
+        if (gemMagicLinks.pendingRequest) {
+          console.log('🔓 Resolving pending sync request with magic link');
+          gemMagicLinks.pendingRequest.resolve(magicLink);
+          gemMagicLinks.pendingRequest = null;
+        }
+        
+        return res.status(200).json({ 
+          success: true, 
+          message: 'Gem magic link received and stored'
+        });
+      } else {
+        console.log('❌ Could not extract magic link from Gem email');
+        
+        // Still resolve pending request with error
+        if (gemMagicLinks.pendingRequest) {
+          gemMagicLinks.pendingRequest.reject(new Error('Magic link not found in email'));
+          gemMagicLinks.pendingRequest = null;
+        }
+        
+        return res.status(200).json({ 
+          success: false, 
+          message: 'Magic link not found in email' 
+        });
+      }
     }
     
     console.log('📝 Extracting sale information with AI...');
