@@ -722,16 +722,112 @@ app.post('/admin/sync-gem', async (req, res) => {
     
     try {
       // Navigate to login page
-      await page.goto('https://gem.app/requestEmailLogIn', { waitUntil: 'networkidle', timeout: 15000 });
+      console.log('🌐 Navigating to gem.app/requestEmailLogIn...');
+      await page.goto('https://gem.app/requestEmailLogIn', { waitUntil: 'domcontentloaded', timeout: 30000 });
       
-      // Fill in email and submit
+      // Take screenshot for debugging
+      await page.screenshot({ path: '/tmp/gem-login-1-loaded.png' });
+      console.log('📸 Screenshot saved: /tmp/gem-login-1-loaded.png');
+      
+      // Wait for page to fully load
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+        console.log('⚠️ Network not idle, continuing anyway...');
+      });
+      
+      // Log page title and URL for debugging
+      const title = await page.title();
+      const url = page.url();
+      console.log(`📄 Page loaded: "${title}" at ${url}`);
+      
+      // Try to find email input with multiple selectors
+      const emailSelectors = [
+        'input[type="email"]',
+        'input[name="email"]',
+        'input[placeholder*="email" i]',
+        'input[autocomplete="email"]',
+        '#email',
+        'input'
+      ];
+      
+      let emailInput = null;
+      for (const selector of emailSelectors) {
+        emailInput = await page.$(selector);
+        if (emailInput) {
+          console.log(`✅ Found email input with selector: ${selector}`);
+          break;
+        }
+      }
+      
+      if (!emailInput) {
+        // Log all inputs on the page
+        const inputs = await page.$$eval('input', els => els.map(el => ({
+          type: el.type,
+          name: el.name,
+          id: el.id,
+          placeholder: el.placeholder,
+          className: el.className
+        })));
+        console.log('🔍 All inputs found on page:', JSON.stringify(inputs, null, 2));
+        throw new Error('Could not find email input field');
+      }
+      
+      // Fill in email
+      console.log('✏️ Filling email field...');
       await page.fill('input[type="email"]', GEM_EMAIL);
+      await page.screenshot({ path: '/tmp/gem-login-2-filled.png' });
+      console.log('📸 Screenshot saved: /tmp/gem-login-2-filled.png');
+      
+      // Try to find submit button with multiple selectors
+      const submitSelectors = [
+        'button[type="submit"]',
+        'button:has-text("Continue")',
+        'button:has-text("Log in")',
+        'button:has-text("Sign in")',
+        'input[type="submit"]',
+        'button'
+      ];
+      
+      let submitButton = null;
+      for (const selector of submitSelectors) {
+        submitButton = await page.$(selector);
+        if (submitButton) {
+          console.log(`✅ Found submit button with selector: ${selector}`);
+          break;
+        }
+      }
+      
+      if (!submitButton) {
+        // Log all buttons on the page
+        const buttons = await page.$$eval('button', els => els.map(el => ({
+          type: el.type,
+          textContent: el.textContent,
+          className: el.className,
+          id: el.id
+        })));
+        console.log('🔍 All buttons found on page:', JSON.stringify(buttons, null, 2));
+        throw new Error('Could not find submit button');
+      }
+      
+      // Click submit
+      console.log('🖱️ Clicking submit button...');
       await page.click('button[type="submit"]');
       
       // Wait for submission to complete
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
+      await page.screenshot({ path: '/tmp/gem-login-3-submitted.png' });
+      console.log('📸 Screenshot saved: /tmp/gem-login-3-submitted.png');
       
       console.log('✅ Login email requested successfully');
+    } catch (error) {
+      console.error('❌ Browser automation error:', error.message);
+      // Try to capture screenshot on error
+      try {
+        await page.screenshot({ path: '/tmp/gem-login-error.png' });
+        console.log('📸 Error screenshot saved: /tmp/gem-login-error.png');
+      } catch (screenshotError) {
+        console.log('⚠️ Could not capture error screenshot');
+      }
+      throw error;
     } finally {
       await browser.close();
     }
