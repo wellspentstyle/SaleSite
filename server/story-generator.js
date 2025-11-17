@@ -33,63 +33,47 @@ export async function generateStoryImage(pick) {
       })
       .toBuffer();
 
-    const productName = pick.name || 'Product';
     const originalPrice = pick.originalPrice;
     const salePrice = pick.salePrice;
     
     let priceText = '';
-    if (originalPrice && originalPrice > 0) {
-      priceText = `$${originalPrice} > $${salePrice}`;
+    if (originalPrice && originalPrice > 0 && salePrice && salePrice > 0) {
+      priceText = `$${salePrice} vs. $${originalPrice}`;
     } else if (salePrice && salePrice > 0) {
       priceText = `$${salePrice}`;
     }
 
-    const padding = 20;
-    const textPadding = 15;
+    if (!priceText) {
+      throw new Error('No price information available');
+    }
+
     const fontSize = 48;
-    const lineHeight = fontSize + 20;
+    const textPadding = 20;
+    const charWidth = fontSize * 0.6;
+    const boxWidth = Math.ceil(priceText.length * charWidth) + (textPadding * 4);
+    const boxHeight = fontSize + (textPadding * 2);
 
-    const nameSvg = `
-      <svg width="${STORY_WIDTH}" height="${lineHeight + textPadding * 2}">
+    const positionY = Math.floor(STORY_HEIGHT - (STORY_HEIGHT / 3));
+
+    const priceSvg = `
+      <svg width="${boxWidth}" height="${boxHeight}">
         <rect width="100%" height="100%" fill="black"/>
         <text 
-          x="${textPadding}" 
-          y="${textPadding + fontSize}" 
-          font-family="Arial, sans-serif" 
-          font-size="${fontSize}" 
-          font-weight="400" 
-          fill="white"
-        >${escapeHtml(productName)}</text>
-      </svg>
-    `;
-
-    const priceSvg = priceText ? `
-      <svg width="${STORY_WIDTH}" height="${lineHeight + textPadding * 2}">
-        <rect width="100%" height="100%" fill="black"/>
-        <text 
-          x="${textPadding}" 
-          y="${textPadding + fontSize}" 
-          font-family="Arial, sans-serif" 
+          x="${textPadding * 2}" 
+          y="${textPadding + fontSize * 0.8}" 
+          font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
           font-size="${fontSize}" 
           font-weight="400" 
           fill="white"
         >${escapeHtml(priceText)}</text>
       </svg>
-    ` : '';
+    `;
 
-    const nameOverlay = Buffer.from(nameSvg);
-    const priceOverlay = priceText ? Buffer.from(priceSvg) : null;
-
-    const nameY = STORY_HEIGHT - (lineHeight + textPadding * 2) * (priceText ? 2 : 1) - padding;
-    const priceY = STORY_HEIGHT - (lineHeight + textPadding * 2) - padding;
+    const priceOverlay = Buffer.from(priceSvg);
 
     let compositeArray = [
-      { input: nameOverlay, top: nameY, left: 0 }
+      { input: priceOverlay, top: positionY, left: 0 }
     ];
-    
-    if (priceOverlay) {
-      compositeArray.push({ input: priceOverlay, top: priceY, left: 0 });
-    }
 
     const finalImage = await sharp(backgroundImage)
       .composite(compositeArray)
@@ -102,7 +86,7 @@ export async function generateStoryImage(pick) {
     }
 
     const timestamp = Date.now();
-    const sanitizedName = productName.replace(/[^a-z0-9]/gi, '_').substring(0, 30);
+    const sanitizedName = (pick.name || 'product').replace(/[^a-z0-9]/gi, '_').substring(0, 30);
     const filename = `story_${sanitizedName}_${timestamp}.jpg`;
     const outputPath = path.join(outputDir, filename);
 

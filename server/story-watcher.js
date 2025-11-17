@@ -54,22 +54,36 @@ export async function checkForStoryRequests() {
       
       console.log(`   📸 Processing story for: ${pick.name}`);
       
+      processedRecords.add(record.id);
+      let telegramSent = false;
+      
       try {
         const storyImage = await generateStoryImage(pick);
         
         const caption = `*${pick.name}*\n\nShop now: ${pick.shopMyUrl}`;
         
         await sendStoryToTelegram(TELEGRAM_CHAT_ID, storyImage.buffer, caption);
+        telegramSent = true;
         
-        await updateAirtableField(record.id, 'CreateStory', 'Created');
-        
-        processedRecords.add(record.id);
+        await updateAirtableField(record.id, 'CreateStory', 'Story Created');
         
         console.log(`   ✅ Story created and sent for: ${pick.name}`);
         
       } catch (error) {
         console.error(`   ❌ Failed to process story for ${pick.name}:`, error);
-        await updateAirtableField(record.id, 'CreateStory', 'Failed');
+        
+        if (!telegramSent) {
+          processedRecords.delete(record.id);
+          console.log(`   ♻️  Removed from processed set - can retry`);
+        } else {
+          console.log(`   ⚠️  Telegram sent but Airtable update failed - keeping in processed set to prevent spam`);
+        }
+        
+        try {
+          await updateAirtableField(record.id, 'CreateStory', 'Failed');
+        } catch (updateError) {
+          console.error(`   ⚠️  Could not update Airtable to Failed:`, updateError.message);
+        }
       }
     }
     
