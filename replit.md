@@ -46,10 +46,12 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
     - When brand differs from company: 3 lines (price, product name, brand)
     - When brand matches company: 2 lines (price, product name)
   - Price format: "$250 vs. $500" (sale price vs. original price)
+  - Smart image fetching with browser-like headers (User-Agent, Referer) to bypass 403/Forbidden errors
+  - Domain-level blocklist tracks sites that block images, preventing repeated failed attempts
   - Auto-uploads to Google Drive in nested folders: "Product Images > Company > Sale Name"
   - Instant delivery to iPhone via Telegram bot for manual posting
   - Smart duplicate prevention: blocks concurrent processing and spam while allowing retries for failed attempts
-  - Automatic status updates in Airtable ("Story Created", "Failed")
+  - Automatic status updates in Airtable ("Story Created")
 
 ## External Dependencies
 - **Airtable**: Primary data source for all sales and product picks. Uses `AIRTABLE_BASE_ID` and `AIRTABLE_PAT` for secure access.
