@@ -54,7 +54,8 @@ async function getGoogleDriveClient() {
 }
 
 function sanitizeFolderName(name) {
-  return name
+  const nameStr = String(name || 'Unknown');
+  return nameStr
     .replace(/\//g, '-')
     .replace(/\\/g, '-')
     .replace(/\0/g, '')
