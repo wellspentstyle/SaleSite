@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { uploadToGoogleDrive } from './google-drive-uploader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -92,12 +93,21 @@ export async function generateStoryImage(pick) {
 
     fs.writeFileSync(outputPath, finalImage);
     
-    console.log(`✅ Story image saved: ${outputPath}`);
+    console.log(`✅ Story image saved locally: ${outputPath}`);
+    
+    let driveLink = null;
+    try {
+      const driveResult = await uploadToGoogleDrive(outputPath, filename, 'Product Images');
+      driveLink = driveResult.webViewLink;
+    } catch (driveError) {
+      console.error('⚠️  Google Drive upload failed (continuing anyway):', driveError.message);
+    }
     
     return {
       buffer: finalImage,
       path: outputPath,
-      filename: filename
+      filename: filename,
+      driveLink: driveLink
     };
 
   } catch (error) {
