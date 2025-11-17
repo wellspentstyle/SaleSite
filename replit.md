@@ -25,7 +25,7 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 **Technical Implementations:**
 - **Filtering**: Sales can be filtered by discount range (0-30%, 30-50%, 50%+) and active status.
 - **Sorting**: Regular sales are automatically sorted from newest to oldest.
-- **Admin Interface**: A password-protected `/admin` panel allows for managing product picks.
+- **Admin Interface**: A password-protected `/admin` panel allows for managing product picks with editable brand fields on both auto-scraped and manual entry forms.
 - **SEO**: Comprehensive meta tags (Title, Description, Keywords, Open Graph, Twitter Card) are implemented for improved search engine visibility and social sharing.
 - **Performance Optimization**: 
   - In-memory caching with 5-minute TTL for the `/sales` endpoint reduces Airtable API calls by ~95%.
