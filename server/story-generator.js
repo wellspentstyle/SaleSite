@@ -72,7 +72,7 @@ export async function generateStoryImage(pick) {
     const priceOverlay = Buffer.from(priceSvg);
 
     let compositeArray = [
-      { input: priceOverlay, top: positionY, left: 5 }
+      { input: priceOverlay, top: positionY, left: 40 }
     ];
 
     const finalImage = await sharp(backgroundImage)
