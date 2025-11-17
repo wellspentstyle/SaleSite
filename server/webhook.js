@@ -469,6 +469,16 @@ app.post('/admin/extract-image', async (req, res) => {
   }
 });
 
+// Extract domain from URL for skip logic
+function extractDomain(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, ''); // Remove www prefix for consistency
+  } catch (error) {
+    return url; // Return original if parsing fails
+  }
+}
+
 // Scrape product data from URL(s) using intelligent orchestrator (fast scraper + Playwright fallback)
 app.post('/admin/scrape-product', async (req, res) => {
   const { auth } = req.headers;
@@ -489,8 +499,22 @@ app.post('/admin/scrape-product', async (req, res) => {
     
     const successes = [];
     const failures = [];
+    const failedDomains = new Set(); // Track domains that failed scraping
     
     for (const productUrl of urlsToScrape) {
+      const domain = extractDomain(productUrl);
+      
+      // Skip if this domain already failed
+      if (failedDomains.has(domain)) {
+        console.log(`  ⏩ Skipping ${productUrl} (domain ${domain} already failed)`);
+        failures.push({
+          url: productUrl,
+          error: `Skipped - domain ${domain} failed on previous URL`,
+          skipped: true
+        });
+        continue;
+      }
+      
       try {
         console.log(`  → ${productUrl}`);
         
@@ -503,6 +527,11 @@ app.post('/admin/scrape-product', async (req, res) => {
         if (!result.success) {
           const errorMsg = result.error || 'Could not extract product data';
           console.error(`  ❌ Failed: ${errorMsg}`);
+          
+          // Mark this domain as failed
+          failedDomains.add(domain);
+          console.log(`  🚫 Domain ${domain} marked as failed - will skip remaining URLs from this domain`);
+          
           failures.push({
             url: productUrl,
             error: errorMsg,
@@ -520,6 +549,11 @@ app.post('/admin/scrape-product', async (req, res) => {
         }
       } catch (error) {
         console.error(`  ❌ Error scraping ${productUrl}:`, error.message);
+        
+        // Mark this domain as failed
+        failedDomains.add(domain);
+        console.log(`  🚫 Domain ${domain} marked as failed - will skip remaining URLs from this domain`);
+        
         failures.push({
           url: productUrl,
           error: error.message
@@ -527,7 +561,8 @@ app.post('/admin/scrape-product', async (req, res) => {
       }
     }
     
-    console.log(`\n📊 Results: ${successes.length} succeeded, ${failures.length} failed`);
+    const skippedCount = failures.filter(f => f.skipped).length;
+    console.log(`\n📊 Results: ${successes.length} succeeded, ${failures.length} failed (${skippedCount} skipped)`);
     
     res.json({
       success: true,
