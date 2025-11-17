@@ -107,9 +107,10 @@ async function findOrCreateFolder(folderName, parentFolderId = null) {
 }
 
 async function findOrCreateNestedFolders(companyName, saleName) {
-  console.log(`📂 Creating folder structure: ${companyName} > ${saleName}`);
+  console.log(`📂 Creating folder structure: Product Images > ${companyName} > ${saleName}`);
   
-  const companyFolderId = await findOrCreateFolder(companyName);
+  const productImagesFolderId = await findOrCreateFolder('Product Images');
+  const companyFolderId = await findOrCreateFolder(companyName, productImagesFolderId);
   const saleFolderId = await findOrCreateFolder(saleName, companyFolderId);
   
   return saleFolderId;
@@ -140,7 +141,7 @@ export async function uploadToGoogleDrive(filePath, fileName, companyName, saleN
     });
 
     console.log(`✅ Uploaded to Google Drive: ${response.data.name}`);
-    console.log(`   Location: ${companyName} > ${saleName}`);
+    console.log(`   Location: Product Images > ${companyName} > ${saleName}`);
     console.log(`   View link: ${response.data.webViewLink}`);
 
     return {
