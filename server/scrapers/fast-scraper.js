@@ -347,19 +347,24 @@ async function extractWithAI(html, url, openai, testMetadata, logger, jsonLdResu
 
 INSTRUCTIONS FOR JSON-LD PARSING:
 1. Look for Product objects with @type: "Product"
-2. Extract name, image, and offers data
-3. For prices:
+2. Extract name, brand, image, and offers data
+3. For product name and brand:
+   - Look for "brand" field with "@type": "Brand" and extract brand name
+   - Extract product name WITHOUT the brand (e.g., "Glove Hinge Pumps" not "Proenza Schouler Glove Hinge Pumps")
+   - If brand is included in name, remove it
+4. For prices:
    - offers.price or offers[0].price = salePrice (current price)
    - offers.highPrice or offers.priceSpecification.price = originalPrice (compare-at price)
    - If only one price exists, set originalPrice to null
-4. For images:
+5. For images:
    - Use image field (can be string, object with url, or array)
    - Ensure it's a valid absolute URL
-5. Calculate percentOff if both prices exist and originalPrice > salePrice
+6. Calculate percentOff if both prices exist and originalPrice > salePrice
 
 Return this exact structure:
 {
-  "name": "Product Name",
+  "name": "Product Name Only",
+  "brand": "Brand Name",
   "imageUrl": "https://...",
   "originalPrice": 999.99,
   "salePrice": 499.99,
@@ -368,11 +373,25 @@ Return this exact structure:
 }
 
 Rules:
+- name: Product name WITHOUT brand prefix
+- brand: Extract brand name if available (may be null)
 - confidence: Use 85-95 for JSON-LD data (it's highly reliable)
 - If originalPrice is null or equals salePrice, set percentOff to 0
 - Return ONLY the JSON object, no markdown, no explanations
 - If you can't extract basic product info, return: {"error": "Could not extract product data"}`
     : `You are a product page parser. Extract product information from HTML and return ONLY valid JSON.
+
+CRITICAL INSTRUCTIONS FOR BRAND EXTRACTION:
+- Look for the ACTUAL product brand name, NOT the website name
+- Example: On Shopbop.com, extract "Proenza Schouler" not "Shopbop"
+- Check for: brand labels, designer names, manufacturer info near the product title
+- The brand is usually displayed prominently near or before the product name
+- If you can't find a specific brand, set brand to null
+
+CRITICAL INSTRUCTIONS FOR PRODUCT NAME:
+- Extract ONLY the product name WITHOUT the brand prefix
+- Example: "Glove Hinge Pumps" not "Proenza Schouler Glove Hinge Pumps"
+- Remove brand name if it's included in the title
 
 CRITICAL INSTRUCTIONS FOR PRICE EXTRACTION:
 1. Look for TWO distinct prices on the page:
@@ -403,7 +422,8 @@ CRITICAL INSTRUCTIONS FOR IMAGE EXTRACTION:
 
 Return this exact structure (do NOT copy these example values, extract REAL data):
 {
-  "name": "ACTUAL_PRODUCT_NAME_FROM_PAGE",
+  "name": "ACTUAL_PRODUCT_NAME_ONLY",
+  "brand": "ACTUAL_BRAND_NAME_OR_NULL",
   "imageUrl": "ACTUAL_IMAGE_URL_FROM_PAGE",
   "originalPrice": 999.99,
   "salePrice": 499.99,
@@ -412,7 +432,8 @@ Return this exact structure (do NOT copy these example values, extract REAL data
 }
 
 Rules:
-- name: Extract product title/name (required)
+- name: Extract product name WITHOUT brand (required)
+- brand: Extract the PRODUCT brand (not website name), set to null if not found
 - imageUrl: Find the main product image URL - must be a REAL absolute URL from the website, NOT a placeholder (required)
 - originalPrice: The HIGHER regular/compare-at price. Set to null if only one price exists.
 - salePrice: The CURRENT selling price (required)
@@ -568,12 +589,13 @@ These prices were extracted from reliable structured data (${deterministicResult
     throw new Error(`Low confidence (${confidence}%) - prices may be inaccurate`);
   }
 
-  logger.log(`✅ Extracted product (confidence: ${confidence}%):`, { name: productData.name, salePrice, originalPrice, percentOff });
+  logger.log(`✅ Extracted product (confidence: ${confidence}%):`, { name: productData.name, brand: productData.brand, salePrice, originalPrice, percentOff });
 
   testMetadata.phaseUsed = 'ai-extraction';
 
   return {
     name: productData.name,
+    brand: productData.brand || null,
     imageUrl: productData.imageUrl,
     originalPrice: originalPrice,
     salePrice: salePrice,

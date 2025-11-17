@@ -567,6 +567,11 @@ app.post('/admin/picks', async (req, res) => {
         SaleID: [saleId] // Link to Sales table
       };
       
+      // Add brand if available
+      if (pick.brand) {
+        fields.Brand = pick.brand;
+      }
+      
       // Only add prices if they exist
       if (pick.originalPrice) {
         fields.OriginalPrice = pick.originalPrice;
