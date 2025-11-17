@@ -710,7 +710,11 @@ app.post('/admin/sync-gem', async (req, res) => {
     
     // Use Playwright to trigger login email (gem.app blocks direct API calls)
     const { chromium } = await import('playwright');
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({ 
+      headless: true,
+      executablePath: '/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     });
