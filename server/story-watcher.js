@@ -49,6 +49,7 @@ export async function checkForStoryRequests() {
         name: fields.ProductName || 'Product',
         brand: fields.Brand || null,
         imageUrl: fields.ImageURL,
+        productUrl: fields.ProductURL || null,
         originalPrice: fields.OriginalPrice,
         salePrice: fields.SalePrice,
         shopMyUrl: fields.ShopMyURL || '#',
@@ -79,15 +80,13 @@ export async function checkForStoryRequests() {
         if (!telegramSent) {
           processedRecords.delete(record.id);
           console.log(`   ♻️  Removed from processed set - can retry`);
+          console.log(`   💡 Tip: Manually change CreateStory field back to "Create Story" to retry`);
         } else {
           console.log(`   ⚠️  Telegram sent but Airtable update failed - keeping in processed set to prevent spam`);
         }
         
-        try {
-          await updateAirtableField(record.id, 'CreateStory', 'Failed');
-        } catch (updateError) {
-          console.error(`   ⚠️  Could not update Airtable to Failed:`, updateError.message);
-        }
+        // Note: Don't try to update to "Failed" - that option doesn't exist in Airtable
+        // User can manually change the field if needed
       }
     }
     

@@ -11,17 +11,60 @@ const __dirname = path.dirname(__filename);
 const STORY_WIDTH = 1080;
 const STORY_HEIGHT = 1920;
 
+// Track domains where image fetching has failed with 403/Forbidden
+const imageBlocklist = new Set();
+
+// Extract domain from URL
+function extractDomain(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, '');
+  } catch (error) {
+    return null;
+  }
+}
+
 export async function generateStoryImage(pick) {
   try {
     console.log(`🎨 Generating story image for: ${pick.name}`);
     
     const imageUrl = pick.imageUrl;
+    const productUrl = pick.productUrl;
+    
     if (!imageUrl) {
       throw new Error('No image URL provided');
     }
 
-    const imageResponse = await fetch(imageUrl);
+    // Check if image domain is on blocklist
+    const imageDomain = extractDomain(imageUrl);
+    if (imageDomain && imageBlocklist.has(imageDomain)) {
+      console.log(`   ⚠️  Image domain ${imageDomain} is blocked - skipping download`);
+      throw new Error(`Image domain ${imageDomain} is blocked due to previous 403 errors`);
+    }
+
+    // Add browser-like headers to avoid Forbidden errors
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    };
+    
+    // Add Referer if we have the product URL
+    if (productUrl) {
+      const productDomain = extractDomain(productUrl);
+      if (productDomain) {
+        headers['Referer'] = productUrl;
+      }
+    }
+
+    const imageResponse = await fetch(imageUrl, { headers });
+    
     if (!imageResponse.ok) {
+      // If we get 403/Forbidden, add domain to blocklist
+      if (imageResponse.status === 403) {
+        if (imageDomain) {
+          imageBlocklist.add(imageDomain);
+          console.log(`   🚫 Added ${imageDomain} to image blocklist (403 Forbidden)`);
+        }
+      }
       throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
     }
     
