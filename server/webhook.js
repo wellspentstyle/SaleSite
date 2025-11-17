@@ -706,31 +706,32 @@ app.post('/admin/sync-gem', async (req, res) => {
   
   try {
     console.log('💎 Starting Gem sync process...');
-    console.log('📧 Requesting login email from Gem...');
+    console.log('📧 Requesting login email from Gem using browser automation...');
     
-    // Trigger Gem login email by making a request to their login endpoint
-    const loginResponse = await fetch('https://gem.app/api/auth/email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      },
-      body: JSON.stringify({
-        email: GEM_EMAIL,
-        callbackUrl: 'https://gem.app/my-gems'
-      })
+    // Use Playwright to trigger login email (gem.app blocks direct API calls)
+    const { chromium } = await import('playwright');
+    const browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     });
+    const page = await context.newPage();
     
-    if (!loginResponse.ok) {
-      const errorText = await loginResponse.text();
-      console.error('❌ Failed to request Gem login email:', errorText);
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Failed to request login email from Gem' 
-      });
+    try {
+      // Navigate to login page
+      await page.goto('https://gem.app/requestEmailLogIn', { waitUntil: 'networkidle', timeout: 15000 });
+      
+      // Fill in email and submit
+      await page.fill('input[type="email"]', GEM_EMAIL);
+      await page.click('button[type="submit"]');
+      
+      // Wait for submission to complete
+      await page.waitForTimeout(2000);
+      
+      console.log('✅ Login email requested successfully');
+    } finally {
+      await browser.close();
     }
     
-    console.log('✅ Login email requested successfully');
     console.log('⏳ Waiting for magic link email (max 2 minutes)...');
     
     // Wait for magic link with timeout (2 minutes)
