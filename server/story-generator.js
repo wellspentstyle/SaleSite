@@ -51,7 +51,9 @@ export async function generateStoryImage(pick) {
     const fontSize = 48;
     const textPadding = 20;
     const charWidth = fontSize * 0.6;
-    const priceBoxWidth = Math.ceil(priceText.length * charWidth) + (textPadding * 4);
+    const maxBoxWidth = STORY_WIDTH - 80;
+    
+    const priceBoxWidth = Math.min(Math.ceil(priceText.length * charWidth) + (textPadding * 4), maxBoxWidth);
     const priceBoxHeight = fontSize + (textPadding * 2);
 
     const pricePositionY = Math.floor(STORY_HEIGHT - (STORY_HEIGHT / 3));
@@ -66,6 +68,8 @@ export async function generateStoryImage(pick) {
           font-size="${fontSize}" 
           font-weight="400" 
           fill="white"
+          textLength="${priceBoxWidth - (textPadding * 4)}"
+          lengthAdjust="spacingAndGlyphs"
         >${escapeHtml(priceText)}</text>
       </svg>
     `;
@@ -73,7 +77,7 @@ export async function generateStoryImage(pick) {
     const priceOverlay = Buffer.from(priceSvg);
 
     const productName = pick.name || 'Product';
-    const nameBoxWidth = Math.ceil(productName.length * charWidth) + (textPadding * 4);
+    const nameBoxWidth = Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth);
     const nameBoxHeight = fontSize + (textPadding * 2);
     const namePositionY = pricePositionY - priceBoxHeight - 10;
 
@@ -87,6 +91,8 @@ export async function generateStoryImage(pick) {
           font-size="${fontSize}" 
           font-weight="400" 
           fill="white"
+          textLength="${nameBoxWidth - (textPadding * 4)}"
+          lengthAdjust="spacingAndGlyphs"
         >${escapeHtml(productName)}</text>
       </svg>
     `;

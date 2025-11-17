@@ -14,7 +14,8 @@ export async function checkForStoryRequests() {
   try {
     console.log('🔍 Checking for CreateStory requests...');
     
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?filterByFormula={CreateStory}='Create Story'`;
+    const filter = `OR({CreateStory}='Create Story', {CreateStory}='create story', {CreateStory}='Story created', {CreateStory}='story created', {CreateStory}='Create story')`;
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?filterByFormula=${encodeURIComponent(filter)}`;
     
     const response = await fetch(url, {
       headers: {
