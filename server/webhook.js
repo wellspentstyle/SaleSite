@@ -237,6 +237,7 @@ app.get('/sales', async (req, res) => {
         picksBySale.get(saleId).push({
           id: record.id,
           name: record.fields.ProductName || '',
+          brand: record.fields.Brand || null,
           url: record.fields.ProductURL || '',
           imageUrl: record.fields.ImageURL || '',
           originalPrice: record.fields.OriginalPrice || 0,

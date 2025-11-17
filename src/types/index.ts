@@ -1,6 +1,7 @@
 export interface SalePick {
   id: string;
   name: string;
+  brand?: string;
   url: string;
   imageUrl: string;
   originalPrice: number;

@@ -73,18 +73,33 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
                       padding: '16px'
                     }}
                   >
-                    <h3 
-                      style={{ 
-                        fontFamily: 'DM Sans, sans-serif',
-                        fontSize: '14px',
-                        fontWeight: 400,
-                        lineHeight: '1.4',
-                        marginBottom: '12px',
-                        color: '#000'
-                      }}
-                    >
-                      {pick.name}
-                    </h3>
+                    <div style={{ marginBottom: '12px' }}>
+                      {pick.brand && pick.brand !== sale.brandName && (
+                        <div 
+                          style={{ 
+                            fontFamily: 'DM Sans, sans-serif',
+                            fontSize: '14px',
+                            fontWeight: 400,
+                            lineHeight: '1.4',
+                            color: '#000',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          {pick.brand}
+                        </div>
+                      )}
+                      <div 
+                        style={{ 
+                          fontFamily: 'DM Sans, sans-serif',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                          lineHeight: '1.4',
+                          color: '#000'
+                        }}
+                      >
+                        {pick.name}
+                      </div>
+                    </div>
                     
                     <div style={{ marginBottom: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
