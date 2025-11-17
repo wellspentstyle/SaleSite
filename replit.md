@@ -36,15 +36,17 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 **Feature Specifications:**
 - **Sales Listing**: Displays current and upcoming sales with discount percentages.
 - **Featured Sales**: Dynamically displays sales marked as "Featured" in Airtable with associated images.
-- **Product Picks**: Detailed product listings within a sale, including images, original/sale prices, and affiliate links.
-- **Hybrid Scraper**: Automatically extracts product data (name, image, price, percent off) from URLs using a multi-phase pipeline (JSON-LD, HTML extraction, AI). Includes a Playwright fallback for client-side rendered sites and a manual entry UI for failed scrapes.
+- **Product Picks**: Detailed product listings within a sale, including brand names, images, original/sale prices, and affiliate links. When brand differs from company (e.g., Proenza Schouler on Shopbop), brand is displayed above the product name in the picks dialog.
+- **Hybrid Scraper**: Automatically extracts product data (brand, name, image, price, percent off) from URLs using a multi-phase pipeline (JSON-LD, HTML extraction, AI). Brand extraction intelligently identifies actual product brands (not website names). Includes a Playwright fallback for client-side rendered sites and a manual entry UI for failed scrapes.
 - **Confidence Scoring**: Scraped products are assigned a confidence score (1-100) to indicate extraction accuracy, aiding in manual review.
 - **Email Automation**: CloudMailin webhook integrates with Gmail to automatically parse incoming sale emails, extract details using AI, and populate Airtable, including duplicate prevention.
 - **Instagram Story Automation**: Semi-automated system that generates Instagram story images (1080x1920px) when user changes Airtable CreateStory field to "Create Story". Features include:
   - Product photo with automatic zoom/crop to fill the frame
-  - Black bar positioned 40px from left, 1/3 from bottom with monospace font
+  - Dynamic text overlays in black bars with IBM Plex Mono font, positioned 40px from left, 1/3 from bottom:
+    - When brand differs from company: 3 lines (price, product name, brand)
+    - When brand matches company: 2 lines (price, product name)
   - Price format: "$250 vs. $500" (sale price vs. original price)
-  - Auto-uploads to Google Drive "Product Images" folder
+  - Auto-uploads to Google Drive in nested folders: "Product Images > Company > Sale Name"
   - Instant delivery to iPhone via Telegram bot for manual posting
   - Smart duplicate prevention: blocks concurrent processing and spam while allowing retries for failed attempts
   - Automatic status updates in Airtable ("Story Created", "Failed")
