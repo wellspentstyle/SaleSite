@@ -97,7 +97,9 @@ export async function generateStoryImage(pick) {
     
     let driveLink = null;
     try {
-      const driveResult = await uploadToGoogleDrive(outputPath, filename, 'Product Images');
+      const companyName = pick.company || 'Unknown';
+      const saleName = pick.saleName || 'Unknown Sale';
+      const driveResult = await uploadToGoogleDrive(outputPath, filename, companyName, saleName);
       driveLink = driveResult.webViewLink;
     } catch (driveError) {
       console.error('⚠️  Google Drive upload failed (continuing anyway):', driveError.message);

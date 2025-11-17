@@ -53,41 +53,74 @@ async function getGoogleDriveClient() {
   return google.drive({ version: 'v3', auth: oauth2Client });
 }
 
-async function findOrCreateFolder(folderName) {
+function sanitizeFolderName(name) {
+  return name
+    .replace(/\//g, '-')
+    .replace(/\\/g, '-')
+    .replace(/\0/g, '')
+    .trim();
+}
+
+function escapeQueryString(str) {
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+async function findOrCreateFolder(folderName, parentFolderId = null) {
   const drive = await getGoogleDriveClient();
+  
+  const sanitizedName = sanitizeFolderName(folderName);
+  const escapedName = escapeQueryString(sanitizedName);
+
+  let query = `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  if (parentFolderId) {
+    query += ` and '${parentFolderId}' in parents`;
+  }
 
   const response = await drive.files.list({
-    q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    q: query,
     fields: 'files(id, name)',
     spaces: 'drive'
   });
 
   if (response.data.files && response.data.files.length > 0) {
-    console.log(`📁 Found existing folder: ${folderName} (${response.data.files[0].id})`);
+    console.log(`📁 Found existing folder: ${sanitizedName} (${response.data.files[0].id})`);
     return response.data.files[0].id;
   }
 
   const fileMetadata = {
-    name: folderName,
+    name: sanitizedName,
     mimeType: 'application/vnd.google-apps.folder'
   };
+
+  if (parentFolderId) {
+    fileMetadata.parents = [parentFolderId];
+  }
 
   const folder = await drive.files.create({
     requestBody: fileMetadata,
     fields: 'id, name'
   });
 
-  console.log(`📁 Created new folder: ${folderName} (${folder.data.id})`);
+  console.log(`📁 Created new folder: ${sanitizedName} (${folder.data.id})`);
   return folder.data.id;
 }
 
-export async function uploadToGoogleDrive(filePath, fileName, folderName = 'Product Images') {
+async function findOrCreateNestedFolders(companyName, saleName) {
+  console.log(`📂 Creating folder structure: ${companyName} > ${saleName}`);
+  
+  const companyFolderId = await findOrCreateFolder(companyName);
+  const saleFolderId = await findOrCreateFolder(saleName, companyFolderId);
+  
+  return saleFolderId;
+}
+
+export async function uploadToGoogleDrive(filePath, fileName, companyName, saleName) {
   try {
     console.log(`☁️  Uploading to Google Drive: ${fileName}`);
 
     const drive = await getGoogleDriveClient();
     
-    const folderId = await findOrCreateFolder(folderName);
+    const folderId = await findOrCreateNestedFolders(companyName, saleName);
 
     const fileMetadata = {
       name: fileName,
@@ -106,6 +139,7 @@ export async function uploadToGoogleDrive(filePath, fileName, folderName = 'Prod
     });
 
     console.log(`✅ Uploaded to Google Drive: ${response.data.name}`);
+    console.log(`   Location: ${companyName} > ${saleName}`);
     console.log(`   View link: ${response.data.webViewLink}`);
 
     return {

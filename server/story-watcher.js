@@ -49,7 +49,9 @@ export async function checkForStoryRequests() {
         imageUrl: fields.ImageURL,
         originalPrice: fields.OriginalPrice,
         salePrice: fields.SalePrice,
-        shopMyUrl: fields.ShopMyURL || '#'
+        shopMyUrl: fields.ShopMyURL || '#',
+        company: fields.Company || 'Unknown',
+        saleName: fields.SaleName ? fields.SaleName[0] : 'Unknown Sale'
       };
       
       console.log(`   📸 Processing story for: ${pick.name}`);
