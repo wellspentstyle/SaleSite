@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeTelegramBot } from './telegram-bot.js';
 import { scrapeGemItems } from './gem-scraper.js';
+import { generateMultipleFeaturedAssets } from './featured-assets-generator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -960,6 +961,45 @@ app.post('/admin/sync-gem', async (req, res) => {
     }
     
     res.status(500).json({ success: false, message: userMessage });
+  }
+});
+
+// Generate featured sales assets
+app.post('/admin/generate-featured-assets', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { saleIds } = req.body;
+    
+    if (!saleIds || !Array.isArray(saleIds) || saleIds.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please provide an array of sale IDs' 
+      });
+    }
+    
+    console.log(`\n📸 Generating featured assets for ${saleIds.length} sales...`);
+    
+    const results = await generateMultipleFeaturedAssets(saleIds);
+    
+    const successCount = results.filter(r => r.success).length;
+    
+    res.json({
+      success: true,
+      message: `Generated ${successCount}/${saleIds.length} assets`,
+      results
+    });
+    
+  } catch (error) {
+    console.error('❌ Featured assets generation error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
   }
 });
 

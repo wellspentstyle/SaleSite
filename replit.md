@@ -62,6 +62,18 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
   - Robust error handling with user-friendly messages for troubleshooting
   - Saves items to Airtable Gem table with fields: ProductName, ProductURL, Brand, Price, Size, ImageURL, DateSaved, Marketplace
   - Magic links are single-use tokens, cached and cleared immediately after receipt to prevent reuse
+- **Featured Sales Assets**: Social media asset generator for promoting sales. Features include:
+  - Admin panel interface for selecting multiple live sales with checkboxes
+  - Generates 1080x1350 Instagram-ready images with:
+    - Random header color from palette (#273536, #145fe9, #fe6731, #d2972f)
+    - Company name, discount percentage, end date, and promo code
+    - First 3 product picks with images and pricing overlays
+    - Bold condensed typography (DejaVu Sans Bold)
+  - Validates picks have required fields (ImageURL, ProductName) before processing
+  - Fails gracefully if no valid product images can be fetched
+  - Auto-uploads to Google Drive: Product Images → Featured Sales → [Date]
+  - Batch processing with per-sale success/failure reporting
+  - Smart image fetching with browser-like headers to bypass 403 errors
 
 ## External Dependencies
 - **Airtable**: Primary data source for all sales and product picks. Uses `AIRTABLE_BASE_ID` and `AIRTABLE_PAT` for secure access.
