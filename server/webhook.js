@@ -877,21 +877,34 @@ app.post('/admin/sync-gem', async (req, res) => {
     }
     
     console.log('⏳ Waiting for magic link email (max 2 minutes)...');
+    console.log('🔍 Current magic link cache status:');
+    console.log('   - Has link:', !!gemMagicLinks.link);
+    console.log('   - Expires at:', new Date(gemMagicLinks.expiresAt).toISOString());
+    console.log('   - Is valid:', gemMagicLinks.link && Date.now() < gemMagicLinks.expiresAt);
     
     // Wait for magic link with timeout (2 minutes)
     const magicLink = await new Promise((resolve, reject) => {
+      const startTime = Date.now();
       const timeout = setTimeout(() => {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        console.log(`⏰ Timeout after ${elapsed} seconds - no magic link received`);
         gemMagicLinks.pendingRequest = null;
-        reject(new Error('Timeout waiting for magic link email'));
+        reject(new Error('Timeout waiting for magic link email (2 minutes)'));
       }, 120000); // 2 minutes
+      
+      console.log('📝 Registered pending request resolver');
       
       // Store resolver so webhook can notify us when email arrives
       gemMagicLinks.pendingRequest = {
         resolve: (link) => {
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          console.log(`✅ Promise resolved after ${elapsed} seconds with magic link`);
           clearTimeout(timeout);
           resolve(link);
         },
         reject: (error) => {
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          console.log(`❌ Promise rejected after ${elapsed} seconds: ${error.message}`);
           clearTimeout(timeout);
           reject(error);
         }
@@ -900,8 +913,10 @@ app.post('/admin/sync-gem', async (req, res) => {
       // Check if we already have a valid link in memory
       if (gemMagicLinks.link && Date.now() < gemMagicLinks.expiresAt) {
         clearTimeout(timeout);
-        console.log('✅ Using existing magic link from memory');
+        console.log('✅ Using existing magic link from memory (cached)');
         resolve(gemMagicLinks.link);
+      } else {
+        console.log('⏳ No cached link - waiting for webhook to receive email...');
       }
     });
     
@@ -1011,14 +1026,16 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
     // Check if this is a Gem login email
     if (from.includes('gem.app') || subject.toLowerCase().includes('log in to gem')) {
       console.log('🔐 Detected Gem login email');
+      console.log('📧 Email content preview:', emailContent.substring(0, 500));
       
       // Extract magic link from email content
-      // Gem sends links like: https://gem.app/auth/login?token=...
-      const magicLinkMatch = emailContent.match(/https:\/\/gem\.app\/auth\/login\?token=[^\s<>"']+/i);
+      // Gem sends links like: https://gem.app/emailLogIn?email=...&token=...
+      const magicLinkMatch = emailContent.match(/https:\/\/gem\.app\/emailLogIn\?[^\s<>"'\r\n]+/i);
       
       if (magicLinkMatch) {
         const magicLink = magicLinkMatch[0];
-        console.log('✅ Extracted Gem magic link');
+        console.log('✅ Extracted Gem magic link:', magicLink);
+        console.log('🔍 Pending request status:', gemMagicLinks.pendingRequest ? 'WAITING' : 'NONE');
         
         // Store magic link in memory (expires in 5 minutes)
         gemMagicLinks.link = magicLink;
@@ -1029,6 +1046,8 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
           console.log('🔓 Resolving pending sync request with magic link');
           gemMagicLinks.pendingRequest.resolve(magicLink);
           gemMagicLinks.pendingRequest = null;
+        } else {
+          console.log('💾 No pending request - magic link stored in memory for 5 minutes');
         }
         
         return res.status(200).json({ 
@@ -1037,6 +1056,7 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
         });
       } else {
         console.log('❌ Could not extract magic link from Gem email');
+        console.log('📧 Full email content:', emailContent);
         
         // Still resolve pending request with error
         if (gemMagicLinks.pendingRequest) {
