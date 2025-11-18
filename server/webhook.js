@@ -8,7 +8,6 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeTelegramBot } from './telegram-bot.js';
-import { startStoryWatcher } from './story-watcher.js';
 import { scrapeGemItems } from './gem-scraper.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1231,6 +1230,90 @@ Rules:
 });
 
 // ============================================
+// AIRTABLE STORY GENERATION WEBHOOK
+// ============================================
+
+app.post('/webhook/airtable-story', async (req, res) => {
+  try {
+    console.log('\n📸 Airtable story generation webhook triggered');
+    console.log('Request body:', req.body);
+    
+    const recordId = req.body?.recordId || req.body?.record_id;
+    
+    if (!recordId) {
+      console.error('❌ No record ID provided');
+      return res.status(400).json({ success: false, error: 'Record ID is required' });
+    }
+    
+    console.log(`Processing story for record: ${recordId}`);
+    
+    // Fetch the specific record from Airtable
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Picks/${recordId}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Airtable API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const fields = data.fields;
+    
+    // Build pick object
+    const pick = {
+      id: recordId,
+      name: fields.ProductName || 'Product',
+      brand: fields.Brand || null,
+      imageUrl: fields.ImageURL,
+      productUrl: fields.ProductURL || null,
+      originalPrice: fields.OriginalPrice,
+      salePrice: fields.SalePrice,
+      shopMyUrl: fields.ShopMyURL || '#',
+      company: fields.Company || 'Unknown',
+      saleName: fields.SaleName ? fields.SaleName[0] : 'Unknown Sale'
+    };
+    
+    console.log(`📸 Generating story for: ${pick.name}`);
+    
+    // Import story generator functions
+    const { generateStoryImage } = await import('./story-generator.js');
+    const { sendStoryToTelegram } = await import('./telegram-bot.js');
+    
+    // Generate and send story
+    const storyImage = await generateStoryImage(pick);
+    const caption = `*${pick.name}*\n\nShop now: ${pick.shopMyUrl}`;
+    
+    await sendStoryToTelegram(TELEGRAM_CHAT_ID, storyImage.buffer, caption);
+    
+    // Update Airtable field to "Story Created"
+    await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          CreateStory: 'Story Created'
+        }
+      })
+    });
+    
+    console.log(`✅ Story created and sent for: ${pick.name}`);
+    
+    res.json({ success: true, message: 'Story generated successfully' });
+    
+  } catch (error) {
+    console.error('❌ Story generation error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
 // SERVE REACT BUILD IN PRODUCTION
 // ============================================
 
@@ -1263,8 +1346,10 @@ app.listen(PORT, '0.0.0.0', () => {
   if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
     console.log('📱 Initializing Telegram bot...');
     initializeTelegramBot(TELEGRAM_BOT_TOKEN);
-    console.log('👀 Starting Instagram story watcher...');
-    startStoryWatcher();
+    console.log('📸 Story generation via webhook: /webhook/airtable-story');
+    console.log('   (Polling disabled - use Airtable Automation to trigger)');
+    // Polling watcher disabled - now using webhook-based triggering from Airtable
+    // startStoryWatcher();
   } else {
     console.log('⚠️  Telegram not configured - story generation disabled');
     console.log('   Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to enable');

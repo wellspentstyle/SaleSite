@@ -40,7 +40,9 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - **Hybrid Scraper**: Automatically extracts product data (brand, name, image, price, percent off) from URLs using a multi-phase pipeline (JSON-LD, HTML extraction, AI). Brand extraction intelligently identifies actual product brands (not website names). Includes a Playwright fallback for client-side rendered sites and a manual entry UI for failed scrapes. Batch scraping is optimized with domain-level skip logic: if the first URL from a domain fails, all remaining URLs from that domain are instantly skipped (avoiding wasted API calls and processing time).
 - **Confidence Scoring**: Scraped products are assigned a confidence score (1-100) to indicate extraction accuracy, aiding in manual review.
 - **Email Automation**: CloudMailin webhook integrates with Gmail to automatically parse incoming sale emails, extract details using AI, and populate Airtable, including duplicate prevention.
-- **Instagram Story Automation**: Semi-automated system that generates Instagram story images (1080x1920px) when user changes Airtable CreateStory field to "Create Story". Features include:
+- **Instagram Story Automation**: Event-driven system that generates Instagram story images (1080x1920px) triggered by Airtable Automation when CreateStory field changes to "Create Story". Features include:
+  - Webhook-based triggering via `/webhook/airtable-story` endpoint (eliminates inefficient polling)
+  - Airtable Automation sends record ID to webhook when CreateStory field changes
   - Product photo with automatic zoom/crop to fill the frame
   - Dynamic text overlays in black bars with IBM Plex Mono font, positioned 40px from left, 1/3 from bottom:
     - When brand differs from company: 3 lines (price, product name, brand)
@@ -50,7 +52,6 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
   - Domain-level blocklist tracks sites that block images, preventing repeated failed attempts
   - Auto-uploads to Google Drive in nested folders: "Product Images > Company > Sale Name"
   - Instant delivery to iPhone via Telegram bot for manual posting
-  - Smart duplicate prevention: blocks concurrent processing and spam while allowing retries for failed attempts
   - Automatic status updates in Airtable ("Story Created")
 - **Gem.app Sync**: Automated scraper for vintage clothing items saved on Gem.app. Features include:
   - Accessible via "💎 Sync Gem Items" button in admin panel header
