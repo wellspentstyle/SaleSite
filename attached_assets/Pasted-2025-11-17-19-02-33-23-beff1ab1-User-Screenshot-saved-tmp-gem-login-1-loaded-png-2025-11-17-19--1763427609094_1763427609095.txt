@@ -1,0 +1,152 @@
+2025-11-17 19:02:33.23
+beff1ab1
+User
+📸 Screenshot saved: /tmp/gem-login-1-loaded.png
+2025-11-17 19:02:33.82
+beff1ab1
+User
+📄 Page loaded: "Gem • Log In" at https://gem.app/requestEmailLogIn
+2025-11-17 19:02:34.43
+beff1ab1
+User
+📸 Screenshot saved: /tmp/gem-login-2-filled.png
+2025-11-17 19:02:37.92
+beff1ab1
+User
+"return_path": "0100019a9445372f-9e21354d-1ba5-4a12-9931-f1a2afb53204-000000@mail.gem.app",
+2025-11-17 19:02:37.92
+beff1ab1
+User
+"i=1; mx.google.com; dkim=pass header.i=@gem.app header.s=ltjayb6pfmg6bdj7burua3yufomupa7y header.b=\"n9rzW2/u\"; dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=FomeNP9k; spf=pass (google.com: domain of 0100019a9445372f-9e21354d-1ba5-4a12-9931-f1a2afb53204-000000@mail.gem.app designates 54.240.48.107 as permitted sender) smtp.mailfrom=0100019a9445372f-9e21354d-1ba5-4a12-9931-f1a2afb53204-000000@mail.gem.app; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=gem.app"
+2025-11-17 19:02:37.92
+beff1ab1
+User
+"i=2; mx.google.com; dkim=pass header.i=@gem.app header.s=ltjayb6pfmg6bdj7burua3yufomupa7y header.b=\"n9rzW2/u\"; dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=FomeNP9k; spf=pass (google.com: domain of 0100019a9445372f-9e21354d-1ba5-4a12-9931-f1a2afb53204-000000@mail.gem.app designates 54.240.48.107 as permitted sender) smtp.mailfrom=0100019a9445372f-9e21354d-1ba5-4a12-9931-f1a2afb53204-000000@mail.gem.app; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=gem.app",
+2025-11-17 19:02:37.92
+beff1ab1
+User
+"received_spf": "pass (google.com: domain of 0100019a9445372f-9e21354d-1ba5-4a12-9931-f1a2afb53204-000000@mail.gem.app designates 54.240.48.107 as permitted sender) client-ip=54.240.48.107;",
+2025-11-17 19:02:37.92
+beff1ab1
+User
+"from": "Gem <emailer@gem.app>",
+2025-11-17 19:02:37.92
+beff1ab1
+User
+"references": "<b9b4cd32-f5ee-4017-9a3b-8c609710ebc9@gem.app>",
+2025-11-17 19:02:37.92
+beff1ab1
+User
+"authentication_results": "mx.google.com; dkim=pass header.i=@gem.app header.s=ltjayb6pfmg6bdj7burua3yufomupa7y header.b=\"n9rzW2/u\"; dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=FomeNP9k; spf=pass (google.com: domain of 0100019a9445372f-9e21354d-1ba5-4a12-9931-f1a2afb53204-000000@mail.gem.app designates 54.240.48.107 as permitted sender) smtp.mailfrom=0100019a9445372f-9e21354d-1ba5-4a12-9931-f1a2afb53204-000000@mail.gem.app; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=gem.app",
+2025-11-17 19:06:55.06
+beff1ab1
+User
+📨 POST /admin/sync-gem
+2025-11-17 19:06:55.47
+beff1ab1
+User
+🌐 Navigating to gem.app/requestEmailLogIn...
+2025-11-17 19:06:56.68
+beff1ab1
+User
+📸 Screenshot saved: /tmp/gem-login-1-loaded.png
+2025-11-17 19:06:57.25
+beff1ab1
+User
+📄 Page loaded: "Gem • Log In" at https://gem.app/requestEmailLogIn
+2025-11-17 19:06:57.80
+beff1ab1
+User
+📸 Screenshot saved: /tmp/gem-login-2-filled.png
+2025-11-17 19:07:00.78
+beff1ab1
+User
+"v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;\ts=ltjayb6pfmg6bdj7burua3yufomupa7y; d=gem.app; t=1763424418;\th=From:To:References:Subject:Message-ID:Date:MIME-Version:Content-Type;\tbh=GzDs1oryFOXB4b5uwyIUSLVzp0yPCEZHI+bvf8oOVqU=;\tb=CFnSp5xZWfiDr/TzPn+GAXrwzQKku2zEsso3pEnVFW+jzM9F8nI6DKCYi/QFgMUY\taBTRNnyTL8XTQzilcAaJZLq6yAOe7V0yRo79JkzpkQ1ojpkG69x3DIP3GfizmKSHrlR\twbrVDgE2Hu2FSUPTprAgsGE3vp4WSwNFafi1A4EM=",
+2025-11-17 19:07:00.78
+beff1ab1
+User
+"return_path": "0100019a94493b6d-490cc236-1b37-4656-8648-49105570b1af-000000@mail.gem.app",
+2025-11-17 19:07:00.78
+beff1ab1
+User
+"plain": "Log in by clicking the following link:\r\nhttps://gem.app/emailLogIn?email&#x3D;wellspentstylelinks%40gmail.com&amp;token&#x3D;tnpUfw5pacYidPFP1vzlkLDAro0\r\n\r\nDidn’t request log in link?\r\nYou can safely disregard this email.\r\n\r\nhttps://gem.app\r\n",
+2025-11-17 19:07:00.78
+beff1ab1
+User
+"from": "Gem <emailer@gem.app>",
+2025-11-17 19:07:00.78
+beff1ab1
+User
+"authentication_results": "mx.google.com; dkim=pass header.i=@gem.app header.s=ltjayb6pfmg6bdj7burua3yufomupa7y header.b=CFnSp5xZ; dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=LEGn4LYF; spf=pass (google.com: domain of 0100019a94493b6d-490cc236-1b37-4656-8648-49105570b1af-000000@mail.gem.app designates 54.240.48.107 as permitted sender) smtp.mailfrom=0100019a94493b6d-490cc236-1b37-4656-8648-49105570b1af-000000@mail.gem.app; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=gem.app",
+2025-11-17 19:07:00.78
+beff1ab1
+User
+"i=2; mx.google.com; dkim=pass header.i=@gem.app header.s=ltjayb6pfmg6bdj7burua3yufomupa7y header.b=CFnSp5xZ; dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=LEGn4LYF; spf=pass (google.com: domain of 0100019a94493b6d-490cc236-1b37-4656-8648-49105570b1af-000000@mail.gem.app designates 54.240.48.107 as permitted sender) smtp.mailfrom=0100019a94493b6d-490cc236-1b37-4656-8648-49105570b1af-000000@mail.gem.app; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=gem.app",
+2025-11-17 19:07:00.78
+beff1ab1
+User
+"i=1; mx.google.com; dkim=pass header.i=@gem.app header.s=ltjayb6pfmg6bdj7burua3yufomupa7y header.b=CFnSp5xZ; dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=LEGn4LYF; spf=pass (google.com: domain of 0100019a94493b6d-490cc236-1b37-4656-8648-49105570b1af-000000@mail.gem.app designates 54.240.48.107 as permitted sender) smtp.mailfrom=0100019a94493b6d-490cc236-1b37-4656-8648-49105570b1af-000000@mail.gem.app; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=gem.app"
+2025-11-17 19:07:00.78
+beff1ab1
+User
+"received_spf": "pass (google.com: domain of 0100019a94493b6d-490cc236-1b37-4656-8648-49105570b1af-000000@mail.gem.app designates 54.240.48.107 as permitted sender) client-ip=54.240.48.107;",
+2025-11-17 19:07:00.78
+beff1ab1
+User
+"references": "<d69f9672-c5d5-4842-8354-0a583bfaf05e@gem.app>",
+2025-11-17 19:16:31.25
+a3355b55
+User
+📨 POST /admin/sync-gem
+2025-11-17 19:16:41.32
+a3355b55
+User
+🌐 Navigating to gem.app/requestEmailLogIn...
+2025-11-17 19:16:43.10
+a3355b55
+User
+📸 Screenshot saved: /tmp/gem-login-1-loaded.png
+2025-11-17 19:16:43.61
+a3355b55
+User
+📄 Page loaded: "Gem • Log In" at https://gem.app/requestEmailLogIn
+2025-11-17 19:16:44.14
+a3355b55
+User
+📸 Screenshot saved: /tmp/gem-login-2-filled.png
+2025-11-17 19:16:47.67
+a3355b55
+User
+📸 Screenshot saved: /tmp/gem-login-3-submitted.png
+2025-11-17 19:16:47.76
+a3355b55
+User
+"references": "<bdc68c9b-aee9-485e-aeb5-4ec815f1a186@gem.app>",
+2025-11-17 19:16:47.76
+a3355b55
+User
+"authentication_results": "mx.google.com; dkim=pass header.i=@gem.app header.s=ltjayb6pfmg6bdj7burua3yufomupa7y header.b=iUnDmie9; dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=BiTL+EER; spf=pass (google.com: domain of 0100019a94522f16-6f91b547-2f3f-45f1-8efe-f468e4f5166b-000000@mail.gem.app designates 54.240.8.79 as permitted sender) smtp.mailfrom=0100019a94522f16-6f91b547-2f3f-45f1-8efe-f468e4f5166b-000000@mail.gem.app; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=gem.app",
+2025-11-17 19:16:47.76
+a3355b55
+User
+"i=1; mx.google.com; dkim=pass header.i=@gem.app header.s=ltjayb6pfmg6bdj7burua3yufomupa7y header.b=iUnDmie9; dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=BiTL+EER; spf=pass (google.com: domain of 0100019a94522f16-6f91b547-2f3f-45f1-8efe-f468e4f5166b-000000@mail.gem.app designates 54.240.8.79 as permitted sender) smtp.mailfrom=0100019a94522f16-6f91b547-2f3f-45f1-8efe-f468e4f5166b-000000@mail.gem.app; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=gem.app"
+2025-11-17 19:16:47.76
+a3355b55
+User
+"received_spf": "pass (google.com: domain of 0100019a94522f16-6f91b547-2f3f-45f1-8efe-f468e4f5166b-000000@mail.gem.app designates 54.240.8.79 as permitted sender) client-ip=54.240.8.79;",
+2025-11-17 19:16:47.76
+a3355b55
+User
+"v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;\ts=ltjayb6pfmg6bdj7burua3yufomupa7y; d=gem.app; t=1763425005;\th=From:To:References:Subject:Message-ID:Date:MIME-Version:Content-Type;\tbh=m2BxQss4wfCuXW2/Oxo2gyzNwWoeZA9cl8QK3JKpBc8=;\tb=iUnDmie9q/YaMPIad3oJK3XYxXS9FAEi8Af40dtBvArIItIm/2d/Ki5y4gEADqM0\tceysUOwbH83aiDzh46YqVKn1FyfC2cWNj5wjwZFrEp5NtDqexPVHZufjZ7/Gaku6xee\tPDCXxoAWAjhoHCgcxM64e/wzLP5lhN5C2BbE67dA=",
+2025-11-17 19:16:47.76
+a3355b55
+User
+"return_path": "0100019a94522f16-6f91b547-2f3f-45f1-8efe-f468e4f5166b-000000@mail.gem.app",
+2025-11-17 19:16:47.76
+a3355b55
+User
+"from": "Gem <emailer@gem.app>",
+2025-11-17 19:16:47.76
+a3355b55
+User
+"i=2; mx.google.com; dkim=pass header.i=@gem.app header.s=ltjayb6pfmg6bdj7burua3yufomupa7y header.b=iUnDmie9; dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b=BiTL+EER; spf=pass (google.com: domain of 0100019a94522f16-6f91b547-2f3f-45f1-8efe-f468e4f5166b-000000@mail.gem.app designates 54.240.8.79 as permitted sender) smtp.mailfrom=0100019a94522f16-6f91b547-2f3f-45f1-8efe-f468e4f5166b-000000@mail.gem.app; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=gem.app",
