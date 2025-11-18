@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -105,11 +106,34 @@ export async function scrapeGemItems(magicLink, options = {}) {
 
   let browser;
   try {
-    browser = await chromium.launch({
+    // Try to find Chromium executable (different paths in dev vs production)
+    let chromiumPath = null;
+    try {
+      chromiumPath = execSync('which chromium', { encoding: 'utf-8' }).trim();
+      logger.log(`✅ Found Chromium at: ${chromiumPath}`);
+    } catch (e) {
+      logger.log('⚠️  Could not find chromium with which, trying default path...');
+    }
+    
+    const launchOptions = {
       headless: true,
-      executablePath: '/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
+    };
+    
+    if (chromiumPath) {
+      launchOptions.executablePath = chromiumPath;
+    }
+    
+    logger.log('🚀 Launching browser...');
+    browser = await chromium.launch(launchOptions);
 
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'

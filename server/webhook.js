@@ -704,17 +704,42 @@ app.post('/admin/sync-gem', async (req, res) => {
     });
   }
   
+  let browser;
   try {
     console.log('💎 Starting Gem sync process...');
     console.log('📧 Requesting login email from Gem using browser automation...');
     
     // Use Playwright to trigger login email (gem.app blocks direct API calls)
     const { chromium } = await import('playwright');
-    const browser = await chromium.launch({ 
+    
+    // Try to find Chromium executable (different paths in dev vs production)
+    let chromiumPath = null;
+    try {
+      chromiumPath = execSync('which chromium', { encoding: 'utf-8' }).trim();
+      console.log(`✅ Found Chromium at: ${chromiumPath}`);
+    } catch (e) {
+      console.log('⚠️  Could not find chromium with which, trying default path...');
+    }
+    
+    const launchOptions = {
       headless: true,
-      executablePath: '/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
+    };
+    
+    if (chromiumPath) {
+      launchOptions.executablePath = chromiumPath;
+    }
+    
+    console.log('🚀 Launching browser with options:', JSON.stringify(launchOptions, null, 2));
+    browser = await chromium.launch(launchOptions);
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     });
@@ -837,6 +862,7 @@ app.post('/admin/sync-gem', async (req, res) => {
       console.log('✅ Login email requested successfully');
     } catch (error) {
       console.error('❌ Browser automation error:', error.message);
+      console.error('Full error:', error);
       // Try to capture screenshot on error
       try {
         await page.screenshot({ path: '/tmp/gem-login-error.png' });
@@ -844,9 +870,11 @@ app.post('/admin/sync-gem', async (req, res) => {
       } catch (screenshotError) {
         console.log('⚠️ Could not capture error screenshot');
       }
-      throw error;
+      throw new Error(`Browser automation failed: ${error.message}`);
     } finally {
-      await browser.close();
+      if (browser) {
+        await browser.close().catch(e => console.log('⚠️  Browser already closed'));
+      }
     }
     
     console.log('⏳ Waiting for magic link email (max 2 minutes)...');
@@ -907,7 +935,17 @@ app.post('/admin/sync-gem', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Gem sync error:', error.message);
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Error stack:', error.stack);
+    
+    // Provide user-friendly error messages
+    let userMessage = error.message;
+    if (error.message.includes('Browser automation failed')) {
+      userMessage = `Browser automation failed. This could be due to Chromium not being available or the Gem login page structure changing. Error: ${error.message}`;
+    } else if (error.message.includes('Timeout waiting for magic link')) {
+      userMessage = 'Timeout waiting for magic link email. Please check that CloudMailin is configured correctly and emails from gem.app are being forwarded.';
+    }
+    
+    res.status(500).json({ success: false, message: userMessage });
   }
 });
 
