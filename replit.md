@@ -52,6 +52,15 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
   - Instant delivery to iPhone via Telegram bot for manual posting
   - Smart duplicate prevention: blocks concurrent processing and spam while allowing retries for failed attempts
   - Automatic status updates in Airtable ("Story Created")
+- **Gem.app Sync**: Automated scraper for vintage clothing items saved on Gem.app. Features include:
+  - Accessible via "💎 Sync Gem Items" button in admin panel header
+  - Uses CloudMailin webhook to receive magic link authentication emails from Gem
+  - Playwright browser automation to request login email and scrape saved items (gem.app/my-gems)
+  - Incremental sync system using JSON marker file (first run: 5 items max, subsequent runs: only new items)
+  - Dynamic Chromium path detection works in both development and production deployments
+  - Robust error handling with user-friendly messages for troubleshooting
+  - Saves items to Airtable Gem table with fields: ProductName, ProductURL, Brand, Price, Size, ImageURL, DateSaved, Marketplace
+  - Magic links are single-use tokens, cached and cleared immediately after receipt to prevent reuse
 
 ## External Dependencies
 - **Airtable**: Primary data source for all sales and product picks. Uses `AIRTABLE_BASE_ID` and `AIRTABLE_PAT` for secure access.
