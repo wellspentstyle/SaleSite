@@ -101,9 +101,10 @@ export function FilterSidebar({ filters, onFilterChange, isOpen }: FilterSidebar
       style={{ 
         fontFamily: 'DM Sans, sans-serif',
         width: isOpen ? '280px' : '0px',
-        paddingRight: isOpen ? '24px' : '0px',
+        paddingLeft: isOpen ? '24px' : '0px',
         opacity: isOpen ? 1 : 0,
-        borderRight: isOpen ? '1px solid var(--border)' : 'none'
+        borderLeft: isOpen ? '1px solid var(--border)' : 'none',
+        transform: isOpen ? 'translateX(0)' : 'translateX(280px)'
       }}
     >
       <div className="mb-8" style={{ minWidth: '256px' }}>
@@ -114,7 +115,7 @@ export function FilterSidebar({ filters, onFilterChange, isOpen }: FilterSidebar
         <FilterSection
           title="TYPE"
           filterKey="type"
-          options={['Brand', 'Shop']}
+          options={['Brand', 'Shop', 'Has picks']}
         />
         
         <FilterSection

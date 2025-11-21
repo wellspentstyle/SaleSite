@@ -64,11 +64,28 @@ export default function App() {
   const { featuredSales, regularSales } = useMemo(() => {
     // Apply filters
     const filtered = sales.filter((sale) => {
-      // Filter by type (Brand/Store)
+      // Filter by type (Brand/Shop/Has picks)
       if (filters.type.length > 0) {
-        if (!sale.companyType || !filters.type.includes(sale.companyType)) {
-          return false;
+        let typeMatches = false;
+        
+        // Check if sale matches any selected type filter
+        for (const typeFilter of filters.type) {
+          if (typeFilter === 'Has picks') {
+            // Check if sale has at least one pick
+            if (sale.picks && sale.picks.length > 0) {
+              typeMatches = true;
+              break;
+            }
+          } else {
+            // Check if sale type matches (Brand or Shop)
+            if (sale.companyType && sale.companyType === typeFilter) {
+              typeMatches = true;
+              break;
+            }
+          }
         }
+        
+        if (!typeMatches) return false;
       }
 
       // Filter by price range
@@ -218,18 +235,11 @@ export default function App() {
       <main className="container mx-auto px-4 py-20 flex-1">
         {/* Layout container with controls, sidebar, and content */}
         <div className="flex">
-          {/* Filter Sidebar */}
-          <FilterSidebar
-            filters={filters}
-            onFilterChange={setFilters}
-            isOpen={isFilterOpen}
-          />
-
           {/* Main content area with controls and sales */}
           <div 
             className="flex-1 transition-all duration-300"
             style={{ 
-              marginLeft: isFilterOpen ? '32px' : '0px'
+              marginRight: isFilterOpen ? '32px' : '0px'
             }}
           >
             {/* Filters and Sort */}
@@ -297,6 +307,13 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {/* Filter Sidebar */}
+          <FilterSidebar
+            filters={filters}
+            onFilterChange={setFilters}
+            isOpen={isFilterOpen}
+          />
         </div>
       </main>
 

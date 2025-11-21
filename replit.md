@@ -26,7 +26,7 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - Sale cards display discount percentages, and featured sales include images
 - Interactive dialogs for detailed product picks with "Shop Now" buttons
 - Sort and Filter controls aligned to the right side with minimal button styling
-- Filter sidebar slides in from the LEFT, pushing content over (cards reduce from 3 to 2 columns)
+- Filter sidebar slides in from the RIGHT, pushing content over (cards reduce from 3 to 2 columns)
   - Sidebar top aligns with FILTER button position (not page top)
   - Smooth width animation from 0px to 280px with opacity fade
   - Content area has synchronized margin transition for seamless push effect
@@ -34,8 +34,8 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
   - Completely hidden when closed (no gap, no border)
 
 **Technical Implementations:**
-- **Filtering**: Left-sliding sidebar with checkbox-based filtering (kickpleat.com-inspired design):
-  - **TYPE**: BRAND, SHOP (from Company lookup)
+- **Filtering**: Right-sliding sidebar with checkbox-based filtering (kickpleat.com-inspired design):
+  - **TYPE**: BRAND, SHOP, HAS PICKS (from Company lookup; Has picks shows sales with product picks)
   - **PRICE RANGE**: $, $$, $$$, $$$$ (from Company lookup)
   - **DISCOUNT**: UP TO 25% OFF, 25-35% OFF, 35-50% OFF, 50%+ OFF
   - **MAX SIZE (WOMEN)**: UP TO 10, UP TO 12, UP TO 14, UP TO 16, UP TO 18+ (from Company lookup)
