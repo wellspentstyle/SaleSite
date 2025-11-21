@@ -554,67 +554,112 @@ CRITICAL RULES:
     
     console.log(`💰 Median price: $${medianPrice} → ${priceRange}`);
     
-    // Step 4: Do another Serper search for brand info (about page, sustainability, sizing)
-    console.log(`🌐 Phase 3: Searching for brand information...`);
+    // Step 4: Ownership check - verify if independent or owned by conglomerate
+    console.log(`🌐 Phase 2: Checking brand ownership...`);
     
-    const brandInfoQuery = `${brandName} about sustainability size chart women founded`;
-    const brandInfoResponse = await fetch('https://google.serper.dev/search', {
+    const ownershipQuery = `${brandName} owned by parent company H&M Group LVMH Kering Richemont`;
+    const ownershipResponse = await fetch('https://google.serper.dev/search', {
       method: 'POST',
       headers: {
         'X-API-KEY': process.env.SERPER_API_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        q: brandInfoQuery,
-        num: 8
+        q: ownershipQuery,
+        num: 6
       })
     });
     
-    // Check for API errors (second call)
-    if (!brandInfoResponse.ok) {
-      console.error(`❌ Serper API error on brand info search (${brandInfoResponse.status})`);
-      // Continue without brand info rather than failing completely
-    }
-    
-    const brandInfoData = brandInfoResponse.ok ? await brandInfoResponse.json() : {};
-    const brandInfoResults = brandInfoData.organic?.slice(0, 6).map(r => ({
+    const ownershipData = ownershipResponse.ok ? await ownershipResponse.json() : {};
+    const ownershipResults = ownershipData.organic?.slice(0, 5).map(r => ({
       title: r.title,
       snippet: r.snippet
     })) || [];
     
-    // Step 5: Use AI to categorize brand based on search results
-    console.log(`🤖 Phase 4: Categorizing brand...`);
+    // Step 5: Sustainability check - look for explicit sustainable practices
+    console.log(`🌐 Phase 3: Checking sustainability practices...`);
+    
+    const sustainabilityQuery = `${brandName} sustainable ethical manufacturing certifications B Corp Fair Trade`;
+    const sustainabilityResponse = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: sustainabilityQuery,
+        num: 6
+      })
+    });
+    
+    const sustainabilityData = sustainabilityResponse.ok ? await sustainabilityResponse.json() : {};
+    const sustainabilityResults = sustainabilityData.organic?.slice(0, 5).map(r => ({
+      title: r.title,
+      snippet: r.snippet
+    })) || [];
+    
+    // Step 6: Size check - find actual pants/trousers sizing
+    console.log(`🌐 Phase 4: Checking size availability...`);
+    
+    const sizeQuery = `${brandName} pants trousers women size largest available`;
+    const sizeResponse = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: sizeQuery,
+        num: 8
+      })
+    });
+    
+    const sizeData = sizeResponse.ok ? await sizeResponse.json() : {};
+    const sizeResults = sizeData.organic?.slice(0, 6).map(r => ({
+      title: r.title,
+      snippet: r.snippet
+    })) || [];
+    
+    // Step 7: Use AI to categorize brand based on targeted search results
+    console.log(`🤖 Phase 5: Analyzing all search data...`);
     
     const categorizeCompletion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         {
           role: 'system',
-          content: `You categorize fashion brands based ONLY on information visible in the search results. Never guess.
+          content: `You analyze fashion brand data from targeted web searches. Extract ONLY facts visible in the provided search results.
 
-Your tasks:
-1. CATEGORIES: Based on products found, list ONLY categories that appear:
-   Options: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry (comma-separated)
+TASK 1 - CATEGORIES (required):
+Based on products found, list categories that appear:
+Options: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry (comma-separated)
 
-2. VALUES: Only include IF you see explicit evidence in search results:
-   - "Sustainable" = Brand states sustainability/eco commitment
-   - "Female-founded" = Founder is identified as female
-   - "Independent label" = NOT owned by major corporation
-   - "Ethical manufacturing" = Brand mentions ethical practices
-   - "Secondhand" = Resale/vintage platform
-   - "BIPOC-founded" = Founder demographics stated
-   
-   If unsure, leave empty.
+TASK 2 - VALUES (be selective):
+- "Independent label" = Include ONLY if ownership search shows NO major parent company (H&M Group, LVMH, Kering, Richemont, etc.)
+  If you see "owned by" or "part of" a major group, DO NOT include this.
+  
+- "Sustainable" = Include if sustainability search shows MULTIPLE mentions of:
+  * Certified practices (B Corp, Fair Trade, GOTS, etc.)
+  * Explicit sustainable materials (organic, recycled, deadstock)
+  * Transparent supply chain commitments
+  Don't include if only vague marketing language or single mention.
+  
+- "Female-founded" = Include ONLY if you see female founder names/pronouns
+- "Ethical manufacturing" = Include ONLY if explicit ethics/labor commitments mentioned
+- "Secondhand" = Include ONLY if resale/vintage platform
+- "BIPOC-founded" = Include ONLY if founder demographics explicitly stated
 
-3. MAX SIZE: Only if you see explicit size info in results:
-   - Map to: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
-   - Leave empty if not mentioned
+TASK 3 - MAX SIZE:
+From size search results, extract the LARGEST numerical size mentioned for pants/trousers:
+- Look for: "size 16", "up to 18", "XL (size 14)", etc.
+- Convert to buckets: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
+- Leave empty if no pants sizing found
 
 Return ONLY valid JSON:
 {
   "category": "Clothing, Bags",
-  "values": "Sustainable, Female-founded",
-  "maxWomensSize": "Up to 12"
+  "values": "Independent label, Sustainable",
+  "maxWomensSize": "Up to 14"
 }`
         },
         {
@@ -623,10 +668,16 @@ Return ONLY valid JSON:
 Type: ${isShop ? 'Shop' : 'Brand'}
 Products found: ${products.map(p => p.name).join(', ')}
 
-Search results about the brand:
-${JSON.stringify(brandInfoResults, null, 2)}
+OWNERSHIP SEARCH RESULTS:
+${JSON.stringify(ownershipResults, null, 2)}
 
-Return JSON with category, values, and maxWomensSize.`
+SUSTAINABILITY SEARCH RESULTS:
+${JSON.stringify(sustainabilityResults, null, 2)}
+
+SIZE SEARCH RESULTS:
+${JSON.stringify(sizeResults, null, 2)}
+
+Analyze and return JSON with category, values, and maxWomensSize.`
         }
       ],
       temperature: 0.2
