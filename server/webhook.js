@@ -411,6 +411,20 @@ app.post('/admin/brand-research', async (req, res) => {
       })
     });
     
+    // Check for API errors
+    if (!serperResponse.ok) {
+      const errorText = await serperResponse.text();
+      console.error(`❌ Serper API error (${serperResponse.status}):`, errorText);
+      return res.json({
+        success: false,
+        error: serperResponse.status === 401 
+          ? 'Search API authentication failed - check API key'
+          : serperResponse.status === 429
+          ? 'Search API rate limit exceeded - try again later'
+          : `Search API error: ${serperResponse.status}`
+      });
+    }
+    
     const searchData = await serperResponse.json();
     console.log(`📦 Serper returned ${searchData.organic?.length || 0} results`);
     
@@ -420,6 +434,11 @@ app.post('/admin/brand-research', async (req, res) => {
         error: 'No search results found for this brand'
       });
     }
+    
+    // Extract official domain from top result for validation
+    const topResult = searchData.organic[0];
+    const officialDomain = topResult?.link ? new URL(topResult.link).hostname.replace('www.', '') : null;
+    console.log(`🏢 Detected official domain: ${officialDomain}`);
     
     // Step 2: Use AI to extract product data from search results
     console.log(`🤖 Phase 2: Extracting product information...`);
@@ -490,8 +509,25 @@ CRITICAL RULES:
       });
     }
     
-    const products = productData.products || [];
+    let products = productData.products || [];
     const isShop = productData.isShop || false;
+    
+    // Validate product domains match official domain
+    if (officialDomain && products.length > 0) {
+      const validatedProducts = products.filter(p => {
+        try {
+          const productDomain = new URL(p.url).hostname.replace('www.', '');
+          return productDomain === officialDomain;
+        } catch {
+          return false;
+        }
+      });
+      
+      if (validatedProducts.length < products.length) {
+        console.log(`⚠️  Filtered out ${products.length - validatedProducts.length} products from non-official domains`);
+        products = validatedProducts;
+      }
+    }
     
     if (products.length === 0) {
       return res.json({
@@ -500,7 +536,7 @@ CRITICAL RULES:
       });
     }
     
-    console.log(`✅ Extracted ${products.length} products from search results`);
+    console.log(`✅ Extracted ${products.length} validated products from search results`);
     
     // Step 3: Calculate median price and determine price tier
     const prices = products.map(p => p.price).filter(p => p > 0).sort((a, b) => a - b);
@@ -534,7 +570,13 @@ CRITICAL RULES:
       })
     });
     
-    const brandInfoData = await brandInfoResponse.json();
+    // Check for API errors (second call)
+    if (!brandInfoResponse.ok) {
+      console.error(`❌ Serper API error on brand info search (${brandInfoResponse.status})`);
+      // Continue without brand info rather than failing completely
+    }
+    
+    const brandInfoData = brandInfoResponse.ok ? await brandInfoResponse.json() : {};
     const brandInfoResults = brandInfoData.organic?.slice(0, 6).map(r => ({
       title: r.title,
       snippet: r.snippet
