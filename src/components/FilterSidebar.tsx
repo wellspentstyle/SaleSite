@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FilterOptions } from '../types';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
-import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Filter, X } from 'lucide-react';
 
 interface FilterSidebarProps {
   filters: FilterOptions;
@@ -54,19 +54,19 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
     const isExpanded = expandedSections[filterKey];
     
     return (
-      <div className="border-b border-border">
+      <div className="border-b border-border last:border-b-0">
         <button
           onClick={() => toggleSection(filterKey)}
-          className="w-full flex items-center justify-between py-4 px-0 text-left hover:opacity-70 transition-opacity"
+          className="w-full flex items-center justify-between py-3 px-0 text-left hover:opacity-70 transition-opacity"
         >
-          <span className="text-sm tracking-wider uppercase" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+          <span className="text-xs tracking-widest uppercase font-normal" style={{ fontFamily: 'DM Sans, sans-serif' }}>
             {title}
           </span>
-          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          {isExpanded ? <ChevronDown className="w-4 h-4 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 flex-shrink-0" />}
         </button>
         
         {isExpanded && (
-          <div className="pb-4 space-y-3">
+          <div className="pb-3 space-y-2.5">
             {options.map((option) => (
               <div key={option} className="flex items-center space-x-2">
                 <Checkbox
@@ -75,10 +75,11 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
                   onCheckedChange={(checked: boolean) =>
                     handleCheckboxChange(filterKey, option, checked)
                   }
+                  className="w-4 h-4"
                 />
                 <Label
                   htmlFor={`${filterKey}-${option}`}
-                  className="text-sm cursor-pointer"
+                  className="text-sm cursor-pointer font-normal leading-none"
                   style={{ fontFamily: 'DM Sans, sans-serif' }}
                 >
                   {option}
@@ -95,32 +96,23 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-6 py-3 border border-border bg-background hover:bg-muted transition-colors"
+        className="flex items-center gap-2 px-4 py-2.5 border border-border bg-background hover:bg-muted transition-colors"
         style={{ fontFamily: 'DM Sans, sans-serif' }}
       >
-        {isOpen ? (
-          <>
-            <X className="w-4 h-4" />
-            <span className="text-sm tracking-wider uppercase">HIDE FILTERS</span>
-          </>
-        ) : (
-          <>
-            <Menu className="w-4 h-4" />
-            <span className="text-sm tracking-wider uppercase">FILTER</span>
-          </>
-        )}
+        <Filter className="w-4 h-4" />
+        <span className="text-xs tracking-widest uppercase font-normal">FILTER</span>
       </button>
 
       {isOpen && (
         <div 
-          className="fixed left-0 top-0 w-80 h-full bg-background border-r border-border overflow-y-auto z-50 p-6"
+          className="fixed right-0 top-0 w-72 h-full bg-white border-l border-border overflow-y-auto z-50 p-6"
           style={{ fontFamily: 'DM Sans, sans-serif' }}
         >
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg tracking-wider uppercase font-medium">FILTERS</h2>
+            <h2 className="text-sm tracking-widest uppercase font-medium">FILTERS</h2>
             <button
               onClick={() => setIsOpen(false)}
-              className="p-2 hover:bg-muted rounded transition-colors"
+              className="p-1 hover:bg-muted rounded transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -178,7 +170,7 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
 
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/20 z-40"
+          className="fixed inset-0 bg-black/10 z-40"
           onClick={() => setIsOpen(false)}
         />
       )}

@@ -38,7 +38,7 @@ export default function App() {
     maxWomensSize: [],
     values: [],
   });
-  const [sortOption, setSortOption] = useState<SortOption>('date-new-old');
+  const [sortOption, setSortOption] = useState<SortOption>('featured');
 
   useEffect(() => {
     async function loadSales() {
@@ -139,10 +139,18 @@ export default function App() {
           });
 
         case 'alphabetically-a-z':
-          return sorted.sort((a, b) => a.brandName.localeCompare(b.brandName));
+          return sorted.sort((a, b) => {
+            const nameA = a.brandName || '';
+            const nameB = b.brandName || '';
+            return nameA.localeCompare(nameB);
+          });
 
         case 'alphabetically-z-a':
-          return sorted.sort((a, b) => b.brandName.localeCompare(a.brandName));
+          return sorted.sort((a, b) => {
+            const nameA = a.brandName || '';
+            const nameB = b.brandName || '';
+            return nameB.localeCompare(nameA);
+          });
 
         case 'discount-high-low':
           return sorted.sort((a, b) => {
@@ -208,14 +216,14 @@ export default function App() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-20 flex-1">
         {/* Filters and Sort */}
-        <div className="mb-10 flex justify-between items-start">
-          <FilterSidebar
-            filters={filters}
-            onFilterChange={setFilters}
-          />
+        <div className="mb-10 flex justify-between items-start gap-4">
           <SortDropdown
             currentSort={sortOption}
             onSortChange={setSortOption}
+          />
+          <FilterSidebar
+            filters={filters}
+            onFilterChange={setFilters}
           />
         </div>
 

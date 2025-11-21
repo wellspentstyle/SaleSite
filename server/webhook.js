@@ -280,10 +280,8 @@ app.get('/sales', async (req, res) => {
         saleUrl = `https://go.shopmy.us/apx/l9N1lH?url=${encodeURIComponent(cleanedUrl)}`;
       }
       
-      // Extract company lookup data (Airtable returns arrays for lookup fields)
-      const companyName = Array.isArray(record.fields.Company) 
-        ? record.fields.Company[0] 
-        : record.fields.Company || 'Unknown Brand';
+      // Extract company data (use CompanyName for display, Type/PriceRange/etc are lookup fields)
+      const companyName = record.fields.CompanyName || 'Unknown Brand';
       
       const priceRange = Array.isArray(record.fields.PriceRange) 
         ? record.fields.PriceRange[0] 
