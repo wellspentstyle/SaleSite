@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { Package, Tag, Gem } from 'lucide-react';
+import { Package, Tag, Image, Gem } from 'lucide-react';
 
 export function AdminSidebar() {
   const navItems = [
     { path: '/admin/picks', label: 'Add Picks', icon: Package },
     { path: '/admin/brands', label: 'Add Brands', icon: Tag },
+    { path: '/admin/assets', label: 'Generate Assets', icon: Image },
     { path: '/admin/sync', label: 'Sync Gem', icon: Gem },
   ];
 

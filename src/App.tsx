@@ -5,6 +5,7 @@ import { AddPicks } from './pages/AddPicks';
 import { FinalizePicks } from './pages/FinalizePicks';
 import { AddBrands } from './pages/AddBrands';
 import { SyncGem } from './pages/SyncGem';
+import { GenerateAssets } from './pages/GenerateAssets';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="picks" element={<AddPicks />} />
           <Route path="picks/finalize" element={<FinalizePicks />} />
           <Route path="brands" element={<AddBrands />} />
+          <Route path="assets" element={<GenerateAssets />} />
           <Route path="sync" element={<SyncGem />} />
         </Route>
       </Routes>
