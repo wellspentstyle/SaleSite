@@ -70,8 +70,11 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
               <div key={option} className="flex items-center justify-between gap-3">
                 <label
                   htmlFor={`${filterKey}-${option}`}
-                  className="text-sm cursor-pointer leading-none uppercase tracking-wide font-extralight"
-                  style={{ fontFamily: 'DM Sans, sans-serif' }}
+                  className="text-sm cursor-pointer leading-none tracking-wide font-extralight"
+                  style={{ 
+                    fontFamily: 'DM Sans, sans-serif',
+                    textTransform: 'uppercase'
+                  }}
                 >
                   {option}
                 </label>
