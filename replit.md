@@ -56,7 +56,23 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
   - DATE, NEW TO OLD
   - Sort button displays currently selected option with minimalist styling
   - First option (FEATURED) separated from others with underline for active selection
-- **Admin Interface**: A password-protected `/admin` panel allows for managing product picks with editable brand fields on both auto-scraped and manual entry forms.
+- **Admin Interface**: A password-protected `/admin` panel with React Router-based navigation allows for managing product picks with editable brand fields on both auto-scraped and manual entry forms.
+  - **Routing Structure**: Uses React Router with BrowserRouter for client-side routing
+    - `/` - Main public site (HomePage component)
+    - `/admin` - Redirects to `/admin/picks`
+    - `/admin/picks` - Add Picks interface (placeholder)
+    - `/admin/brands` - Add Brands interface (placeholder)
+    - `/admin/sync` - Sync Gem interface (placeholder)
+  - **AdminLayout Component**: Top-level admin layout with password gate and sidebar navigation
+    - Password authentication reused from original Admin.tsx
+    - sessionStorage-based auth persistence
+    - Sign out clears sessionStorage
+  - **AdminSidebar Component**: 240px fixed-width left sidebar with navigation
+    - Three nav items: "Add Picks", "Add Brands", "Sync Gem"
+    - Active route highlighting with bold or background color
+    - DM Sans font weight 300
+    - Border-right separator
+  - **Layout Structure**: Header with logo + Sign Out button, sidebar on left, main content area on right using React Router's Outlet
 - **SEO**: Comprehensive meta tags (Title, Description, Keywords, Open Graph, Twitter Card) are implemented for improved search engine visibility and social sharing.
 - **Performance Optimization**: 
   - In-memory caching with 5-minute TTL for the `/sales` endpoint reduces Airtable API calls by ~95%.

@@ -1,0 +1,192 @@
+You are helping me tag fashion brands and shops using real price data, not guesses.
+When I give you a list of names, produce a table with the following fields:
+
+Name
+
+Type — choose one:
+
+Brand
+
+Shop (multi-brand retailer, marketplace, outlet, or resale site)
+
+Price Range — determined ONLY by the median of real full-price items using the rules below
+
+Category — choose all that apply:
+
+Clothing
+
+Shoes
+
+Accessories
+
+Bags
+
+Swimwear
+
+Jewelry 
+
+Values — include only those that are known, never guessed:
+
+Sustainable
+
+Female-founded
+
+Independent label
+
+Ethical manufacturing
+
+Secondhand
+
+BIPOC-founded
+
+🔎 STEP 1: Determine the Type (Brand vs Shop)
+
+If they primarily sell their own label → Brand
+
+If they sell multiple labels → Shop
+
+💸 STEP 2: Gather REAL Pricing Data
+
+For each brand, browse and collect 3–5 real full-price items.
+Sample representative items such as:
+
+Dresses
+
+Tops/knits
+
+Jeans/pants
+
+Bags
+
+Shoes
+
+For shops, sample 3–5 items they typically sell that reflect their average price level.
+
+Record prices in USD when possible. Ignore sale prices.
+
+💰 STEP 3: Determine the Median Price Tier
+
+Use ONLY these thresholds:
+
+Tier	Rule
+$	median under $250
+$$	median $250–$450
+$$$	median $450–$1100
+$$$$	median over $1100, OR if the brand is a known luxury house (Prada, Loewe, YSL, Valentino, Chanel, etc.) even if the median is slightly lower
+
+If the median is borderline, use overall brand positioning to break ties.
+
+🧵 STEP 4: Determine the Categories
+
+Choose all that legitimately apply based on what the brand sells:
+
+Clothing
+
+Shoes
+
+Accessories
+
+Bags
+
+Swimwear
+
+Jewelry
+
+🌱 STEP 5: Determine Values
+
+Include ONLY values that are factual and widely documented:
+
+Sustainable (materials or verified sustainability initiatives)
+
+Female-founded
+
+Independent label
+
+Ethical manufacturing
+
+Secondhand 
+
+BIPOC-founded
+
+If unsure → leave blank.
+
+📤 STEP 6: Output Format
+
+Return a clean table with columns in this exact order:
+
+Name | Type | Price Range | Category | Values
+
+Each row should look like:
+
+Tove | Brand | $$$ | Clothing | Female-founded, Independent label
+
+Do NOT include explanations, commentary, footnotes, or extra text — only the table.
+
+STEP 7: Determine Maximum Women’s Size (Convert if needed)
+
+For each brand, determine the largest women’s size they offer in ready-to-wear.
+Use browsing to check a few categories (dresses, pants, tops).
+
+Rules:
+
+If the brand uses US sizes, use the largest number directly.
+
+If the brand uses EU / FR / IT, convert the largest size to a US women’s size using this mapping:
+
+EU to US: US = EU – 30
+
+FR to US: US = FR – 32
+
+IT to US: US = IT – 34
+
+If the brand uses letter sizing, translate as:
+
+XXS = 0
+
+XS = 0–2
+
+S = 4–6
+
+M = 8–10
+
+L = 12–14
+
+XL = 16–18
+
+XXL = 18–20
+
+3XL = 20–22
+
+When multiple size systems exist, choose the largest equivalent.
+
+After conversion, assign the brand to one of these buckets:
+
+Up to 10
+
+Up to 12
+
+Up to 14
+
+Up to 16
+
+Up to 18
+
+Up to 20+
+
+If a brand does not clearly publish size ranges leave blank. Only put one of those options or leave it blank. Don't write anything else. 
+
+STEP 8: Add Max Size to the Output Table
+
+Add a new column at the end of the table:
+
+Max Women’s Size
+
+Each row should now look like:
+
+Tove | Brand | $$$ | Clothing | Female-founded, Independent label | Up to 12
+
+✔ FULL OUTPUT FORMAT (with size included)
+
+Name | Type | Price Range | Category | Values | Max Women’s Size
+
+Return only the table. No explanations.
