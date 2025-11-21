@@ -389,7 +389,7 @@ export function AddBrands() {
             {/* Results Table */}
             <div className="border rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                 <thead className="bg-muted">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium">Name</th>
