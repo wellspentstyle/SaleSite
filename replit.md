@@ -86,6 +86,15 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - **Product Picks**: Detailed product listings within a sale, including brand names, images, original/sale prices, and affiliate links. When brand differs from company (e.g., Proenza Schouler on Shopbop), brand is displayed above the product name in the picks dialog.
 - **Hybrid Scraper**: Automatically extracts product data (brand, name, image, price, percent off) from URLs using a multi-phase pipeline (JSON-LD, HTML extraction, AI). Brand extraction intelligently identifies actual product brands (not website names). Includes a Playwright fallback for client-side rendered sites and a manual entry UI for failed scrapes. Batch scraping is optimized with domain-level skip logic: if the first URL from a domain fails, all remaining URLs from that domain are instantly skipped (avoiding wasted API calls and processing time).
 - **Confidence Scoring**: Scraped products are assigned a confidence score (1-100) to indicate extraction accuracy, aiding in manual review.
+- **Brand Research**: AI-powered brand research tool using real web search data via Serper.dev API. Features include:
+  - Dual-phase search: products with pricing, then brand attributes (sustainability, sizing, etc.)
+  - AI extraction of 3-5 product URLs with prices from search snippets
+  - Domain validation ensures only official brand website data is used
+  - Local median price calculation determines price tier ($, $$, $$$, $$$$)
+  - Categorization based on verified search results only (no hallucinations)
+  - Fields populated: Type (Brand/Shop), Price Range, Category, Values (Sustainable, Female-founded, etc.), Max Women's Size
+  - Robust error handling for API failures with specific user-facing messages
+  - Fallback logic allows partial results if brand info search fails
 - **Email Automation**: CloudMailin webhook integrates with Gmail to automatically parse incoming sale emails, extract details using AI, and populate Airtable, including duplicate prevention.
 - **Instagram Story Automation**: Event-driven system that generates Instagram story images (1080x1920px) triggered by Airtable Automation when CreateStory field changes to "Create Story". Features include:
   - Webhook-based triggering via `/webhook/airtable-story` endpoint (eliminates inefficient polling)
@@ -126,6 +135,7 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - **Airtable**: Primary data source for all sales and product picks. Uses `AIRTABLE_BASE_ID` and `AIRTABLE_PAT` for secure access.
 - **ShopMy**: Affiliate marketing platform for monetizing product links. Integrates with a custom formula in Airtable to generate affiliate URLs.
 - **OpenAI**: Utilized for AI-powered data extraction from product URLs and email content within the scraper and email automation workflows.
+- **Serper.dev**: Real-time Google search API used for brand research feature. Uses `SERPER_API_KEY` for authentication. Provides organic search results that feed into AI extraction pipeline.
 - **CloudMailin**: Inbound email parsing service, used to receive and process forwarded sale emails via a webhook, secured with `CLOUDMAIL_SECRET`.
 - **Telegram Bot API**: Free messaging service used to deliver generated Instagram stories to iPhone. Uses `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` for authentication.
 - **Google Drive API**: Cloud storage for generated Instagram story images. Uses Replit's managed OAuth integration to automatically upload to the "Product Images" folder.
