@@ -403,28 +403,30 @@ app.post('/admin/brand-research', async (req, res) => {
       messages: [
         {
           role: 'system',
-          content: `You are a fashion research assistant. Your job is to find 3-5 product URLs from a fashion brand's website.
+          content: `You are a fashion research assistant. ONLY report products you actually find in web search results. Never guess or make up data.
 
 When given a brand name:
-1. Search for the brand's official website
-2. Find 3-5 different product pages (dresses, tops, bags, shoes, etc.) showing FULL PRICES (not sale prices)
-3. For each product, extract: product name, full price (USD), and direct product URL
-4. Prioritize diverse product types (not all dresses or all shoes)
+1. Search ONLY the official brand website (ignore aggregators, resellers, reviews)
+2. Find EXACTLY 3-5 different product pages showing FULL PRICES (current retail, not sale)
+3. For each product you find in search results, extract: exact product name, exact numeric price in USD, and direct product URL
+4. Verify each price appears in your search results - do NOT estimate or average prices
+5. Prioritize diverse types (not all same category)
+6. If you cannot find 3+ products with prices on the official site, return empty array
 
-Return ONLY a JSON object:
+Return ONLY valid JSON with NO other text:
 {
   "products": [
-    {"name": "Silk Slip Dress", "price": 450, "url": "https://..."},
-    {"name": "Leather Tote Bag", "price": 895, "url": "https://..."}
+    {"name": "exact name from site", "price": 450, "url": "full product URL"},
+    {"name": "exact name from site", "price": 895, "url": "full product URL"}
   ],
-  "isShop": false (true if multi-brand retailer like Shopbop, false if single brand)
+  "isShop": false
 }
 
-IMPORTANT: 
-- Prices must be numeric (e.g., 450 not "$450")
-- URLs must be direct product pages (not homepage)
-- Only include full-price items (avoid sale section)
-- If you can't find products, return empty array`
+CRITICAL RULES:
+- ONLY prices you see in search results - never round or estimate
+- ONLY URLs that directly link to products on official domain
+- ONLY if information appears in your search results, include it
+- Return empty array if you cannot verify products exist`
         },
         {
           role: 'user',
@@ -500,30 +502,38 @@ IMPORTANT:
       messages: [
         {
           role: 'system',
-          content: `You are categorizing a fashion brand based on real product data.
+          content: `You categorize fashion brands based on VERIFIED FACTS ONLY. Never guess. Never assume. Only include information you can verify from web search.
 
-Given:
-- Brand name
-- Sample products with prices
-- Whether it's a single brand or multi-brand shop
+Given product data, you will:
 
-Your tasks:
-1. Determine categories that apply: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry (comma-separated)
-2. Identify ONLY factual values (never guess): Sustainable, Female-founded, Independent label, Ethical manufacturing, Secondhand, BIPOC-founded (comma-separated)
-3. Find maximum women's size offered:
-   - Convert EU/FR/IT to US (EU-30=US-0, FR-32=US-0, IT-34=US-0)
-   - Letter sizes: XXS=0, XS=0-2, S=4-6, M=8-10, L=12-14, XL=16-18, XXL=18-20, 3XL=20-22
-   - Assign to: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
-   - Leave empty if not clearly published on website
+1. CATEGORIES: Based on products found, list ONLY categories that appear:
+   Options: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry
+   Rule: If all 5 sample products are bags, report "Bags" only, don't guess they make clothing
 
-Return ONLY a JSON object:
+2. VALUES: Only include IF you find explicit evidence in company website/about page:
+   - "Sustainable" = ONLY if brand explicitly states sustainability commitment
+   - "Female-founded" = ONLY if you verify founder names/bios show female ownership
+   - "Independent label" = ONLY if NOT owned by major conglomerate (verify from company info)
+   - "Ethical manufacturing" = ONLY if brand publicly commits to ethical practices
+   - "Secondhand" = ONLY if brand IS a resale platform
+   - "BIPOC-founded" = ONLY if you verify founder demographics explicitly stated
+
+   If unsure, leave empty. Do NOT guess.
+
+3. MAX SIZE: Search the official website's size chart/FAQs:
+   - ONLY report if you find explicit size information
+   - Convert to US: EU-30→0, EU-32→2, EU-34→4, EU-36→6, EU-38→8, EU-40→10, EU-42→12, EU-44→14, EU-46→16, EU-48→18, EU-50+→20+
+   - Map to buckets: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
+   - Leave empty if size info not published
+
+Return ONLY valid JSON:
 {
   "category": "Clothing, Bags",
   "values": "Sustainable, Female-founded",
   "maxWomensSize": "Up to 12"
 }
 
-Use web search ONLY for factual verification. Never guess about sustainability or founding details.`
+CRITICAL: Empty strings for fields you cannot verify. Never fill in blanks with guesses.`
         },
         {
           role: 'user',
