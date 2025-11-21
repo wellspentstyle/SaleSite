@@ -67,7 +67,9 @@ export default defineConfig({
     strictPort: true,
     allowedHosts: true,
     hmr: {
-      clientPort: 5000,
+      protocol: 'wss',
+      host: 'localhost',
+      port: 5000,
     },
     headers: {
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
