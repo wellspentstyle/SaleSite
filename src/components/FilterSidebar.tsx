@@ -174,11 +174,10 @@ export function FilterSidebar({ filters, onFilterChange, isOpen }: FilterSidebar
           filterKey="values"
           options={[
             'Sustainable',
-            'Female-founded',
+            'Women-owned',
             'Independent label',
-            'Ethical manufacturing',
             'Secondhand',
-            'BIPOC-founded'
+            'BIPOC-owned'
           ]}
         />
       </div>

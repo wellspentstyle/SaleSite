@@ -296,9 +296,17 @@ app.get('/sales', async (req, res) => {
         : record.fields.MaxWomensSize;
       
       // Values is likely a multi-select, keep as array
-      const values = Array.isArray(record.fields.Values) 
+      let values = Array.isArray(record.fields.Values) 
         ? record.fields.Values 
         : (record.fields.Values ? [record.fields.Values] : []);
+      
+      // Normalize legacy values for backward compatibility
+      values = values.map(v => {
+        if (v === 'Female-founded') return 'Women-owned';
+        if (v === 'BIPOC-founded') return 'BIPOC-owned';
+        if (v === 'Ethical manufacturing') return null; // Remove deprecated value
+        return v;
+      }).filter(v => v !== null); // Remove nulls
       
       return {
         id: record.id,
@@ -605,7 +613,7 @@ CRITICAL RULES:
     
     let priceRange = '';
     if (medianPrice < 250) priceRange = '$';
-    else if (medianPrice < 450) priceRange = '$$';
+    else if (medianPrice < 500) priceRange = '$$';
     else if (medianPrice < 1100) priceRange = '$$$';
     else priceRange = '$$$$';
     
@@ -636,7 +644,7 @@ CRITICAL RULES:
     // Step 5: Sustainability check - look for explicit sustainable practices
     console.log(`🌐 Phase 3: Checking sustainability practices...`);
     
-    const sustainabilityQuery = `${brandName} sustainable ethical manufacturing certifications B Corp Fair Trade`;
+    const sustainabilityQuery = `${brandName} sustainable certifications B Corp Fair Trade GOTS organic materials`;
     const sustainabilityResponse = await fetch('https://google.serper.dev/search', {
       method: 'POST',
       headers: {
@@ -677,8 +685,30 @@ CRITICAL RULES:
       snippet: r.snippet
     })) || [];
     
-    // Step 7: Use AI to categorize brand based on targeted search results
-    console.log(`🤖 Phase 5: Analyzing all search data...`);
+    // Step 7: Ownership & diversity check - women-owned, BIPOC-owned
+    console.log(`🌐 Phase 5: Checking ownership & diversity...`);
+    
+    const ownershipDiversityQuery = `${brandName} women-owned OR female-founded OR BIPOC-owned OR Black-owned founder`;
+    const ownershipDiversityResponse = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: ownershipDiversityQuery,
+        num: 6
+      })
+    });
+    
+    const ownershipDiversityData = ownershipDiversityResponse.ok ? await ownershipDiversityResponse.json() : {};
+    const ownershipDiversityResults = ownershipDiversityData.organic?.slice(0, 5).map(r => ({
+      title: r.title,
+      snippet: r.snippet
+    })) || [];
+    
+    // Step 8: Use AI to categorize brand based on targeted search results
+    console.log(`🤖 Phase 6: Analyzing all search data...`);
     
     const categorizeCompletion = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -691,20 +721,19 @@ TASK 1 - CATEGORIES (required):
 Based on products found, list categories that appear:
 Options: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry (comma-separated)
 
-TASK 2 - VALUES (be selective):
-- "Independent label" = Include ONLY if ownership search shows NO major parent company (H&M Group, LVMH, Kering, Richemont, etc.)
-  If you see "owned by" or "part of" a major group, DO NOT include this.
+TASK 2 - VALUES (be selective, cite source arrays):
+- "Independent label" = Check OWNERSHIP SEARCH RESULTS ONLY. Include ONLY if NO major parent company mentioned (H&M Group, LVMH, Kering, Richemont, etc.)
+  If you see "owned by" or "part of" a major group in those results, DO NOT include this.
   
-- "Sustainable" = Include if sustainability search shows MULTIPLE mentions of:
+- "Sustainable" = Check SUSTAINABILITY SEARCH RESULTS ONLY. Include if MULTIPLE mentions of:
   * Certified practices (B Corp, Fair Trade, GOTS, etc.)
   * Explicit sustainable materials (organic, recycled, deadstock)
   * Transparent supply chain commitments
   Don't include if only vague marketing language or single mention.
   
-- "Female-founded" = Include ONLY if you see female founder names/pronouns
-- "Ethical manufacturing" = Include ONLY if explicit ethics/labor commitments mentioned
-- "Secondhand" = Include ONLY if resale/vintage platform
-- "BIPOC-founded" = Include ONLY if founder demographics explicitly stated
+- "Women-owned" = Check OWNERSHIP & DIVERSITY SEARCH RESULTS ONLY. Include ONLY if female founder names/pronouns or explicit "women-owned" mention
+- "BIPOC-owned" = Check OWNERSHIP & DIVERSITY SEARCH RESULTS ONLY. Include ONLY if BIPOC/Black-owned explicitly stated
+- "Secondhand" = Check products/category. Include ONLY if resale/vintage platform
 
 TASK 3 - MAX SIZE:
 From size search results, extract the LARGEST numerical size mentioned for pants/trousers:
@@ -712,10 +741,10 @@ From size search results, extract the LARGEST numerical size mentioned for pants
 - Convert to buckets: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
 - Leave empty if no pants sizing found
 
-Return ONLY valid JSON:
+Return ONLY valid JSON with comma-separated values (use exact names with hyphens):
 {
   "category": "Clothing, Bags",
-  "values": "Independent label, Sustainable",
+  "values": "Independent label, Sustainable, Women-owned",
   "maxWomensSize": "Up to 14"
 }`
         },
@@ -733,6 +762,9 @@ ${JSON.stringify(sustainabilityResults, null, 2)}
 
 SIZE SEARCH RESULTS:
 ${JSON.stringify(sizeResults, null, 2)}
+
+OWNERSHIP & DIVERSITY SEARCH RESULTS:
+${JSON.stringify(ownershipDiversityResults, null, 2)}
 
 Analyze and return JSON with category, values, and maxWomensSize.`
         }
