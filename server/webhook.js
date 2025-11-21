@@ -379,7 +379,7 @@ app.get('/admin/sales', async (req, res) => {
   }
 });
 
-// Brand research endpoint - uses web search + AI to research fashion brands with REAL pricing data
+// Brand research endpoint - uses Serper web search + AI to research fashion brands with REAL pricing data
 app.post('/admin/brand-research', async (req, res) => {
   const { auth } = req.headers;
   const { brandName } = req.body;
@@ -395,50 +395,74 @@ app.post('/admin/brand-research', async (req, res) => {
   try {
     console.log(`🔍 Researching brand: ${brandName}`);
     
-    // Step 1: Use AI with web search to find 3-5 product URLs with prices
-    console.log(`🌐 Phase 1: Finding product URLs...`);
+    // Step 1: Use Serper to search for product pages
+    console.log(`🌐 Phase 1: Searching for product pages...`);
+    
+    const searchQuery = `${brandName} official site products shop price`;
+    const serperResponse = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: searchQuery,
+        num: 10
+      })
+    });
+    
+    const searchData = await serperResponse.json();
+    console.log(`📦 Serper returned ${searchData.organic?.length || 0} results`);
+    
+    if (!searchData.organic || searchData.organic.length === 0) {
+      return res.json({
+        success: false,
+        error: 'No search results found for this brand'
+      });
+    }
+    
+    // Step 2: Use AI to extract product data from search results
+    console.log(`🤖 Phase 2: Extracting product information...`);
+    
+    const searchResults = searchData.organic.slice(0, 8).map(r => ({
+      title: r.title,
+      snippet: r.snippet,
+      link: r.link
+    }));
     
     const findProductsCompletion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         {
           role: 'system',
-          content: `You are a fashion research assistant. ONLY report products you actually find in web search results. Never guess or make up data.
+          content: `You are analyzing search results to find fashion products with prices. Extract ONLY information that appears in the search results provided.
 
-When given a brand name:
-1. Search ONLY the official brand website (ignore aggregators, resellers, reviews)
-2. Find EXACTLY 3-5 different product pages showing FULL PRICES (current retail, not sale)
-3. For each product you find in search results, extract: exact product name, exact numeric price in USD, and direct product URL
-4. Verify each price appears in your search results - do NOT estimate or average prices
-5. Prioritize diverse types (not all same category)
-6. If you cannot find 3+ products with prices on the official site, return empty array
+Your task:
+1. Identify 3-5 product pages from the official brand website (ignore aggregators, resellers)
+2. For each product, extract: product name, price (USD), and URL
+3. ONLY include products where you can see a price in the title or snippet
+4. Determine if this is a single brand or multi-brand shop
 
-Return ONLY valid JSON with NO other text:
+Return ONLY valid JSON:
 {
   "products": [
-    {"name": "exact name from site", "price": 450, "url": "full product URL"},
-    {"name": "exact name from site", "price": 895, "url": "full product URL"}
+    {"name": "Product Name", "price": 450, "url": "https://..."}
   ],
   "isShop": false
 }
 
 CRITICAL RULES:
-- ONLY prices you see in search results - never round or estimate
-- ONLY URLs that directly link to products on official domain
-- ONLY if information appears in your search results, include it
-- Return empty array if you cannot verify products exist`
+- ONLY extract prices you actually see in the search results
+- If no prices are visible in snippets, return empty array
+- URLs must be from the official brand domain
+- Price must be numeric (e.g., 450 not "$450")`
         },
         {
           role: 'user',
-          content: `Find 3-5 product URLs with prices for: ${brandName}`
+          content: `Extract products with prices from these search results for "${brandName}":\n\n${JSON.stringify(searchResults, null, 2)}`
         }
       ],
-      temperature: 0.3,
-      tools: [
-        {
-          type: 'web_search'
-        }
-      ]
+      temperature: 0.2
     });
     
     const productsResponse = findProductsCompletion.choices[0]?.message?.content;
@@ -447,9 +471,9 @@ CRITICAL RULES:
       throw new Error('No response from product search');
     }
     
-    console.log(`📦 Product search response: ${productsResponse.substring(0, 200)}...`);
+    console.log(`📦 Product extraction response: ${productsResponse.substring(0, 200)}...`);
     
-    // Parse product URLs
+    // Parse product data
     let productData;
     try {
       const jsonMatch = productsResponse.match(/\{[\s\S]*\}/);
@@ -462,7 +486,7 @@ CRITICAL RULES:
       console.error('Failed to parse product data:', parseError);
       return res.json({
         success: false,
-        error: 'Could not find product information for this brand'
+        error: 'Could not extract product information from search results'
       });
     }
     
@@ -472,13 +496,13 @@ CRITICAL RULES:
     if (products.length === 0) {
       return res.json({
         success: false,
-        error: 'No products found for this brand'
+        error: 'No products with prices found in search results'
       });
     }
     
-    console.log(`✅ Found ${products.length} products`);
+    console.log(`✅ Extracted ${products.length} products from search results`);
     
-    // Step 2: Calculate median price and determine price tier
+    // Step 3: Calculate median price and determine price tier
     const prices = products.map(p => p.price).filter(p => p > 0).sort((a, b) => a - b);
     const medianPrice = prices.length > 0 
       ? (prices.length % 2 === 0 
@@ -494,63 +518,76 @@ CRITICAL RULES:
     
     console.log(`💰 Median price: $${medianPrice} → ${priceRange}`);
     
-    // Step 3: Use AI to categorize brand based on real product data
-    console.log(`🤖 Phase 2: Categorizing brand...`);
+    // Step 4: Do another Serper search for brand info (about page, sustainability, sizing)
+    console.log(`🌐 Phase 3: Searching for brand information...`);
+    
+    const brandInfoQuery = `${brandName} about sustainability size chart women founded`;
+    const brandInfoResponse = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: brandInfoQuery,
+        num: 8
+      })
+    });
+    
+    const brandInfoData = await brandInfoResponse.json();
+    const brandInfoResults = brandInfoData.organic?.slice(0, 6).map(r => ({
+      title: r.title,
+      snippet: r.snippet
+    })) || [];
+    
+    // Step 5: Use AI to categorize brand based on search results
+    console.log(`🤖 Phase 4: Categorizing brand...`);
     
     const categorizeCompletion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         {
           role: 'system',
-          content: `You categorize fashion brands based on VERIFIED FACTS ONLY. Never guess. Never assume. Only include information you can verify from web search.
+          content: `You categorize fashion brands based ONLY on information visible in the search results. Never guess.
 
-Given product data, you will:
-
+Your tasks:
 1. CATEGORIES: Based on products found, list ONLY categories that appear:
-   Options: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry
-   Rule: If all 5 sample products are bags, report "Bags" only, don't guess they make clothing
+   Options: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry (comma-separated)
 
-2. VALUES: Only include IF you find explicit evidence in company website/about page:
-   - "Sustainable" = ONLY if brand explicitly states sustainability commitment
-   - "Female-founded" = ONLY if you verify founder names/bios show female ownership
-   - "Independent label" = ONLY if NOT owned by major conglomerate (verify from company info)
-   - "Ethical manufacturing" = ONLY if brand publicly commits to ethical practices
-   - "Secondhand" = ONLY if brand IS a resale platform
-   - "BIPOC-founded" = ONLY if you verify founder demographics explicitly stated
+2. VALUES: Only include IF you see explicit evidence in search results:
+   - "Sustainable" = Brand states sustainability/eco commitment
+   - "Female-founded" = Founder is identified as female
+   - "Independent label" = NOT owned by major corporation
+   - "Ethical manufacturing" = Brand mentions ethical practices
+   - "Secondhand" = Resale/vintage platform
+   - "BIPOC-founded" = Founder demographics stated
+   
+   If unsure, leave empty.
 
-   If unsure, leave empty. Do NOT guess.
-
-3. MAX SIZE: Search the official website's size chart/FAQs:
-   - ONLY report if you find explicit size information
-   - Convert to US: EU-30→0, EU-32→2, EU-34→4, EU-36→6, EU-38→8, EU-40→10, EU-42→12, EU-44→14, EU-46→16, EU-48→18, EU-50+→20+
-   - Map to buckets: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
-   - Leave empty if size info not published
+3. MAX SIZE: Only if you see explicit size info in results:
+   - Map to: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
+   - Leave empty if not mentioned
 
 Return ONLY valid JSON:
 {
   "category": "Clothing, Bags",
   "values": "Sustainable, Female-founded",
   "maxWomensSize": "Up to 12"
-}
-
-CRITICAL: Empty strings for fields you cannot verify. Never fill in blanks with guesses.`
+}`
         },
         {
           role: 'user',
-          content: `Categorize this brand:
-Brand: ${brandName}
-Type: ${isShop ? 'Shop (multi-brand retailer)' : 'Brand (single label)'}
-Sample products: ${products.map(p => `${p.name} ($${p.price})`).join(', ')}
+          content: `Brand: ${brandName}
+Type: ${isShop ? 'Shop' : 'Brand'}
+Products found: ${products.map(p => p.name).join(', ')}
 
-Return the JSON.`
+Search results about the brand:
+${JSON.stringify(brandInfoResults, null, 2)}
+
+Return JSON with category, values, and maxWomensSize.`
         }
       ],
-      temperature: 0.2,
-      tools: [
-        {
-          type: 'web_search'
-        }
-      ]
+      temperature: 0.2
     });
     
     const categoryResponse = categorizeCompletion.choices[0]?.message?.content;
