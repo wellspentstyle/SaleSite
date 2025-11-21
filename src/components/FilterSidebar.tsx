@@ -119,7 +119,7 @@ export function FilterSidebar({ filters, onFilterChange, isOpen }: FilterSidebar
         />
         
         {/* Has Picks - Standalone section with header styling */}
-        <div className="flex items-center justify-between py-3 px-0 mb-6">
+        <div className="flex items-center justify-between py-3 px-0">
           <label
             htmlFor="has-picks"
             className="text-sm cursor-pointer leading-none tracking-widest uppercase"
