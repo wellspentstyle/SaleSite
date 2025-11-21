@@ -21,15 +21,20 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 
 **UI/UX Decisions:**
 - Clean, minimalist design with a responsive grid layout inspired by kickpleat.com aesthetic
-- Custom fonts (DM Sans, Crimson Pro) for a modern aesthetic
+- Custom fonts (DM Sans weights 200, 300, 400 and Crimson Pro) for a modern aesthetic
 - Streamlined navigation with logo-only header (removed Discount Codes, Articles, About links)
 - Sale cards display discount percentages, and featured sales include images
 - Interactive dialogs for detailed product picks with "Shop Now" buttons
 - Sort and Filter controls aligned to the right side with minimal button styling
-- Filter sidebar opens from the right with generous spacing and checkboxes positioned on the right
+- Filter sidebar slides in from the LEFT, pushing content over (cards reduce from 3 to 2 columns)
+  - Sidebar top aligns with FILTER button position (not page top)
+  - Smooth width animation from 0px to 280px with opacity fade
+  - Content area has synchronized margin transition for seamless push effect
+  - Grid transitions smoothly between column layouts with CSS transitions
+  - Completely hidden when closed (no gap, no border)
 
 **Technical Implementations:**
-- **Filtering**: Right-side overlay panel with checkbox-based filtering (kickpleat.com-inspired design):
+- **Filtering**: Left-sliding sidebar with checkbox-based filtering (kickpleat.com-inspired design):
   - **TYPE**: BRAND, STORE (from Company lookup)
   - **PRICE RANGE**: $, $$, $$$, $$$$ (from Company lookup)
   - **DISCOUNT**: UP TO 25% OFF, 25-35% OFF, 35-50% OFF, 50%+ OFF
@@ -37,10 +42,11 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
   - **VALUES**: SUSTAINABLE, WOMEN-OWNED, BIPOC-OWNED, FAIR TRADE (from Company lookup array)
   - Each section is collapsible; filters use OR logic within categories, AND logic across categories
   - Values filter requires ALL selected values to be present
-  - All filter options displayed in ALL CAPS with checkboxes on the right, labels on the left
+  - All filter options displayed in ALL CAPS with light font weight (DM Sans 300), checkboxes on the right, labels on the left
   - Generous spacing between options (~80% of font height), no divider lines between sections
   - Backend passes exact Airtable values (preserving user's naming)
   - CompanyName field used for display and sorting instead of Company lookup field
+  - Sidebar state lifted to App.tsx for proper integration between button, sidebar, and responsive grid
 - **Sorting**: Dropdown with 6 options (default: FEATURED):
   - FEATURED (featured sales first, then by date)
   - ALPHABETICALLY, A-Z (sorted by CompanyName)
