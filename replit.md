@@ -27,7 +27,13 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - Interactive dialogs for detailed product picks with "Shop Now" buttons
 
 **Technical Implementations:**
-- **Filtering**: Sales can be filtered by discount range (0-30%, 30-50%, 50%+) and active status.
+- **Filtering**: Advanced filtering system with five independent filters:
+  - **Discount Range**: Up to 25%, 25-35%, 35-50%, 50%+ Off
+  - **Price Range**: Budget, Mid-Range, Luxury (from Company lookup)
+  - **Company Type**: Brand vs Store (from Company lookup)
+  - **Max Women's Size**: Plus Size (14+) filter (from Company lookup)
+  - **Values**: Multi-select checkboxes for Sustainable, Women-Owned, BIPOC-Owned, Fair Trade (from Company lookup array)
+  - All filters work together; Values filter requires ALL selected values to be present
 - **Sorting**: Regular sales are automatically sorted from newest to oldest.
 - **Admin Interface**: A password-protected `/admin` panel allows for managing product picks with editable brand fields on both auto-scraped and manual entry forms.
 - **SEO**: Comprehensive meta tags (Title, Description, Keywords, Open Graph, Twitter Card) are implemented for improved search engine visibility and social sharing.
