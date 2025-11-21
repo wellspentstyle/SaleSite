@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FilterOptions } from '../types';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
-import { ChevronDown, ChevronRight, Filter, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, X } from 'lucide-react';
 
 interface FilterSidebarProps {
   filters: FilterOptions;
@@ -54,36 +54,36 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
     const isExpanded = expandedSections[filterKey];
     
     return (
-      <div className="border-b border-border last:border-b-0">
+      <div className="mb-6 last:mb-0">
         <button
           onClick={() => toggleSection(filterKey)}
           className="w-full flex items-center justify-between py-3 px-0 text-left hover:opacity-70 transition-opacity"
         >
-          <span className="text-xs tracking-widest uppercase font-normal" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+          <span className="text-sm tracking-widest uppercase font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>
             {title}
           </span>
           {isExpanded ? <ChevronDown className="w-4 h-4 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 flex-shrink-0" />}
         </button>
         
         {isExpanded && (
-          <div className="pb-3 space-y-2.5">
+          <div className="pt-3 space-y-3">
             {options.map((option) => (
-              <div key={option} className="flex items-center space-x-2">
+              <div key={option} className="flex items-center justify-between gap-3">
+                <Label
+                  htmlFor={`${filterKey}-${option}`}
+                  className="text-sm cursor-pointer font-normal leading-none uppercase tracking-wide"
+                  style={{ fontFamily: 'DM Sans, sans-serif' }}
+                >
+                  {option}
+                </Label>
                 <Checkbox
                   id={`${filterKey}-${option}`}
                   checked={filters[filterKey].includes(option)}
                   onCheckedChange={(checked: boolean) =>
                     handleCheckboxChange(filterKey, option, checked)
                   }
-                  className="w-4 h-4"
+                  className="w-4 h-4 flex-shrink-0"
                 />
-                <Label
-                  htmlFor={`${filterKey}-${option}`}
-                  className="text-sm cursor-pointer font-normal leading-none"
-                  style={{ fontFamily: 'DM Sans, sans-serif' }}
-                >
-                  {option}
-                </Label>
               </div>
             ))}
           </div>
@@ -96,19 +96,18 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2.5 border border-border bg-background hover:bg-muted transition-colors"
+        className="flex items-center gap-2 px-4 py-2.5 border border-border bg-background hover:bg-muted transition-colors whitespace-nowrap"
         style={{ fontFamily: 'DM Sans, sans-serif' }}
       >
-        <Filter className="w-4 h-4" />
         <span className="text-xs tracking-widest uppercase font-normal">FILTER</span>
       </button>
 
       {isOpen && (
         <div 
-          className="fixed right-0 top-0 w-72 h-full bg-white border-l border-border overflow-y-auto z-50 p-6"
+          className="fixed right-0 top-0 w-80 h-full bg-white border-l border-border overflow-y-auto z-50 p-8"
           style={{ fontFamily: 'DM Sans, sans-serif' }}
         >
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-8">
             <h2 className="text-sm tracking-widest uppercase font-medium">FILTERS</h2>
             <button
               onClick={() => setIsOpen(false)}
@@ -118,11 +117,11 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
             </button>
           </div>
 
-          <div className="space-y-0">
+          <div>
             <FilterSection
               title="TYPE"
               filterKey="type"
-              options={['Brand', 'Store']}
+              options={['BRAND', 'STORE']}
             />
             
             <FilterSection
@@ -135,10 +134,10 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
               title="DISCOUNT"
               filterKey="discount"
               options={[
-                'Up to 25% off',
-                '25-35% off',
-                '35-50% off',
-                '50%+ off'
+                'UP TO 25% OFF',
+                '25-35% OFF',
+                '35-50% OFF',
+                '50%+ OFF'
               ]}
             />
             
@@ -146,11 +145,11 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
               title="MAX SIZE (WOMEN)"
               filterKey="maxWomensSize"
               options={[
-                'Up to 10',
-                'Up to 12',
-                'Up to 14',
-                'Up to 16',
-                'Up to 18+'
+                'UP TO 10',
+                'UP TO 12',
+                'UP TO 14',
+                'UP TO 16',
+                'UP TO 18+'
               ]}
             />
             
@@ -158,10 +157,10 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
               title="VALUES"
               filterKey="values"
               options={[
-                'Sustainable',
-                'Women-Owned',
-                'BIPOC-Owned',
-                'Fair Trade'
+                'SUSTAINABLE',
+                'WOMEN-OWNED',
+                'BIPOC-OWNED',
+                'FAIR TRADE'
               ]}
             />
           </div>

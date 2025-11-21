@@ -216,7 +216,7 @@ export default function App() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-20 flex-1">
         {/* Filters and Sort */}
-        <div className="mb-10 flex justify-between items-start gap-4">
+        <div className="mb-10 flex justify-end items-start gap-3">
           <SortDropdown
             currentSort={sortOption}
             onSortChange={setSortOption}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { SortOption } from '../types';
-import { ChevronDown } from 'lucide-react';
+import { Menu } from 'lucide-react';
 
 interface SortDropdownProps {
   currentSort: SortOption;
@@ -30,11 +30,11 @@ export function SortDropdown({ currentSort, onSortChange }: SortDropdownProps) {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-6 py-3 border border-border bg-background hover:bg-muted transition-colors"
+        className="flex items-center gap-2 px-4 py-2.5 border border-border bg-background hover:bg-muted transition-colors whitespace-nowrap"
         style={{ fontFamily: 'DM Sans, sans-serif' }}
       >
-        <span className="text-sm tracking-wider uppercase">{currentLabel}</span>
-        <ChevronDown className="w-4 h-4" />
+        <Menu className="w-4 h-4" />
+        <span className="text-xs tracking-widest uppercase font-normal">{currentLabel}</span>
       </button>
 
       {isOpen && (
@@ -44,16 +44,16 @@ export function SortDropdown({ currentSort, onSortChange }: SortDropdownProps) {
             onClick={() => setIsOpen(false)}
           />
           <div
-            className="absolute right-0 top-full mt-1 w-64 bg-background border border-border shadow-lg z-50"
+            className="absolute right-0 top-full mt-1 w-72 bg-white border border-border shadow-lg z-50 py-4"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           >
-            {sortOptions.map((option) => (
+            {sortOptions.map((option, index) => (
               <button
                 key={option.value}
                 onClick={() => handleSelect(option.value)}
-                className={`w-full text-left px-6 py-4 text-sm tracking-wider uppercase hover:bg-muted transition-colors ${
-                  currentSort === option.value ? 'bg-muted' : ''
-                }`}
+                className={`w-full text-left px-6 py-3 text-sm tracking-wide uppercase hover:bg-muted transition-colors whitespace-nowrap ${
+                  currentSort === option.value ? 'font-medium underline underline-offset-4' : 'font-normal'
+                } ${index === 0 ? 'border-b border-border pb-5 mb-2' : ''}`}
               >
                 {option.label}
               </button>
