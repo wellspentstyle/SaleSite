@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { FilterOptions } from '../types';
 import { Checkbox } from './ui/checkbox';
-import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface FilterSidebarProps {
   filters: FilterOptions;
   onFilterChange: (filters: FilterOptions) => void;
+  isOpen: boolean;
 }
 
-export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function FilterSidebar({ filters, onFilterChange, isOpen }: FilterSidebarProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     type: true,
     priceRange: true,
@@ -96,91 +96,67 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
   };
 
   return (
-    <>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-3 px-6 py-3 border border-border bg-background hover:bg-muted transition-colors whitespace-nowrap"
-        style={{ fontFamily: 'DM Sans, sans-serif' }}
-      >
-        <Menu className="w-4 h-4" />
-        <span className="text-sm tracking-wider uppercase font-normal">{isOpen ? 'HIDE FILTERS' : 'FILTER'}</span>
-      </button>
-
-      {/* Sidebar with slide-in animation */}
-      <div
-        className="fixed right-0 top-0 w-80 h-full bg-white border-l border-border overflow-y-auto z-50 p-8 transition-transform duration-300 ease-in-out"
-        style={{ 
-          fontFamily: 'DM Sans, sans-serif',
-          transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-          pointerEvents: isOpen ? 'auto' : 'none'
-        }}
-      >
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-sm tracking-widest uppercase font-medium">FILTERS</h2>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="p-1 hover:bg-muted rounded transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div>
-          <FilterSection
-            title="TYPE"
-            filterKey="type"
-            options={['Brand', 'Store']}
-          />
-          
-          <FilterSection
-            title="PRICE RANGE"
-            filterKey="priceRange"
-            options={['$', '$$', '$$$', '$$$$']}
-          />
-          
-          <FilterSection
-            title="DISCOUNT"
-            filterKey="discount"
-            options={[
-              'Up to 25% off',
-              '25-35% off',
-              '35-50% off',
-              '50%+ off'
-            ]}
-          />
-          
-          <FilterSection
-            title="MAX SIZE (WOMEN)"
-            filterKey="maxWomensSize"
-            options={[
-              'Up to 10',
-              'Up to 12',
-              'Up to 14',
-              'Up to 16',
-              'Up to 18+'
-            ]}
-          />
-          
-          <FilterSection
-            title="VALUES"
-            filterKey="values"
-            options={[
-              'Sustainable',
-              'Women-Owned',
-              'BIPOC-Owned',
-              'Fair Trade'
-            ]}
-          />
-        </div>
+    <div 
+      className="bg-white overflow-hidden transition-all duration-300 ease-in-out"
+      style={{ 
+        fontFamily: 'DM Sans, sans-serif',
+        width: isOpen ? '280px' : '0px',
+        paddingRight: isOpen ? '24px' : '0px',
+        opacity: isOpen ? 1 : 0,
+        borderRight: isOpen ? '1px solid var(--border)' : 'none'
+      }}
+    >
+      <div className="mb-8" style={{ minWidth: '256px' }}>
+        <h2 className="text-sm tracking-widest uppercase font-medium">FILTERS</h2>
       </div>
 
-      {/* Backdrop overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/10 z-40 transition-opacity duration-300"
-          onClick={() => setIsOpen(false)}
+      <div style={{ minWidth: '256px' }}>
+        <FilterSection
+          title="TYPE"
+          filterKey="type"
+          options={['Brand', 'Store']}
         />
-      )}
-    </>
+        
+        <FilterSection
+          title="PRICE RANGE"
+          filterKey="priceRange"
+          options={['$', '$$', '$$$', '$$$$']}
+        />
+        
+        <FilterSection
+          title="DISCOUNT"
+          filterKey="discount"
+          options={[
+            'Up to 25% off',
+            '25-35% off',
+            '35-50% off',
+            '50%+ off'
+          ]}
+        />
+        
+        <FilterSection
+          title="MAX SIZE (WOMEN)"
+          filterKey="maxWomensSize"
+          options={[
+            'Up to 10',
+            'Up to 12',
+            'Up to 14',
+            'Up to 16',
+            'Up to 18+'
+          ]}
+        />
+        
+        <FilterSection
+          title="VALUES"
+          filterKey="values"
+          options={[
+            'Sustainable',
+            'Women-Owned',
+            'BIPOC-Owned',
+            'Fair Trade'
+          ]}
+        />
+      </div>
+    </div>
   );
 }

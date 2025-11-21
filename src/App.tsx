@@ -39,6 +39,7 @@ export default function App() {
     values: [],
   });
   const [sortOption, setSortOption] = useState<SortOption>('featured');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
     async function loadSales() {
@@ -215,64 +216,88 @@ export default function App() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-20 flex-1">
-        {/* Filters and Sort */}
-        <div className="mb-10 flex justify-end items-start gap-3">
-          <SortDropdown
-            currentSort={sortOption}
-            onSortChange={setSortOption}
-          />
+        {/* Layout container with controls, sidebar, and content */}
+        <div className="flex">
+          {/* Filter Sidebar */}
           <FilterSidebar
             filters={filters}
             onFilterChange={setFilters}
+            isOpen={isFilterOpen}
           />
+
+          {/* Main content area with controls and sales */}
+          <div 
+            className="flex-1 transition-all duration-300"
+            style={{ 
+              marginLeft: isFilterOpen ? '32px' : '0px'
+            }}
+          >
+            {/* Filters and Sort */}
+            <div className="mb-10 flex justify-end items-start gap-3">
+              <SortDropdown
+                currentSort={sortOption}
+                onSortChange={setSortOption}
+              />
+              <button
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className="flex items-center gap-3 px-6 py-3 border border-border bg-background hover:bg-muted transition-colors whitespace-nowrap"
+                style={{ fontFamily: 'DM Sans, sans-serif' }}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                <span className="text-sm tracking-wider uppercase font-normal">{isFilterOpen ? 'HIDE FILTERS' : 'FILTER'}</span>
+              </button>
+            </div>
+
+            {/* Sales Content */}
+            {loading ? (
+              <div className="text-center py-20">
+                <p className="text-muted-foreground" style={{ fontFamily: 'Crimson Pro, serif' }}>
+                  Loading sales...
+                </p>
+              </div>
+            ) : featuredSales.length === 0 && regularSales.length === 0 ? (
+              <div className="text-center py-20">
+                <p className="text-muted-foreground" style={{ fontFamily: 'Crimson Pro, serif' }}>
+                  {sales.length === 0 ? 'No active sales at the moment.' : 'No sales match your current filters.'}
+                </p>
+              </div>
+            ) : (
+              <div>
+                {/* Featured Sales Section */}
+                {featuredSales.length > 0 && (
+                  <section style={{ marginBottom: '2.5rem' }}>
+                    <div className={`grid grid-cols-1 gap-8 transition-all duration-300 ${isFilterOpen ? 'md:grid-cols-1 lg:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
+                      {featuredSales.map((sale) => (
+                        <FeaturedSaleCard
+                          key={sale.id}
+                          sale={sale}
+                          onViewPicks={handleViewPicks}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Regular Sales Section */}
+                {regularSales.length > 0 && (
+                  <section>
+                    <div className={`grid grid-cols-1 gap-8 transition-all duration-300 ${isFilterOpen ? 'md:grid-cols-1 lg:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
+                      {regularSales.map((sale) => (
+                        <SaleCard
+                          key={sale.id}
+                          sale={sale}
+                          onViewPicks={handleViewPicks}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-
-        {/* Sales Content */}
-        {loading ? (
-          <div className="text-center py-20">
-            <p className="text-muted-foreground" style={{ fontFamily: 'Crimson Pro, serif' }}>
-              Loading sales...
-            </p>
-          </div>
-        ) : featuredSales.length === 0 && regularSales.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-muted-foreground" style={{ fontFamily: 'Crimson Pro, serif' }}>
-              {sales.length === 0 ? 'No active sales at the moment.' : 'No sales match your current filters.'}
-            </p>
-          </div>
-        ) : (
-          <div>
-            {/* Featured Sales Section */}
-            {featuredSales.length > 0 && (
-              <section style={{ marginBottom: '2.5rem' }}>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {featuredSales.map((sale) => (
-                    <FeaturedSaleCard
-                      key={sale.id}
-                      sale={sale}
-                      onViewPicks={handleViewPicks}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Regular Sales Section */}
-            {regularSales.length > 0 && (
-              <section>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {regularSales.map((sale) => (
-                    <SaleCard
-                      key={sale.id}
-                      sale={sale}
-                      onViewPicks={handleViewPicks}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
-        )}
       </main>
 
       {/* Footer */}
