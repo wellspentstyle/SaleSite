@@ -1119,9 +1119,18 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
       messages: [
         {
           role: 'system',
-          content: `You are a sales email parser. Extract sale information from emails and return ONLY valid JSON.
-          
-Return this exact structure:
+          content: `You are a sales email parser. Extract sale information from PROMOTIONAL SALE emails and return ONLY valid JSON.
+
+IMPORTANT: Only extract information from TIME-LIMITED PROMOTIONAL SALES. DO NOT process:
+- Welcome emails (e.g., "Welcome! Get 10% off your first order")
+- Account creation emails or signup bonuses
+- Newsletter emails or general marketing emails
+- Referral program emails
+- Emails containing "welcome", "welcome to", "thanks for signing up", "verify your account"
+- Ongoing/permanent new customer discounts
+For these, return: {"error": "Not a promotional sale email"}
+
+Return this exact structure for PROMOTIONAL SALES ONLY:
 {
   "company": "Brand Name",
   "percentOff": 30,
@@ -1139,9 +1148,9 @@ Rules:
 - discountCode: Extract promo code if mentioned (optional, use null if not found)
 - startDate: Use today's date in YYYY-MM-DD format (required)
 - endDate: Extract end date or use null if not mentioned
-- confidence: Rate your confidence in the extraction accuracy from 1-100 (required). Use 90-100 for very clear sales emails with explicit information, 70-89 for emails with some ambiguity, 50-69 for estimates, below 50 for highly uncertain extractions.
+- confidence: Rate your confidence in the extraction accuracy from 1-100 (required). Use 90-100 for very clear sales emails with explicit information, 70-89 for emails with some ambiguity. Use confidence below 70 for welcome emails, signup bonuses, or uncertain extractions.
 - Return ONLY the JSON object, no markdown, no explanations
-- If the email is not about a sale, return: {"error": "Not a sale email"}`
+- If the email is not a promotional sale, return: {"error": "Not a promotional sale email"}`
         },
         {
           role: 'user',
@@ -1167,7 +1176,7 @@ Rules:
     
     // Check if it's a valid sale
     if (saleData.error) {
-      console.log('ℹ️  Not a sale email');
+      console.log('ℹ️  Not a promotional sale email:', saleData.error);
       return res.status(200).json({ success: false, message: saleData.error });
     }
     
@@ -1175,6 +1184,16 @@ Rules:
     if (!saleData.company || !saleData.saleUrl || !saleData.percentOff) {
       console.log('❌ Missing required fields');
       return res.status(200).json({ success: false, message: 'Missing required fields' });
+    }
+    
+    // Validate confidence threshold (reject low confidence extractions)
+    const confidenceThreshold = 70;
+    if (saleData.confidence && saleData.confidence < confidenceThreshold) {
+      console.log(`⚠️  Low confidence (${saleData.confidence}%) - likely not a promotional sale. Rejecting.`);
+      return res.status(200).json({ 
+        success: false, 
+        message: `Low confidence extraction (${saleData.confidence}%) - likely not a promotional sale` 
+      });
     }
     
     console.log('✅ Parsed sale data:', saleData);
