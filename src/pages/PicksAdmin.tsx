@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
@@ -21,19 +22,13 @@ interface Sale {
   live: string;
 }
 
-interface PicksAdminProps {
-  onSignOut: () => void;
-  onNavigateToFinalize: (products: any[], saleId: string, failures?: any[]) => void;
-}
-
-export function PicksAdmin({ onSignOut, onNavigateToFinalize }: PicksAdminProps) {
+export function PicksAdmin() {
+  const navigate = useNavigate();
   const [sales, setSales] = useState<Sale[]>([]);
   const [selectedSaleId, setSelectedSaleId] = useState<string>('');
   const [urls, setUrls] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingSales, setLoadingSales] = useState(true);
-  const [isSyncingGem, setIsSyncingGem] = useState(false);
-  const [gemSyncMessage, setGemSyncMessage] = useState<string>('');
   const [selectedAssetSales, setSelectedAssetSales] = useState<Set<string>>(new Set());
   const [isGeneratingAssets, setIsGeneratingAssets] = useState(false);
   const [assetMessage, setAssetMessage] = useState<string>('');
@@ -100,7 +95,13 @@ export function PicksAdmin({ onSignOut, onNavigateToFinalize }: PicksAdminProps)
           extractionMethod: s.extractionMethod
         }));
         
-        onNavigateToFinalize(scrapedProducts, selectedSaleId, failures);
+        navigate('/admin/picks/finalize', {
+          state: {
+            scrapedProducts,
+            selectedSaleId,
+            failures
+          }
+        });
       } else {
         alert('An error occurred while scraping. Please try again.');
         setIsLoading(false);
@@ -109,38 +110,6 @@ export function PicksAdmin({ onSignOut, onNavigateToFinalize }: PicksAdminProps)
       console.error('Scraping error:', error);
       alert('An error occurred while scraping. Please try again.');
       setIsLoading(false);
-    }
-  };
-
-  const handleSyncGem = async () => {
-    setIsSyncingGem(true);
-    setGemSyncMessage('Requesting login email from Gem...');
-
-    const auth = sessionStorage.getItem('adminAuth');
-
-    try {
-      const response = await fetch(`${API_BASE}/admin/sync-gem`, {
-        method: 'POST',
-        headers: {
-          'auth': auth || ''
-        }
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setGemSyncMessage(`✅ ${data.message} - Saved ${data.itemsSaved} items to Airtable`);
-        setTimeout(() => setGemSyncMessage(''), 5000);
-      } else {
-        setGemSyncMessage(`❌ Error: ${data.message}`);
-        setTimeout(() => setGemSyncMessage(''), 5000);
-      }
-    } catch (error) {
-      console.error('Gem sync error:', error);
-      setGemSyncMessage('❌ Sync failed. Please try again.');
-      setTimeout(() => setGemSyncMessage(''), 5000);
-    } finally {
-      setIsSyncingGem(false);
     }
   };
 
@@ -195,65 +164,9 @@ export function PicksAdmin({ onSignOut, onNavigateToFinalize }: PicksAdminProps)
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="border-b border-border">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <img 
-              src="/logo.png" 
-              alt="Well Spent Style" 
-              className="h-16"
-            />
-            <div className="flex items-center gap-4">
-              <Button
-                onClick={handleSyncGem}
-                disabled={isSyncingGem}
-                variant="outline"
-                style={{ 
-                  fontFamily: 'DM Sans, sans-serif',
-                  height: '40px'
-                }}
-              >
-                {isSyncingGem ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  '💎 Sync Gem Items'
-                )}
-              </Button>
-              <button
-                onClick={onSignOut}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                style={{ fontFamily: 'DM Sans, sans-serif' }}
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
-        <div style={{ width: '100%', maxWidth: '700px' }}>
-          {/* Gem Sync Status Message */}
-          {gemSyncMessage && (
-            <div 
-              className="border border-border bg-white mb-6" 
-              style={{ 
-                padding: '16px 24px',
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: '14px'
-              }}
-            >
-              {gemSyncMessage}
-            </div>
-          )}
-          
-          <div className="border border-border bg-white" style={{ padding: '48px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
+      <div style={{ width: '100%', maxWidth: '700px' }}>
+        <div className="border border-border bg-white" style={{ padding: '48px' }}>
             <h1 
               className="mb-2 tracking-tight" 
               style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
@@ -452,7 +365,6 @@ export function PicksAdmin({ onSignOut, onNavigateToFinalize }: PicksAdminProps)
             </Button>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
   );
 }

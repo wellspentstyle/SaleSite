@@ -379,6 +379,133 @@ app.get('/admin/sales', async (req, res) => {
   }
 });
 
+// Brand research endpoint - uses web search + AI to research fashion brands
+app.post('/admin/brand-research', async (req, res) => {
+  const { auth } = req.headers;
+  const { brandName } = req.body;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  if (!brandName || typeof brandName !== 'string') {
+    return res.status(400).json({ success: false, error: 'Brand name is required' });
+  }
+  
+  try {
+    console.log(`🔍 Researching brand: ${brandName}`);
+    
+    // Step 1: Use web search to find brand information and product pages
+    const searchQuery = `${brandName} fashion brand official website products pricing`;
+    
+    console.log(`🌐 Searching: ${searchQuery}`);
+    
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are helping research fashion brands and shops using real price data from web searches.
+
+When given a brand name, you will:
+1. Search for the brand's official website and product pages
+2. Collect 3-5 real full-price product examples (dresses, tops, jeans, bags, shoes)
+3. Determine if it's a Brand (sells own label) or Shop (multi-brand retailer)
+4. Calculate the median price and assign a price tier:
+   - $ = median under $250
+   - $$ = median $250-$450
+   - $$$ = median $450-$1100
+   - $$$$ = median over $1100, OR known luxury house
+
+5. Determine categories that apply: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry
+6. Identify factual values (never guess): Sustainable, Female-founded, Independent label, Ethical manufacturing, Secondhand, BIPOC-founded
+7. Find the maximum women's size offered:
+   - Convert EU/FR/IT to US (EU-30, FR-32, IT-34)
+   - Letter sizes: XXS=0, XS=0-2, S=4-6, M=8-10, L=12-14, XL=16-18, XXL=18-20, 3XL=20-22
+   - Assign to buckets: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
+   - Leave blank if not clearly published
+
+Return ONLY a JSON object with this exact structure (multi-values comma-separated):
+{
+  "name": "Brand Name",
+  "type": "Brand or Shop",
+  "priceRange": "$, $$, $$$, or $$$$",
+  "category": "Clothing, Shoes, Bags" (comma-separated),
+  "values": "Sustainable, Female-founded" (comma-separated, only factual),
+  "maxWomensSize": "Up to 12" (or leave empty if unknown)
+}
+
+Use web search to find real data. Be thorough and accurate.`
+        },
+        {
+          role: 'user',
+          content: `Research this brand and return the JSON: ${brandName}`
+        }
+      ],
+      temperature: 0.3,
+      tools: [
+        {
+          type: 'web_search'
+        }
+      ]
+    });
+    
+    const response = completion.choices[0]?.message?.content;
+    
+    if (!response) {
+      throw new Error('No response from AI');
+    }
+    
+    console.log(`📊 AI Response: ${response}`);
+    
+    // Parse JSON response
+    let brandData;
+    try {
+      // Try to extract JSON from response (might have markdown code blocks)
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        brandData = JSON.parse(jsonMatch[0]);
+      } else {
+        brandData = JSON.parse(response);
+      }
+    } catch (parseError) {
+      console.error('Failed to parse AI response as JSON:', parseError);
+      return res.json({
+        success: false,
+        error: 'Failed to parse brand data from AI response'
+      });
+    }
+    
+    // Validate required fields
+    if (!brandData.name || !brandData.type) {
+      return res.json({
+        success: false,
+        error: 'Incomplete brand data received'
+      });
+    }
+    
+    console.log(`✅ Successfully researched ${brandName}`);
+    
+    res.json({
+      success: true,
+      brand: {
+        type: brandData.type || '',
+        priceRange: brandData.priceRange || '',
+        category: brandData.category || '',
+        values: brandData.values || '',
+        maxWomensSize: brandData.maxWomensSize || ''
+      }
+    });
+    
+  } catch (error) {
+    console.error(`❌ Error researching brand ${brandName}:`, error);
+    res.json({
+      success: false,
+      error: error.message || 'Failed to research brand'
+    });
+  }
+});
+
 // Clean all CleanURL fields in Airtable (remove tracking parameters)
 app.post('/admin/clean-urls', async (req, res) => {
   const { auth } = req.headers;

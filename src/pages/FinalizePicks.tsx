@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Loader2, Trash2 } from 'lucide-react';
 import { ManualEntryForm, ManualProductData } from '../components/ManualEntryForm';
 import { Input } from '../components/ui/input';
@@ -21,9 +22,7 @@ interface Failure {
   error: string;
 }
 
-interface FinalizePicksProps {
-  onSignOut: () => void;
-  onBack: () => void;
+interface LocationState {
   scrapedProducts: Product[];
   selectedSaleId: string;
   failures?: Failure[];
@@ -31,11 +30,27 @@ interface FinalizePicksProps {
 
 const API_BASE = '/api';
 
-export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSaleId, failures = [] }: FinalizePicksProps) {
-  const [picks, setPicks] = useState<Product[]>(scrapedProducts);
+export function FinalizePicks() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as LocationState;
+  
+  const [picks, setPicks] = useState<Product[]>([]);
   const [manualEntries, setManualEntries] = useState<Map<string, ManualProductData>>(new Map());
-  const [failedUrls, setFailedUrls] = useState<string[]>(failures.map(f => f.url));
+  const [failedUrls, setFailedUrls] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedSaleId, setSelectedSaleId] = useState<string>('');
+
+  useEffect(() => {
+    if (!state?.scrapedProducts || !state?.selectedSaleId) {
+      navigate('/admin/picks');
+      return;
+    }
+    
+    setPicks(state.scrapedProducts);
+    setSelectedSaleId(state.selectedSaleId);
+    setFailedUrls((state.failures || []).map(f => f.url));
+  }, [state, navigate]);
 
   const handleDelete = (index: number) => {
     setPicks(picks.filter((_, i) => i !== index));
@@ -103,7 +118,7 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
 
       if (data.success) {
         alert(`Successfully saved ${allPicks.length} picks!`);
-        onBack();
+        navigate('/admin/picks');
       } else {
         alert(`Failed to save picks: ${data.message}`);
       }
@@ -116,37 +131,9 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '12px 34px' }}>
-          <div className="flex items-center justify-between">
-            <img 
-              src="/logo.png" 
-              alt="Well Spent Style" 
-              className="h-16"
-            />
-            <button
-              onClick={onSignOut}
-              style={{ 
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: '14px',
-                color: '#666',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 34px' }}>
-        {/* Page Title */}
-        <div style={{ marginBottom: '40px' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 34px' }}>
+      {/* Page Title */}
+      <div style={{ marginBottom: '40px' }}>
           <h1 
             style={{ 
               fontFamily: 'DM Sans, sans-serif', 
@@ -239,7 +226,7 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
               No picks to display. Go back and scrape some products.
             </p>
             <button
-              onClick={onBack}
+              onClick={() => navigate('/admin/picks')}
               className="border border-border bg-white px-8 py-3 hover:border-foreground transition-colors"
               style={{ fontFamily: 'DM Sans, sans-serif' }}
             >
@@ -421,7 +408,7 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
               <button
-                onClick={onBack}
+                onClick={() => navigate('/admin/picks')}
                 disabled={isSaving}
                 style={{
                   backgroundColor: '#fff',
@@ -470,7 +457,6 @@ export function FinalizePicks({ onSignOut, onBack, scrapedProducts, selectedSale
             </div>
           </>
         )}
-      </main>
     </div>
   );
 }
