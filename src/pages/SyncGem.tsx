@@ -53,24 +53,25 @@ export function SyncGem() {
   };
 
   return (
-    <div className="p-8" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-      <div className="max-w-2xl">
-        <h1 
-          className="mb-2 tracking-tight" 
-          style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
-        >
-          💎 Sync Gem Items
-        </h1>
-        <p 
-          className="text-muted-foreground mb-8" 
-          style={{ fontFamily: 'Crimson Pro, serif', fontSize: '16px' }}
-        >
-          Synchronize items from your Gem.app account to the database.
-        </p>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
+      <div style={{ width: '100%', maxWidth: '700px' }}>
+        <div className="border border-border bg-white" style={{ padding: '48px' }}>
+          <h1 
+            className="mb-2 tracking-tight" 
+            style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
+          >
+            Sync Gem
+          </h1>
+          <p 
+            className="text-muted-foreground mb-10" 
+            style={{ fontFamily: 'Crimson Pro, serif' }}
+          >
+            Synchronize items from your Gem.app account to the database.
+          </p>
 
-        {/* Sync Button */}
-        <div className="mb-8">
-          <Button 
+          {/* Sync Button */}
+          <div style={{ marginTop: '24px', marginBottom: '32px' }}>
+            <Button 
             onClick={handleSyncGem}
             disabled={isSyncing}
             style={{ 
@@ -91,11 +92,11 @@ export function SyncGem() {
             ) : (
               'Sync Gem Items'
             )}
-          </Button>
-        </div>
+            </Button>
+          </div>
 
-        {/* Success Message */}
-        {syncResult && !errorMessage && (
+          {/* Success Message */}
+          {syncResult && !errorMessage && (
           <div 
             className="border border-border bg-green-50 p-6 rounded-lg mb-6"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
@@ -128,11 +129,11 @@ export function SyncGem() {
                 </ul>
               </div>
             )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Error Message */}
-        {errorMessage && (
+          {/* Error Message */}
+          {errorMessage && (
           <div 
             className="border border-red-300 bg-red-50 p-6 rounded-lg"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
@@ -143,11 +144,11 @@ export function SyncGem() {
             <p className="text-sm text-red-700">
               {errorMessage}
             </p>
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Info Box */}
-        {!syncResult && !errorMessage && !isSyncing && (
+          {/* Info Box */}
+          {!syncResult && !errorMessage && !isSyncing && (
           <div 
             className="border border-border bg-muted p-6 rounded-lg"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
@@ -159,8 +160,9 @@ export function SyncGem() {
               <li>Adds new items and updates existing ones in the database</li>
               <li>Reports the number of items processed and any errors</li>
             </ul>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
