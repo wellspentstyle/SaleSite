@@ -9,7 +9,10 @@ import { Checkbox } from './ui/checkbox';
 
 export type FilterOptions = {
   discountRange: string;
-  activeOnly: boolean;
+  priceRange: string;
+  companyType: string;
+  maxWomensSize: string;
+  values: string[];
 };
 
 interface FilterBarProps {
@@ -18,15 +21,23 @@ interface FilterBarProps {
 }
 
 export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
+  const toggleValue = (value: string) => {
+    const newValues = filters.values.includes(value)
+      ? filters.values.filter(v => v !== value)
+      : [...filters.values, value];
+    onFilterChange({ ...filters, values: newValues });
+  };
+
   return (
-    <div className="flex flex-wrap gap-8 items-center text-sm" style={{ fontFamily: 'Crimson Pro, serif' }}>
+    <div className="flex flex-wrap gap-6 items-center text-sm" style={{ fontFamily: 'Crimson Pro, serif' }}>
+      {/* Discount Range */}
       <Select
         value={filters.discountRange}
-        onValueChange={(value) =>
+        onValueChange={(value: string) =>
           onFilterChange({ ...filters, discountRange: value })
         }
       >
-        <SelectTrigger className="w-[200px] h-10 border-border">
+        <SelectTrigger className="w-[180px] h-10 border-border">
           <SelectValue placeholder="All discounts" />
         </SelectTrigger>
         <SelectContent>
@@ -38,20 +49,74 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
         </SelectContent>
       </Select>
 
-      <div className="flex items-center gap-2.5">
-        <Checkbox
-          id="active-only"
-          checked={filters.activeOnly}
-          onCheckedChange={(checked) =>
-            onFilterChange({ ...filters, activeOnly: checked as boolean })
-          }
-        />
-        <label
-          htmlFor="active-only"
-          className="text-sm cursor-pointer select-none"
-        >
-          Active Now
-        </label>
+      {/* Price Range */}
+      <Select
+        value={filters.priceRange}
+        onValueChange={(value: string) =>
+          onFilterChange({ ...filters, priceRange: value })
+        }
+      >
+        <SelectTrigger className="w-[180px] h-10 border-border">
+          <SelectValue placeholder="All prices" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Prices</SelectItem>
+          <SelectItem value="Budget">Budget</SelectItem>
+          <SelectItem value="Mid">Mid-Range</SelectItem>
+          <SelectItem value="Luxury">Luxury</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Brand vs Store */}
+      <Select
+        value={filters.companyType}
+        onValueChange={(value: string) =>
+          onFilterChange({ ...filters, companyType: value })
+        }
+      >
+        <SelectTrigger className="w-[180px] h-10 border-border">
+          <SelectValue placeholder="All types" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Types</SelectItem>
+          <SelectItem value="Brand">Brands</SelectItem>
+          <SelectItem value="Store">Stores</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Max Women's Size */}
+      <Select
+        value={filters.maxWomensSize}
+        onValueChange={(value: string) =>
+          onFilterChange({ ...filters, maxWomensSize: value })
+        }
+      >
+        <SelectTrigger className="w-[180px] h-10 border-border">
+          <SelectValue placeholder="All sizes" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Sizes</SelectItem>
+          <SelectItem value="Plus">Plus Size (14+)</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Values - Multi-select with checkboxes */}
+      <div className="flex flex-wrap gap-4">
+        {['Sustainable', 'Women-Owned', 'BIPOC-Owned', 'Fair Trade'].map((value) => (
+          <div key={value} className="flex items-center gap-2">
+            <Checkbox
+              id={`value-${value}`}
+              checked={filters.values.includes(value)}
+              onCheckedChange={() => toggleValue(value)}
+            />
+            <label
+              htmlFor={`value-${value}`}
+              className="text-sm cursor-pointer select-none"
+            >
+              {value}
+            </label>
+          </div>
+        ))}
       </div>
     </div>
   );

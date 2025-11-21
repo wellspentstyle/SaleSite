@@ -24,4 +24,9 @@ export interface Sale {
   featured?: boolean;
   createdTime?: string;
   picks: SalePick[];
+  // Company filtering metadata
+  priceRange?: string;
+  companyType?: string;
+  maxWomensSize?: string;
+  values?: string[];
 }

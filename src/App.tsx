@@ -32,7 +32,10 @@ export default function App() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
     discountRange: 'all',
-    activeOnly: false,
+    priceRange: 'all',
+    companyType: 'all',
+    maxWomensSize: 'all',
+    values: [],
   });
 
   useEffect(() => {
@@ -55,15 +58,6 @@ export default function App() {
     setDialogOpen(true);
   };
 
-  const isActiveNow = (sale: Sale) => {
-    if (!sale.startDate) return false;
-    const now = new Date();
-    const start = new Date(sale.startDate);
-    const end = sale.endDate ? new Date(sale.endDate) : null;
-    
-    return now >= start && (!end || now <= end);
-  };
-
   const { featuredSales, regularSales } = useMemo(() => {
     const filtered = sales.filter((sale) => {
       // Filter by discount range
@@ -80,8 +74,30 @@ export default function App() {
         }
       }
 
-      // Filter by active status
-      if (filters.activeOnly && !isActiveNow(sale)) return false;
+      // Filter by price range
+      if (filters.priceRange !== 'all') {
+        if (sale.priceRange !== filters.priceRange) return false;
+      }
+
+      // Filter by company type (Brand vs Store)
+      if (filters.companyType !== 'all') {
+        if (sale.companyType !== filters.companyType) return false;
+      }
+
+      // Filter by max women's size
+      if (filters.maxWomensSize !== 'all') {
+        // Only show companies that have Plus size availability
+        if (sale.maxWomensSize !== 'Plus') return false;
+      }
+
+      // Filter by values (multi-select - sale must have ALL selected values)
+      if (filters.values.length > 0) {
+        const saleValues = sale.values || [];
+        const hasAllValues = filters.values.every(filterValue => 
+          saleValues.includes(filterValue)
+        );
+        if (!hasAllValues) return false;
+      }
 
       return true;
     });

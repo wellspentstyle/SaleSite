@@ -280,10 +280,32 @@ app.get('/sales', async (req, res) => {
         saleUrl = `https://go.shopmy.us/apx/l9N1lH?url=${encodeURIComponent(cleanedUrl)}`;
       }
       
+      // Extract company lookup data (Airtable returns arrays for lookup fields)
+      const companyName = Array.isArray(record.fields.Company) 
+        ? record.fields.Company[0] 
+        : record.fields.Company || 'Unknown Brand';
+      
+      const priceRange = Array.isArray(record.fields.PriceRange) 
+        ? record.fields.PriceRange[0] 
+        : record.fields.PriceRange;
+      
+      const companyType = Array.isArray(record.fields.Type) 
+        ? record.fields.Type[0] 
+        : record.fields.Type;
+      
+      const maxWomensSize = Array.isArray(record.fields.MaxWomensSize) 
+        ? record.fields.MaxWomensSize[0] 
+        : record.fields.MaxWomensSize;
+      
+      // Values is likely a multi-select, keep as array
+      const values = Array.isArray(record.fields.Values) 
+        ? record.fields.Values 
+        : (record.fields.Values ? [record.fields.Values] : []);
+      
       return {
         id: record.id,
-        brandName: record.fields.Company || 'Unknown Brand',
-        brandLogo: record.fields.Company || 'BRAND',
+        brandName: companyName,
+        brandLogo: companyName,
         discount: `${record.fields.PercentOff || 0}% Off`,
         discountCode: record.fields.PromoCode || record.fields.DiscountCode || undefined,
         startDate: record.fields.StartDate,
@@ -292,7 +314,12 @@ app.get('/sales', async (req, res) => {
         featured: record.fields.Featured === 'YES',
         imageUrl: record.fields.Image && record.fields.Image.length > 0 ? record.fields.Image[0].url : undefined,
         createdTime: record.createdTime,
-        picks: picksBySale.get(record.id) || []
+        picks: picksBySale.get(record.id) || [],
+        // Company metadata for filtering
+        priceRange: priceRange,
+        companyType: companyType,
+        maxWomensSize: maxWomensSize,
+        values: values
       };
     });
     
