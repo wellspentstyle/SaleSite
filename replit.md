@@ -35,11 +35,11 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 
 **Technical Implementations:**
 - **Filtering**: Left-sliding sidebar with checkbox-based filtering (kickpleat.com-inspired design):
-  - **TYPE**: BRAND, STORE (from Company lookup)
+  - **TYPE**: BRAND, SHOP (from Company lookup)
   - **PRICE RANGE**: $, $$, $$$, $$$$ (from Company lookup)
   - **DISCOUNT**: UP TO 25% OFF, 25-35% OFF, 35-50% OFF, 50%+ OFF
   - **MAX SIZE (WOMEN)**: UP TO 10, UP TO 12, UP TO 14, UP TO 16, UP TO 18+ (from Company lookup)
-  - **VALUES**: SUSTAINABLE, WOMEN-OWNED, BIPOC-OWNED, FAIR TRADE (from Company lookup array)
+  - **VALUES**: SUSTAINABLE, FEMALE-FOUNDED, INDEPENDENT LABEL, ETHICAL MANUFACTURING, SECONDHAND, BIPOC-FOUNDED (from Company lookup array)
   - Each section is collapsible; filters use OR logic within categories, AND logic across categories
   - Values filter requires ALL selected values to be present
   - All filter options displayed in ALL CAPS with light font weight (DM Sans 300), checkboxes on the right, labels on the left

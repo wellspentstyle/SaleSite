@@ -114,7 +114,7 @@ export function FilterSidebar({ filters, onFilterChange, isOpen }: FilterSidebar
         <FilterSection
           title="TYPE"
           filterKey="type"
-          options={['Brand', 'Store']}
+          options={['Brand', 'Shop']}
         />
         
         <FilterSection
@@ -151,9 +151,11 @@ export function FilterSidebar({ filters, onFilterChange, isOpen }: FilterSidebar
           filterKey="values"
           options={[
             'Sustainable',
-            'Women-Owned',
-            'BIPOC-Owned',
-            'Fair Trade'
+            'Female-founded',
+            'Independent label',
+            'Ethical manufacturing',
+            'Secondhand',
+            'BIPOC-founded'
           ]}
         />
       </div>
