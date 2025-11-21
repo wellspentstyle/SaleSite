@@ -70,10 +70,11 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
               <div key={option} className="flex items-center justify-between gap-3">
                 <label
                   htmlFor={`${filterKey}-${option}`}
-                  className="text-sm cursor-pointer leading-none tracking-wide font-extralight"
+                  className="text-sm cursor-pointer leading-none tracking-wide"
                   style={{ 
                     fontFamily: 'DM Sans, sans-serif',
-                    textTransform: 'uppercase'
+                    textTransform: 'uppercase',
+                    fontWeight: 300
                   }}
                 >
                   {option}
@@ -107,10 +108,12 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
 
       {/* Sidebar with slide-in animation */}
       <div
-        className={`fixed right-0 top-0 w-80 h-full bg-white border-l border-border overflow-y-auto z-50 p-8 transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-        style={{ fontFamily: 'DM Sans, sans-serif' }}
+        className="fixed right-0 top-0 w-80 h-full bg-white border-l border-border overflow-y-auto z-50 p-8 transition-transform duration-300 ease-in-out"
+        style={{ 
+          fontFamily: 'DM Sans, sans-serif',
+          transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+          pointerEvents: isOpen ? 'auto' : 'none'
+        }}
       >
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-sm tracking-widest uppercase font-medium">FILTERS</h2>
