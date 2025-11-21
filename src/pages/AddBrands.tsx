@@ -6,6 +6,12 @@ import { Loader2, Copy, RotateCcw } from 'lucide-react';
 
 const API_BASE = '/api';
 
+interface Product {
+  name: string;
+  price: number;
+  url: string;
+}
+
 interface BrandResult {
   name: string;
   type: string;
@@ -15,6 +21,10 @@ interface BrandResult {
   maxWomensSize: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
+  evidence?: {
+    products: Product[];
+    medianPrice: number;
+  };
 }
 
 export function AddBrands() {
@@ -88,6 +98,7 @@ export function AddBrands() {
               category: data.brand.category || '',
               values: data.brand.values || '',
               maxWomensSize: data.brand.maxWomensSize || '',
+              evidence: data.brand.evidence,
               status: 'completed'
             } : r
           ));
@@ -146,6 +157,7 @@ export function AddBrands() {
             category: data.brand.category || '',
             values: data.brand.values || '',
             maxWomensSize: data.brand.maxWomensSize || '',
+            evidence: data.brand.evidence,
             status: 'completed'
           } : r
         ));
@@ -171,7 +183,7 @@ export function AddBrands() {
   };
 
   const handleCopyTable = () => {
-    // Create TSV format (no headers, multi-values comma-separated)
+    // Create TSV format with evidence columns (no headers, multi-values comma-separated)
     const completedResults = results.filter(r => r.status === 'completed');
     
     if (completedResults.length === 0) {
@@ -180,11 +192,31 @@ export function AddBrands() {
     }
 
     const tsv = completedResults
-      .map(r => [r.name, r.type, r.priceRange, r.category, r.values, r.maxWomensSize].join('\t'))
+      .map(r => {
+        // Format product samples as "Product 1 ($X), Product 2 ($Y), ..."
+        const productSamples = r.evidence?.products 
+          ? r.evidence.products.map(p => `${p.name} ($${p.price})`).join(', ')
+          : '';
+        
+        const medianPrice = r.evidence?.medianPrice 
+          ? `$${r.evidence.medianPrice}`
+          : '';
+        
+        return [
+          r.name, 
+          r.type, 
+          r.priceRange, 
+          r.category, 
+          r.values, 
+          r.maxWomensSize,
+          medianPrice,
+          productSamples
+        ].join('\t');
+      })
       .join('\n');
 
     navigator.clipboard.writeText(tsv).then(() => {
-      alert('Table copied to clipboard! Ready to paste into Airtable.');
+      alert('Table copied to clipboard! Ready to paste into Airtable.\n\nColumns: Name, Type, Price Range, Category, Values, Max Size, Median Price, Product Samples');
     }).catch(err => {
       console.error('Failed to copy:', err);
       alert('Failed to copy to clipboard');
@@ -274,6 +306,7 @@ export function AddBrands() {
                     <th className="px-4 py-3 text-left font-medium">Name</th>
                     <th className="px-4 py-3 text-left font-medium">Type</th>
                     <th className="px-4 py-3 text-left font-medium">Price Range</th>
+                    <th className="px-4 py-3 text-left font-medium">Median Price</th>
                     <th className="px-4 py-3 text-left font-medium">Category</th>
                     <th className="px-4 py-3 text-left font-medium">Values</th>
                     <th className="px-4 py-3 text-left font-medium">Max Size</th>
@@ -286,6 +319,18 @@ export function AddBrands() {
                       <td className="px-4 py-3 font-medium">{result.name}</td>
                       <td className="px-4 py-3">{result.type}</td>
                       <td className="px-4 py-3">{result.priceRange}</td>
+                      <td className="px-4 py-3">
+                        {result.evidence?.medianPrice ? (
+                          <span className="text-muted-foreground">
+                            ${result.evidence.medianPrice}
+                            <span className="text-xs ml-1">
+                              ({result.evidence.products?.length || 0} products)
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">{result.category}</td>
                       <td className="px-4 py-3">{result.values}</td>
                       <td className="px-4 py-3">{result.maxWomensSize}</td>

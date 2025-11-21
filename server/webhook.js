@@ -379,7 +379,7 @@ app.get('/admin/sales', async (req, res) => {
   }
 });
 
-// Brand research endpoint - uses web search + AI to research fashion brands
+// Brand research endpoint - uses web search + AI to research fashion brands with REAL pricing data
 app.post('/admin/brand-research', async (req, res) => {
   const { auth } = req.headers;
   const { brandName } = req.body;
@@ -395,51 +395,40 @@ app.post('/admin/brand-research', async (req, res) => {
   try {
     console.log(`🔍 Researching brand: ${brandName}`);
     
-    // Step 1: Use web search to find brand information and product pages
-    const searchQuery = `${brandName} fashion brand official website products pricing`;
+    // Step 1: Use AI with web search to find 3-5 product URLs with prices
+    console.log(`🌐 Phase 1: Finding product URLs...`);
     
-    console.log(`🌐 Searching: ${searchQuery}`);
-    
-    const completion = await openai.chat.completions.create({
+    const findProductsCompletion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         {
           role: 'system',
-          content: `You are helping research fashion brands and shops using real price data from web searches.
+          content: `You are a fashion research assistant. Your job is to find 3-5 product URLs from a fashion brand's website.
 
-When given a brand name, you will:
-1. Search for the brand's official website and product pages
-2. Collect 3-5 real full-price product examples (dresses, tops, jeans, bags, shoes)
-3. Determine if it's a Brand (sells own label) or Shop (multi-brand retailer)
-4. Calculate the median price and assign a price tier:
-   - $ = median under $250
-   - $$ = median $250-$450
-   - $$$ = median $450-$1100
-   - $$$$ = median over $1100, OR known luxury house
+When given a brand name:
+1. Search for the brand's official website
+2. Find 3-5 different product pages (dresses, tops, bags, shoes, etc.) showing FULL PRICES (not sale prices)
+3. For each product, extract: product name, full price (USD), and direct product URL
+4. Prioritize diverse product types (not all dresses or all shoes)
 
-5. Determine categories that apply: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry
-6. Identify factual values (never guess): Sustainable, Female-founded, Independent label, Ethical manufacturing, Secondhand, BIPOC-founded
-7. Find the maximum women's size offered:
-   - Convert EU/FR/IT to US (EU-30, FR-32, IT-34)
-   - Letter sizes: XXS=0, XS=0-2, S=4-6, M=8-10, L=12-14, XL=16-18, XXL=18-20, 3XL=20-22
-   - Assign to buckets: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
-   - Leave blank if not clearly published
-
-Return ONLY a JSON object with this exact structure (multi-values comma-separated):
+Return ONLY a JSON object:
 {
-  "name": "Brand Name",
-  "type": "Brand or Shop",
-  "priceRange": "$, $$, $$$, or $$$$",
-  "category": "Clothing, Shoes, Bags" (comma-separated),
-  "values": "Sustainable, Female-founded" (comma-separated, only factual),
-  "maxWomensSize": "Up to 12" (or leave empty if unknown)
+  "products": [
+    {"name": "Silk Slip Dress", "price": 450, "url": "https://..."},
+    {"name": "Leather Tote Bag", "price": 895, "url": "https://..."}
+  ],
+  "isShop": false (true if multi-brand retailer like Shopbop, false if single brand)
 }
 
-Use web search to find real data. Be thorough and accurate.`
+IMPORTANT: 
+- Prices must be numeric (e.g., 450 not "$450")
+- URLs must be direct product pages (not homepage)
+- Only include full-price items (avoid sale section)
+- If you can't find products, return empty array`
         },
         {
           role: 'user',
-          content: `Research this brand and return the JSON: ${brandName}`
+          content: `Find 3-5 product URLs with prices for: ${brandName}`
         }
       ],
       temperature: 0.3,
@@ -450,50 +439,153 @@ Use web search to find real data. Be thorough and accurate.`
       ]
     });
     
-    const response = completion.choices[0]?.message?.content;
+    const productsResponse = findProductsCompletion.choices[0]?.message?.content;
     
-    if (!response) {
-      throw new Error('No response from AI');
+    if (!productsResponse) {
+      throw new Error('No response from product search');
     }
     
-    console.log(`📊 AI Response: ${response}`);
+    console.log(`📦 Product search response: ${productsResponse.substring(0, 200)}...`);
     
-    // Parse JSON response
-    let brandData;
+    // Parse product URLs
+    let productData;
     try {
-      // Try to extract JSON from response (might have markdown code blocks)
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonMatch = productsResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        brandData = JSON.parse(jsonMatch[0]);
+        productData = JSON.parse(jsonMatch[0]);
       } else {
-        brandData = JSON.parse(response);
+        productData = JSON.parse(productsResponse);
       }
     } catch (parseError) {
-      console.error('Failed to parse AI response as JSON:', parseError);
+      console.error('Failed to parse product data:', parseError);
       return res.json({
         success: false,
-        error: 'Failed to parse brand data from AI response'
+        error: 'Could not find product information for this brand'
       });
     }
     
-    // Validate required fields
-    if (!brandData.name || !brandData.type) {
+    const products = productData.products || [];
+    const isShop = productData.isShop || false;
+    
+    if (products.length === 0) {
       return res.json({
         success: false,
-        error: 'Incomplete brand data received'
+        error: 'No products found for this brand'
       });
+    }
+    
+    console.log(`✅ Found ${products.length} products`);
+    
+    // Step 2: Calculate median price and determine price tier
+    const prices = products.map(p => p.price).filter(p => p > 0).sort((a, b) => a - b);
+    const medianPrice = prices.length > 0 
+      ? (prices.length % 2 === 0 
+          ? (prices[prices.length/2 - 1] + prices[prices.length/2]) / 2 
+          : prices[Math.floor(prices.length/2)])
+      : 0;
+    
+    let priceRange = '';
+    if (medianPrice < 250) priceRange = '$';
+    else if (medianPrice < 450) priceRange = '$$';
+    else if (medianPrice < 1100) priceRange = '$$$';
+    else priceRange = '$$$$';
+    
+    console.log(`💰 Median price: $${medianPrice} → ${priceRange}`);
+    
+    // Step 3: Use AI to categorize brand based on real product data
+    console.log(`🤖 Phase 2: Categorizing brand...`);
+    
+    const categorizeCompletion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are categorizing a fashion brand based on real product data.
+
+Given:
+- Brand name
+- Sample products with prices
+- Whether it's a single brand or multi-brand shop
+
+Your tasks:
+1. Determine categories that apply: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry (comma-separated)
+2. Identify ONLY factual values (never guess): Sustainable, Female-founded, Independent label, Ethical manufacturing, Secondhand, BIPOC-founded (comma-separated)
+3. Find maximum women's size offered:
+   - Convert EU/FR/IT to US (EU-30=US-0, FR-32=US-0, IT-34=US-0)
+   - Letter sizes: XXS=0, XS=0-2, S=4-6, M=8-10, L=12-14, XL=16-18, XXL=18-20, 3XL=20-22
+   - Assign to: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
+   - Leave empty if not clearly published on website
+
+Return ONLY a JSON object:
+{
+  "category": "Clothing, Bags",
+  "values": "Sustainable, Female-founded",
+  "maxWomensSize": "Up to 12"
+}
+
+Use web search ONLY for factual verification. Never guess about sustainability or founding details.`
+        },
+        {
+          role: 'user',
+          content: `Categorize this brand:
+Brand: ${brandName}
+Type: ${isShop ? 'Shop (multi-brand retailer)' : 'Brand (single label)'}
+Sample products: ${products.map(p => `${p.name} ($${p.price})`).join(', ')}
+
+Return the JSON.`
+        }
+      ],
+      temperature: 0.2,
+      tools: [
+        {
+          type: 'web_search'
+        }
+      ]
+    });
+    
+    const categoryResponse = categorizeCompletion.choices[0]?.message?.content;
+    
+    if (!categoryResponse) {
+      throw new Error('No response from categorization');
+    }
+    
+    console.log(`📊 Category response: ${categoryResponse}`);
+    
+    // Parse categorization
+    let categoryData;
+    try {
+      const jsonMatch = categoryResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        categoryData = JSON.parse(jsonMatch[0]);
+      } else {
+        categoryData = JSON.parse(categoryResponse);
+      }
+    } catch (parseError) {
+      console.error('Failed to parse category data:', parseError);
+      // Provide defaults if parsing fails
+      categoryData = { category: '', values: '', maxWomensSize: '' };
     }
     
     console.log(`✅ Successfully researched ${brandName}`);
     
+    // Step 4: Return structured data with evidence
     res.json({
       success: true,
       brand: {
-        type: brandData.type || '',
-        priceRange: brandData.priceRange || '',
-        category: brandData.category || '',
-        values: brandData.values || '',
-        maxWomensSize: brandData.maxWomensSize || ''
+        type: isShop ? 'Shop' : 'Brand',
+        priceRange: priceRange,
+        category: categoryData.category || '',
+        values: categoryData.values || '',
+        maxWomensSize: categoryData.maxWomensSize || '',
+        // Include evidence for audit trail
+        evidence: {
+          products: products.slice(0, 5).map(p => ({
+            name: p.name,
+            price: p.price,
+            url: p.url
+          })),
+          medianPrice: Math.round(medianPrice)
+        }
       }
     });
     
