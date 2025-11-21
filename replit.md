@@ -20,29 +20,36 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
   - Ensures safe testing without affecting live production data
 
 **UI/UX Decisions:**
-- Clean, minimalist design with a responsive grid layout
+- Clean, minimalist design with a responsive grid layout inspired by kickpleat.com aesthetic
 - Custom fonts (DM Sans, Crimson Pro) for a modern aesthetic
 - Streamlined navigation with logo-only header (removed Discount Codes, Articles, About links)
 - Sale cards display discount percentages, and featured sales include images
 - Interactive dialogs for detailed product picks with "Shop Now" buttons
+- Sort and Filter controls aligned to the right side with minimal button styling
+- Filter sidebar opens from the right with generous spacing and checkboxes positioned on the right
 
 **Technical Implementations:**
-- **Filtering**: Expandable sidebar filter system with checkbox-based filtering:
-  - **TYPE**: Brand, Store (from Company lookup)
+- **Filtering**: Right-side overlay panel with checkbox-based filtering (kickpleat.com-inspired design):
+  - **TYPE**: BRAND, STORE (from Company lookup)
   - **PRICE RANGE**: $, $$, $$$, $$$$ (from Company lookup)
-  - **DISCOUNT**: Up to 25% off, 25-35% off, 35-50% off, 50%+ off
-  - **MAX SIZE (WOMEN)**: Up to 10, Up to 12, Up to 14, Up to 16, Up to 18+ (from Company lookup)
-  - **VALUES**: Sustainable, Women-Owned, BIPOC-Owned, Fair Trade (from Company lookup array)
+  - **DISCOUNT**: UP TO 25% OFF, 25-35% OFF, 35-50% OFF, 50%+ OFF
+  - **MAX SIZE (WOMEN)**: UP TO 10, UP TO 12, UP TO 14, UP TO 16, UP TO 18+ (from Company lookup)
+  - **VALUES**: SUSTAINABLE, WOMEN-OWNED, BIPOC-OWNED, FAIR TRADE (from Company lookup array)
   - Each section is collapsible; filters use OR logic within categories, AND logic across categories
   - Values filter requires ALL selected values to be present
+  - All filter options displayed in ALL CAPS with checkboxes on the right, labels on the left
+  - Generous spacing between options (~80% of font height), no divider lines between sections
   - Backend passes exact Airtable values (preserving user's naming)
-- **Sorting**: Dropdown with 6 options:
+  - CompanyName field used for display and sorting instead of Company lookup field
+- **Sorting**: Dropdown with 6 options (default: FEATURED):
   - FEATURED (featured sales first, then by date)
-  - ALPHABETICALLY, A-Z
-  - ALPHABETICALLY, Z-A
+  - ALPHABETICALLY, A-Z (sorted by CompanyName)
+  - ALPHABETICALLY, Z-A (sorted by CompanyName)
   - DISCOUNT, HIGH TO LOW
   - DATE, OLD TO NEW
-  - DATE, NEW TO OLD (default)
+  - DATE, NEW TO OLD
+  - Sort button displays currently selected option with minimalist styling
+  - First option (FEATURED) separated from others with underline for active selection
 - **Admin Interface**: A password-protected `/admin` panel allows for managing product picks with editable brand fields on both auto-scraped and manual entry forms.
 - **SEO**: Comprehensive meta tags (Title, Description, Keywords, Open Graph, Twitter Card) are implemented for improved search engine visibility and social sharing.
 - **Performance Optimization**: 
