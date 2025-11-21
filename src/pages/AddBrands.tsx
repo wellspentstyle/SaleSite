@@ -227,79 +227,115 @@ export function AddBrands() {
   const failedCount = results.filter(r => r.status === 'failed').length;
 
   return (
-    <div className="p-8" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-      <h1 className="text-3xl tracking-tight font-bold mb-8">
-        Add Brands
-      </h1>
-
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="mb-8">
-        <div className="space-y-4 max-w-2xl">
-          <div>
-            <Label htmlFor="brand-names" className="text-sm font-medium mb-2 block">
-              Brand Names (one per line)
-            </Label>
-            <Textarea
-              id="brand-names"
-              value={brandNames}
-              onChange={(e) => setBrandNames(e.target.value)}
-              placeholder="Tove&#10;The Row&#10;Staud&#10;..."
-              rows={10}
-              className="font-mono text-sm"
-              disabled={isProcessing}
-            />
-          </div>
-          
-          <Button 
-            type="submit" 
-            disabled={isProcessing || !brandNames.trim()}
-            className="w-full"
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
+      <div style={{ width: '100%', maxWidth: '700px' }}>
+        <div className="border border-border bg-white" style={{ padding: '48px' }}>
+          <h1 
+            className="mb-2 tracking-tight" 
+            style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
           >
-            {isProcessing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Researching ({currentIndex + 1} of {totalBrands})...
-              </>
-            ) : (
-              'Research Brands'
-            )}
-          </Button>
+            Add Brands
+          </h1>
+          <p 
+            className="text-muted-foreground mb-10" 
+            style={{ fontFamily: 'Crimson Pro, serif' }}
+          >
+            Research fashion brands using AI to automatically categorize pricing, values, and size ranges.
+          </p>
+
+          {/* Input Form */}
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-2" style={{ marginBottom: '32px' }}>
+              <Label 
+                htmlFor="brand-names"
+                style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px' }}
+              >
+                Brand Names (one per line)
+              </Label>
+              <Textarea
+                id="brand-names"
+                value={brandNames}
+                onChange={(e) => setBrandNames(e.target.value)}
+                placeholder="Tove&#10;The Row&#10;Staud&#10;..."
+                rows={10}
+                className="text-sm"
+                style={{ fontFamily: 'monospace' }}
+                disabled={isProcessing}
+              />
+            </div>
+            
+            <div style={{ marginTop: '24px' }}>
+              <Button 
+                type="submit" 
+                disabled={isProcessing || !brandNames.trim()}
+                style={{ 
+                  fontFamily: 'DM Sans, sans-serif',
+                  backgroundColor: '#000',
+                  color: '#fff',
+                  height: '48px',
+                  paddingLeft: '32px',
+                  paddingRight: '32px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Researching ({currentIndex + 1} of {totalBrands})...
+                  </>
+                ) : (
+                  'Research Brands'
+                )}
+              </Button>
+            </div>
+          </form>
+
         </div>
-      </form>
 
-      {/* Progress and Status */}
-      {results.length > 0 && (
-        <div className="mb-6 p-4 bg-muted rounded-lg max-w-2xl">
-          <div className="flex items-center justify-between text-sm">
-            <span>
-              <strong>Completed:</strong> {completedCount} / {totalBrands}
-            </span>
-            {failedCount > 0 && (
-              <span className="text-destructive">
-                <strong>Failed:</strong> {failedCount}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+        {/* Progress and Results */}
+        {results.length > 0 && (
+          <div className="border border-border bg-white mt-6" style={{ padding: '48px' }}>
+            {/* Progress Status */}
+            <div className="border border-border bg-muted mb-6" style={{ padding: '16px' }}>
+              <div className="flex items-center justify-between text-sm" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                <span>
+                  <strong>Completed:</strong> {completedCount} / {totalBrands}
+                </span>
+                {failedCount > 0 && (
+                  <span className="text-destructive">
+                    <strong>Failed:</strong> {failedCount}
+                  </span>
+                )}
+              </div>
+            </div>
 
-      {/* Results Table */}
-      {results.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Results</h2>
-            <Button
-              onClick={handleCopyTable}
-              variant="outline"
-              disabled={completedCount === 0}
-            >
-              <Copy className="mr-2 h-4 w-4" />
-              Copy Table ({completedCount} rows)
-            </Button>
-          </div>
+            {/* Results Table Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 
+                className="tracking-tight" 
+                style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '24px' }}
+              >
+                Results
+              </h2>
+              <Button
+                onClick={handleCopyTable}
+                variant="outline"
+                disabled={completedCount === 0}
+                style={{ 
+                  fontFamily: 'DM Sans, sans-serif',
+                  height: '48px',
+                  paddingLeft: '32px',
+                  paddingRight: '32px'
+                }}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy Table ({completedCount} rows)
+              </Button>
+            </div>
 
-          <div className="border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Results Table */}
+            <div className="border rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted">
                   <tr>
@@ -370,7 +406,8 @@ export function AddBrands() {
             </div>
           </div>
         </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
