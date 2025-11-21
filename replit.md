@@ -87,14 +87,18 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - **Hybrid Scraper**: Automatically extracts product data (brand, name, image, price, percent off) from URLs using a multi-phase pipeline (JSON-LD, HTML extraction, AI). Brand extraction intelligently identifies actual product brands (not website names). Includes a Playwright fallback for client-side rendered sites and a manual entry UI for failed scrapes. Batch scraping is optimized with domain-level skip logic: if the first URL from a domain fails, all remaining URLs from that domain are instantly skipped (avoiding wasted API calls and processing time).
 - **Confidence Scoring**: Scraped products are assigned a confidence score (1-100) to indicate extraction accuracy, aiding in manual review.
 - **Brand Research**: AI-powered brand research tool using real web search data via Serper.dev API. Features include:
-  - Dual-phase search: products with pricing, then brand attributes (sustainability, sizing, etc.)
-  - AI extraction of 3-5 product URLs with prices from search snippets
+  - **4-phase targeted search strategy** for maximum accuracy:
+    1. Products search with prices (fallback if snippets lack prices)
+    2. Ownership verification (checks for H&M Group, LVMH, Kering, Richemont)
+    3. Sustainability certifications (B Corp, Fair Trade, GOTS, sustainable materials)
+    4. Pants/trousers sizing (extracts actual max women's size available)
+  - AI extraction of 3-5 product URLs with **real prices only** (no estimates or guesses)
   - Domain validation ensures only official brand website data is used
   - Local median price calculation determines price tier ($, $$, $$$, $$$$)
-  - Categorization based on verified search results only (no hallucinations)
-  - Fields populated: Type (Brand/Shop), Price Range, Category, Values (Sustainable, Female-founded, etc.), Max Women's Size
+  - Strict categorization requiring MULTIPLE verified sources (prevents false sustainability claims)
+  - Fields populated: Type (Brand/Shop), Price Range, Category, Values (Independent label, Sustainable, Female-founded, Ethical manufacturing, etc.), Max Women's Size
   - Robust error handling for API failures with specific user-facing messages
-  - Fallback logic allows partial results if brand info search fails
+  - Cost: ~$0.004 per brand research (4 Serper searches + AI extraction)
 - **Email Automation**: CloudMailin webhook integrates with Gmail to automatically parse incoming sale emails, extract details using AI, and populate Airtable, including duplicate prevention.
 - **Instagram Story Automation**: Event-driven system that generates Instagram story images (1080x1920px) triggered by Airtable Automation when CreateStory field changes to "Create Story". Features include:
   - Webhook-based triggering via `/webhook/airtable-story` endpoint (eliminates inefficient polling)

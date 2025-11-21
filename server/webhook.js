@@ -512,6 +512,63 @@ CRITICAL RULES:
     let products = productData.products || [];
     const isShop = productData.isShop || false;
     
+    // FALLBACK: If no products with prices found, try a more specific price-focused search
+    if (products.length === 0) {
+      console.log(`⚠️  No prices in initial search - trying price-specific search...`);
+      
+      const priceSearchQuery = `${brandName} dress shirt pants price $`;
+      const priceSearchResponse = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': process.env.SERPER_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          q: priceSearchQuery,
+          num: 8
+        })
+      });
+      
+      if (priceSearchResponse.ok) {
+        const priceSearchData = await priceSearchResponse.json();
+        const priceSearchResults = priceSearchData.organic?.slice(0, 6).map(r => ({
+          title: r.title,
+          snippet: r.snippet,
+          link: r.link
+        })) || [];
+        
+        if (priceSearchResults.length > 0) {
+          // Try extracting again from price-focused results - ONLY real prices
+          const priceCompletion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: `Extract 3-5 products with prices ONLY if prices are visible in the search results. Never estimate or guess prices. Return JSON: {"products": [{"name": "...", "price": 150, "url": "..."}], "isShop": false}. If no prices visible, return empty products array.`
+              },
+              {
+                role: 'user',
+                content: `Brand: ${brandName}\n\nSearch results:\n${JSON.stringify(priceSearchResults, null, 2)}`
+              }
+            ],
+            temperature: 0.2
+          });
+          
+          const priceResponse = priceCompletion.choices[0]?.message?.content;
+          if (priceResponse) {
+            try {
+              const jsonMatch = priceResponse.match(/\{[\s\S]*\}/);
+              const priceData = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(priceResponse);
+              products = priceData.products || [];
+              console.log(`💡 Fallback search found ${products.length} products`);
+            } catch (e) {
+              console.error('Failed to parse fallback products:', e);
+            }
+          }
+        }
+      }
+    }
+    
     // Validate product domains match official domain
     if (officialDomain && products.length > 0) {
       const validatedProducts = products.filter(p => {
