@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
-import { Loader2, Copy, RotateCcw } from 'lucide-react';
+import { Loader2, Copy, RotateCcw, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 const API_BASE = '/api';
 
@@ -33,6 +34,7 @@ export function AddBrands() {
   const [results, setResults] = useState<BrandResult[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [totalBrands, setTotalBrands] = useState<number>(0);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +48,7 @@ export function AddBrands() {
     ));
 
     if (brands.length === 0) {
-      alert('Please enter at least one brand name');
+      toast.error('Please enter at least one brand name');
       return;
     }
 
@@ -66,8 +68,17 @@ export function AddBrands() {
     setIsProcessing(true);
     setCurrentIndex(0);
 
+    // Create AbortController for this batch
+    const controller = new AbortController();
+    setAbortController(controller);
+
     // Process brands sequentially
     for (let i = 0; i < brands.length; i++) {
+      // Check if aborted
+      if (controller.signal.aborted) {
+        break;
+      }
+
       setCurrentIndex(i);
       
       // Update status to processing
@@ -83,7 +94,8 @@ export function AddBrands() {
             'Content-Type': 'application/json',
             'auth': auth
           },
-          body: JSON.stringify({ brandName: brands[i] })
+          body: JSON.stringify({ brandName: brands[i] }),
+          signal: controller.signal
         });
 
         const data = await response.json();
@@ -112,7 +124,13 @@ export function AddBrands() {
             } : r
           ));
         }
-      } catch (error) {
+      } catch (error: any) {
+        // Don't mark as failed if aborted by user
+        if (error.name === 'AbortError') {
+          console.log(`Request aborted for brand ${brands[i]}`);
+          break;
+        }
+        
         console.error(`Error researching brand ${brands[i]}:`, error);
         setResults(prev => prev.map((r, idx) => 
           idx === i ? {
@@ -126,6 +144,7 @@ export function AddBrands() {
 
     setIsProcessing(false);
     setCurrentIndex(-1);
+    setAbortController(null);
   };
 
   const handleRetry = async (index: number) => {
@@ -187,7 +206,7 @@ export function AddBrands() {
     const completedResults = results.filter(r => r.status === 'completed');
     
     if (completedResults.length === 0) {
-      alert('No completed results to copy');
+      toast.error('No completed results to copy');
       return;
     }
 
@@ -216,11 +235,28 @@ export function AddBrands() {
       .join('\n');
 
     navigator.clipboard.writeText(tsv).then(() => {
-      alert('Table copied to clipboard! Ready to paste into Airtable.\n\nColumns: Name, Type, Price Range, Category, Values, Max Size, Median Price, Product Samples');
+      toast.success(`Table copied! ${completedResults.length} rows ready to paste into Airtable.`);
     }).catch(err => {
       console.error('Failed to copy:', err);
-      alert('Failed to copy to clipboard');
+      toast.error('Failed to copy to clipboard');
     });
+  };
+
+  const handleClear = () => {
+    // Abort any in-flight requests
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+    }
+    
+    // Reset all state
+    setBrandNames('');
+    setResults([]);
+    setCurrentIndex(-1);
+    setTotalBrands(0);
+    setIsProcessing(false);
+    
+    toast.success('Table and input cleared');
   };
 
   const completedCount = results.filter(r => r.status === 'completed').length;
@@ -264,7 +300,7 @@ export function AddBrands() {
               />
             </div>
             
-            <div style={{ marginTop: '24px' }}>
+            <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
               <Button 
                 type="submit" 
                 disabled={isProcessing || !brandNames.trim()}
@@ -286,6 +322,23 @@ export function AddBrands() {
                 ) : (
                   'Research Brands'
                 )}
+              </Button>
+              
+              <Button 
+                type="button"
+                onClick={handleClear}
+                disabled={!brandNames.trim() && results.length === 0}
+                variant="outline"
+                style={{ 
+                  fontFamily: 'DM Sans, sans-serif',
+                  height: '48px',
+                  paddingLeft: '32px',
+                  paddingRight: '32px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <X className="mr-2 h-4 w-4" />
+                {isProcessing ? 'Cancel & Clear' : 'Clear'}
               </Button>
             </div>
           </form>

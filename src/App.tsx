@@ -6,6 +6,7 @@ import { FinalizePicks } from './pages/FinalizePicks';
 import { AddBrands } from './pages/AddBrands';
 import { SyncGem } from './pages/SyncGem';
 import { GenerateAssets } from './pages/GenerateAssets';
+import { Toaster } from './components/ui/sonner';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="sync" element={<SyncGem />} />
         </Route>
       </Routes>
+      <Toaster />
     </BrowserRouter>
   );
 }
