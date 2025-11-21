@@ -39,7 +39,7 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
   - **PRICE RANGE**: $, $$, $$$, $$$$ (from Company lookup)
   - **DISCOUNT**: UP TO 25% OFF, 25-35% OFF, 35-50% OFF, 50%+ OFF
   - **MAX SIZE (WOMEN)**: UP TO 10, UP TO 12, UP TO 14, UP TO 16, UP TO 18+ (from Company lookup)
-  - **VALUES**: SUSTAINABLE, FEMALE-FOUNDED, INDEPENDENT LABEL, ETHICAL MANUFACTURING, SECONDHAND, BIPOC-FOUNDED (from Company lookup array)
+  - **VALUES**: SUSTAINABLE, WOMEN-OWNED, INDEPENDENT LABEL, SECONDHAND, BIPOC-OWNED (from Company lookup array)
   - Each section is collapsible; filters use OR logic within categories, AND logic across categories
   - Values filter requires ALL selected values to be present
   - All filter options displayed in ALL CAPS with light font weight (DM Sans 300), checkboxes on the right, labels on the left
@@ -87,18 +87,20 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - **Hybrid Scraper**: Automatically extracts product data (brand, name, image, price, percent off) from URLs using a multi-phase pipeline (JSON-LD, HTML extraction, AI). Brand extraction intelligently identifies actual product brands (not website names). Includes a Playwright fallback for client-side rendered sites and a manual entry UI for failed scrapes. Batch scraping is optimized with domain-level skip logic: if the first URL from a domain fails, all remaining URLs from that domain are instantly skipped (avoiding wasted API calls and processing time).
 - **Confidence Scoring**: Scraped products are assigned a confidence score (1-100) to indicate extraction accuracy, aiding in manual review.
 - **Brand Research**: AI-powered brand research tool using real web search data via Serper.dev API. Features include:
-  - **4-phase targeted search strategy** for maximum accuracy:
-    1. Products search with prices (fallback if snippets lack prices)
-    2. Ownership verification (checks for H&M Group, LVMH, Kering, Richemont)
-    3. Sustainability certifications (B Corp, Fair Trade, GOTS, sustainable materials)
+  - **5-phase targeted search strategy** for maximum accuracy:
+    1. Products search with prices (fallback if snippets lack prices, strict real-price-only policy)
+    2. Ownership verification (checks for H&M Group, LVMH, Kering, Richemont conglomerates)
+    3. Sustainability certifications (B Corp, Fair Trade, GOTS, organic materials)
     4. Pants/trousers sizing (extracts actual max women's size available)
+    5. Ownership & diversity (women-owned, BIPOC-owned detection)
   - AI extraction of 3-5 product URLs with **real prices only** (no estimates or guesses)
   - Domain validation ensures only official brand website data is used
-  - Local median price calculation determines price tier ($, $$, $$$, $$$$)
-  - Strict categorization requiring MULTIPLE verified sources (prevents false sustainability claims)
-  - Fields populated: Type (Brand/Shop), Price Range, Category, Values (Independent label, Sustainable, Female-founded, Ethical manufacturing, etc.), Max Women's Size
+  - Price tier calculation: $ (<$250), $$ (<$500), $$$ (<$1100), $$$$ ($1100+)
+  - Strict categorization with explicit source array citations (prevents misclassification)
+  - Fields populated: Type (Brand/Shop), Price Range, Category, Values (Independent label, Sustainable, Women-owned, BIPOC-owned, Secondhand), Max Women's Size
+  - Backward compatibility mapping for legacy Airtable values (Female-founded → Women-owned, BIPOC-founded → BIPOC-owned)
   - Robust error handling for API failures with specific user-facing messages
-  - Cost: ~$0.004 per brand research (4 Serper searches + AI extraction)
+  - Cost: ~$0.005 per brand research (5 Serper searches + AI extraction)
 - **Email Automation**: CloudMailin webhook integrates with Gmail to automatically parse incoming sale emails, extract details using AI, and populate Airtable, including duplicate prevention.
 - **Instagram Story Automation**: Event-driven system that generates Instagram story images (1080x1920px) triggered by Airtable Automation when CreateStory field changes to "Create Story". Features include:
   - Webhook-based triggering via `/webhook/airtable-story` endpoint (eliminates inefficient polling)
