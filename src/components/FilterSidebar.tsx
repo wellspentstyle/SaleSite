@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { FilterOptions } from '../types';
 import { Checkbox } from './ui/checkbox';
-import { Label } from './ui/label';
 import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
 
 interface FilterSidebarProps {
@@ -69,13 +68,13 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
           <div className="pt-3 space-y-3">
             {options.map((option) => (
               <div key={option} className="flex items-center justify-between gap-3">
-                <Label
+                <label
                   htmlFor={`${filterKey}-${option}`}
-                  className="text-sm cursor-pointer leading-none uppercase tracking-wide"
-                  style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: '300' }}
+                  className="text-sm cursor-pointer leading-none uppercase tracking-wide font-extralight"
+                  style={{ fontFamily: 'DM Sans, sans-serif' }}
                 >
                   {option}
-                </Label>
+                </label>
                 <Checkbox
                   id={`${filterKey}-${option}`}
                   checked={filters[filterKey].includes(option)}
@@ -105,7 +104,7 @@ export function FilterSidebar({ filters, onFilterChange }: FilterSidebarProps) {
 
       {/* Sidebar with slide-in animation */}
       <div
-        className={`fixed right-0 top-0 w-80 h-full bg-white border-l border-border overflow-y-auto z-50 p-8 transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 top-0 w-80 h-full bg-white border-l border-border overflow-y-auto z-50 p-8 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         style={{ fontFamily: 'DM Sans, sans-serif' }}
