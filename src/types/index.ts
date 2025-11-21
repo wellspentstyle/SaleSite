@@ -30,3 +30,19 @@ export interface Sale {
   maxWomensSize?: string;
   values?: string[];
 }
+
+export interface FilterOptions {
+  type: string[];
+  priceRange: string[];
+  discount: string[];
+  maxWomensSize: string[];
+  values: string[];
+}
+
+export type SortOption = 
+  | 'featured'
+  | 'alphabetically-a-z'
+  | 'alphabetically-z-a'
+  | 'discount-high-low'
+  | 'date-old-new'
+  | 'date-new-old';
