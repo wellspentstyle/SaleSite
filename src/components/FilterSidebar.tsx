@@ -115,8 +115,32 @@ export function FilterSidebar({ filters, onFilterChange, isOpen }: FilterSidebar
         <FilterSection
           title="TYPE"
           filterKey="type"
-          options={['Brand', 'Shop', 'Has picks']}
+          options={['Brand', 'Shop']}
         />
+        
+        {/* Has Picks - Standalone section with header styling */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between py-3 px-0">
+            <label
+              htmlFor="has-picks"
+              className="text-sm cursor-pointer leading-none tracking-widest uppercase"
+              style={{ 
+                fontFamily: 'DM Sans, sans-serif',
+                fontWeight: 500
+              }}
+            >
+              HAS PICKS
+            </label>
+            <Checkbox
+              id="has-picks"
+              checked={filters.type.includes('Has picks')}
+              onCheckedChange={(checked: boolean) =>
+                handleCheckboxChange('type', 'Has picks', checked)
+              }
+              className="w-4 h-4 flex-shrink-0"
+            />
+          </div>
+        </div>
         
         <FilterSection
           title="PRICE RANGE"
