@@ -27,14 +27,22 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - Interactive dialogs for detailed product picks with "Shop Now" buttons
 
 **Technical Implementations:**
-- **Filtering**: Advanced filtering system with five independent filters:
-  - **Discount Range**: Up to 25%, 25-35%, 35-50%, 50%+ Off
-  - **Price Range**: Budget, Mid-Range, Luxury (from Company lookup)
-  - **Company Type**: Brand vs Store (from Company lookup)
-  - **Max Women's Size**: Plus Size (14+) filter (from Company lookup)
-  - **Values**: Multi-select checkboxes for Sustainable, Women-Owned, BIPOC-Owned, Fair Trade (from Company lookup array)
-  - All filters work together; Values filter requires ALL selected values to be present
-- **Sorting**: Regular sales are automatically sorted from newest to oldest.
+- **Filtering**: Expandable sidebar filter system with checkbox-based filtering:
+  - **TYPE**: Brand, Store (from Company lookup)
+  - **PRICE RANGE**: $, $$, $$$, $$$$ (from Company lookup)
+  - **DISCOUNT**: Up to 25% off, 25-35% off, 35-50% off, 50%+ off
+  - **MAX SIZE (WOMEN)**: Up to 10, Up to 12, Up to 14, Up to 16, Up to 18+ (from Company lookup)
+  - **VALUES**: Sustainable, Women-Owned, BIPOC-Owned, Fair Trade (from Company lookup array)
+  - Each section is collapsible; filters use OR logic within categories, AND logic across categories
+  - Values filter requires ALL selected values to be present
+  - Backend passes exact Airtable values (preserving user's naming)
+- **Sorting**: Dropdown with 6 options:
+  - FEATURED (featured sales first, then by date)
+  - ALPHABETICALLY, A-Z
+  - ALPHABETICALLY, Z-A
+  - DISCOUNT, HIGH TO LOW
+  - DATE, OLD TO NEW
+  - DATE, NEW TO OLD (default)
 - **Admin Interface**: A password-protected `/admin` panel allows for managing product picks with editable brand fields on both auto-scraped and manual entry forms.
 - **SEO**: Comprehensive meta tags (Title, Description, Keywords, Open Graph, Twitter Card) are implemented for improved search engine visibility and social sharing.
 - **Performance Optimization**: 
