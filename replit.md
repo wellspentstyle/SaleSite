@@ -14,6 +14,10 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - **Production**: Single unified Express server serves both React build and API endpoints on port 3001
 - **Routing**: Middleware strips `/api` prefix from requests for dev/prod compatibility, enabling SPA client-side routing (/, /admin, etc.)
 - **Configuration**: autoscale deployment with build step (`npm run build`) + run command (`node server/webhook.js`)
+- **Environment Detection**: Automatically detects production vs development using `REPLIT_DEPLOYMENT` environment variable
+  - **Development**: Uses `AIRTABLE_BASE_ID_DEV` secret → "Sale Tracker - Development" base
+  - **Production**: Uses `AIRTABLE_BASE_ID` secret → "Sale Tracker" base
+  - Ensures safe testing without affecting live production data
 
 **UI/UX Decisions:**
 - Clean, minimalist design with a responsive grid layout

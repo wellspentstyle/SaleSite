@@ -9,7 +9,13 @@ const __dirname = path.dirname(__filename);
 
 const MARKER_FILE = path.join(__dirname, 'gem-sync-state.json');
 const AIRTABLE_PAT = process.env.AIRTABLE_PAT;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+
+// Auto-detect environment and use appropriate Airtable base
+const isProduction = !!process.env.REPLIT_DEPLOYMENT;
+const AIRTABLE_BASE_ID = isProduction 
+  ? process.env.AIRTABLE_BASE_ID 
+  : (process.env.AIRTABLE_BASE_ID_DEV || process.env.AIRTABLE_BASE_ID);
+
 const GEM_TABLE_NAME = 'Gem';
 
 function readMarker() {

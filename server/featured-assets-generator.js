@@ -14,7 +14,12 @@ const ASSET_HEIGHT = 1350;
 const HEADER_COLORS = ['#273536', '#145fe9', '#fe6731', '#d2972f'];
 
 const AIRTABLE_PAT = process.env.AIRTABLE_PAT;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+
+// Auto-detect environment and use appropriate Airtable base
+const isProduction = !!process.env.REPLIT_DEPLOYMENT;
+const AIRTABLE_BASE_ID = isProduction 
+  ? process.env.AIRTABLE_BASE_ID 
+  : (process.env.AIRTABLE_BASE_ID_DEV || process.env.AIRTABLE_BASE_ID);
 
 function getRandomColor() {
   return HEADER_COLORS[Math.floor(Math.random() * HEADER_COLORS.length)];

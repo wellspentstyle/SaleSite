@@ -26,7 +26,17 @@ const openai = new OpenAI({
 
 // Airtable configuration
 const AIRTABLE_PAT = process.env.AIRTABLE_PAT;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+
+// Auto-detect environment and use appropriate Airtable base
+// Production deployments have REPLIT_DEPLOYMENT env var set
+const isProduction = !!process.env.REPLIT_DEPLOYMENT;
+const AIRTABLE_BASE_ID = isProduction 
+  ? process.env.AIRTABLE_BASE_ID 
+  : (process.env.AIRTABLE_BASE_ID_DEV || process.env.AIRTABLE_BASE_ID);
+
+console.log(`🔧 Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+console.log(`📊 Using Airtable Base: ${AIRTABLE_BASE_ID?.substring(0, 10)}...`);
+
 const TABLE_NAME = 'Sales';
 const PICKS_TABLE_NAME = 'Picks';
 
