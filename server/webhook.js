@@ -680,13 +680,66 @@ CRITICAL RULES:
     });
     
     const sizeData = sizeResponse.ok ? await sizeResponse.json() : {};
-    const sizeResults = sizeData.organic?.slice(0, 6).map(r => ({
+    let sizeResults = sizeData.organic?.slice(0, 6).map(r => ({
       title: r.title,
       snippet: r.snippet
     })) || [];
     
-    // Step 7: Ownership & diversity check - women-owned, BIPOC-owned
-    console.log(`🌐 Phase 5: Checking ownership & diversity...`);
+    // FALLBACK: If no size info found, try size chart search
+    if (sizeResults.length === 0 || !sizeResults.some(r => r.snippet.includes('size'))) {
+      console.log(`⚠️  No sizing in initial search - trying size chart search...`);
+      
+      const sizeChartQuery = `${brandName} women size chart guide`;
+      const sizeChartResponse = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': process.env.SERPER_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          q: sizeChartQuery,
+          num: 6
+        })
+      });
+      
+      if (sizeChartResponse.ok) {
+        const sizeChartData = await sizeChartResponse.json();
+        const fallbackResults = sizeChartData.organic?.slice(0, 5).map(r => ({
+          title: r.title,
+          snippet: r.snippet
+        })) || [];
+        
+        if (fallbackResults.length > 0) {
+          sizeResults = fallbackResults;
+          console.log(`💡 Fallback size chart search found ${sizeResults.length} results`);
+        }
+      }
+    }
+    
+    // Step 7: Category detection - comprehensive product type search
+    console.log(`🌐 Phase 5: Detecting product categories...`);
+    
+    const categoryQuery = `${brandName} shop shoes bags accessories jewelry swimwear`;
+    const categorySearchResponse = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: categoryQuery,
+        num: 8
+      })
+    });
+    
+    const categorySearchData = categorySearchResponse.ok ? await categorySearchResponse.json() : {};
+    const categoryResults = categorySearchData.organic?.slice(0, 6).map(r => ({
+      title: r.title,
+      snippet: r.snippet
+    })) || [];
+    
+    // Step 8: Ownership & diversity check - women-owned, BIPOC-owned
+    console.log(`🌐 Phase 6: Checking ownership & diversity...`);
     
     const ownershipDiversityQuery = `${brandName} women-owned OR female-founded OR BIPOC-owned OR Black-owned founder`;
     const ownershipDiversityResponse = await fetch('https://google.serper.dev/search', {
@@ -707,8 +760,8 @@ CRITICAL RULES:
       snippet: r.snippet
     })) || [];
     
-    // Step 8: Use AI to categorize brand based on targeted search results
-    console.log(`🤖 Phase 6: Analyzing all search data...`);
+    // Step 9: Use AI to categorize brand based on targeted search results
+    console.log(`🤖 Phase 7: Analyzing all search data...`);
     
     const categorizeCompletion = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -718,8 +771,9 @@ CRITICAL RULES:
           content: `You analyze fashion brand data from targeted web searches. Extract ONLY facts visible in the provided search results.
 
 TASK 1 - CATEGORIES (required):
-Based on products found, list categories that appear:
+Check CATEGORY SEARCH RESULTS to identify all product types sold:
 Options: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry (comma-separated)
+Look for mentions of these product types in titles/snippets
 
 TASK 2 - VALUES (be selective, cite source arrays):
 - "Independent label" = Check OWNERSHIP SEARCH RESULTS ONLY. Include ONLY if NO major parent company mentioned (H&M Group, LVMH, Kering, Richemont, etc.)
@@ -759,6 +813,9 @@ ${JSON.stringify(ownershipResults, null, 2)}
 
 SUSTAINABILITY SEARCH RESULTS:
 ${JSON.stringify(sustainabilityResults, null, 2)}
+
+CATEGORY SEARCH RESULTS:
+${JSON.stringify(categoryResults, null, 2)}
 
 SIZE SEARCH RESULTS:
 ${JSON.stringify(sizeResults, null, 2)}
