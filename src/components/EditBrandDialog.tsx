@@ -99,7 +99,7 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-10" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+        <div className="space-y-16" style={{ fontFamily: 'DM Sans, sans-serif' }}>
           {/* Type - Always "Brand" (hidden, non-editable) */}
           
           {/* Price Range */}

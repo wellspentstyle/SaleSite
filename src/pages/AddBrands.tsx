@@ -24,10 +24,11 @@ interface BrandResult {
   description: string;
   url: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
+  partialData?: boolean; // Flag for missing price data
   error?: string;
   evidence?: {
     products: Product[];
-    medianPrice: number;
+    medianPrice: number | null;
   };
 }
 
@@ -120,6 +121,7 @@ export function AddBrands() {
               description: data.brand.description || '',
               url: data.brand.url || '',
               evidence: data.brand.evidence,
+              partialData: data.partialData || false,
               status: 'completed'
             } : r
           ));
@@ -188,6 +190,7 @@ export function AddBrands() {
             description: data.brand.description || '',
             url: data.brand.url || '',
             evidence: data.brand.evidence,
+            partialData: data.partialData || false,
             status: 'completed'
           } : r
         ));
@@ -279,9 +282,17 @@ export function AddBrands() {
   };
 
   const handleEditSave = (index: number, updatedData: BrandResult) => {
-    setResults(prev => prev.map((r, idx) => 
-      idx === index ? { ...r, ...updatedData } : r
-    ));
+    setResults(prev => prev.map((r, idx) => {
+      if (idx === index) {
+        const merged = { ...r, ...updatedData };
+        // Clear partialData flag if user manually added price info
+        if (merged.priceRange && merged.priceRange.trim() !== '') {
+          merged.partialData = false;
+        }
+        return merged;
+      }
+      return r;
+    }));
     toast.success('Brand data updated');
   };
 
@@ -517,7 +528,9 @@ export function AddBrands() {
                           </span>
                         )}
                         {result.status === 'completed' && (
-                          <span className="text-green-600">✓ Complete</span>
+                          <span className={result.partialData ? "text-amber-600" : "text-green-600"}>
+                            {result.partialData ? '⚠ Partial' : '✓ Complete'}
+                          </span>
                         )}
                         {result.status === 'failed' && (
                           <div className="flex items-center gap-2">

@@ -1185,12 +1185,16 @@ Write ONLY the brief 1-2 sentence description for ${brandName}, no preamble or e
     const brandUrl = officialDomain ? `https://${officialDomain}` : '';
     console.log(`🔗 Brand URL: ${brandUrl || 'Not found'}`);
     
+    // Flag for partial data (missing prices)
+    const partialData = products.length === 0;
+    
     // Step 4: Return structured data with evidence
     res.json({
       success: true,
+      partialData: partialData, // Flag to indicate price data is missing
       brand: {
         type: 'Brand', // Always set to Brand (user only adds brands via this tool)
-        priceRange: priceRange,
+        priceRange: priceRange || '', // Empty string when no prices found
         category: finalCategory,
         values: valuesData.values || '',
         maxWomensSize: finalMaxSize,
@@ -1203,7 +1207,7 @@ Write ONLY the brief 1-2 sentence description for ${brandName}, no preamble or e
             price: p.price,
             url: p.url
           })),
-          medianPrice: Math.round(medianPrice)
+          medianPrice: products.length > 0 ? Math.round(medianPrice) : null
         }
       }
     });
