@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Loader2, ExternalLink } from 'lucide-react';
-import { Switch } from '../components/ui/switch';
+import { Loader2, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 
 const API_BASE = '/api';
 
@@ -26,7 +26,8 @@ export function PicksAdmin() {
   const [urls, setUrls] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingSales, setLoadingSales] = useState(true);
-  const [showInactive, setShowInactive] = useState(false);
+  const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
+  const [salesListExpanded, setSalesListExpanded] = useState(true);
 
   useEffect(() => {
     fetchSales();
@@ -53,6 +54,7 @@ export function PicksAdmin() {
   const handleSaleClick = (sale: Sale) => {
     setSelectedSale(sale);
     setUrls('');
+    setSalesListExpanded(false);
     
     if (sale.saleUrl) {
       window.open(sale.saleUrl, '_blank');
@@ -122,8 +124,8 @@ export function PicksAdmin() {
     const hasNoPicks = sale.picksCount === 0;
     const isActive = sale.live === 'YES';
     
-    if (showInactive) {
-      return hasNoPicks;
+    if (activeTab === 'inactive') {
+      return hasNoPicks && !isActive;
     }
     return hasNoPicks && isActive;
   });
@@ -144,19 +146,16 @@ export function PicksAdmin() {
           Select a sale to add curated product picks. Sales without picks are shown first.
         </p>
         
-        <div className="flex items-center gap-3">
-          <Switch
-            id="show-inactive"
-            checked={showInactive}
-            onCheckedChange={setShowInactive}
-          />
-          <Label 
-            htmlFor="show-inactive"
-            style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', cursor: 'pointer' }}
-          >
-            Show inactive sales
-          </Label>
-        </div>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'active' | 'inactive')}>
+          <TabsList>
+            <TabsTrigger value="active" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Active Sales
+            </TabsTrigger>
+            <TabsTrigger value="inactive" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Inactive Sales
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {loadingSales ? (
@@ -169,65 +168,84 @@ export function PicksAdmin() {
           {filteredSales.length === 0 ? (
             <div className="border border-dashed border-border bg-muted/20" style={{ padding: '60px', textAlign: 'center', borderRadius: '8px' }}>
               <p className="text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                {showInactive 
-                  ? 'No sales without picks found.' 
-                  : 'No active sales without picks found. Try toggling "Show inactive sales".'}
+                {activeTab === 'inactive' 
+                  ? 'No inactive sales without picks found.' 
+                  : 'No active sales without picks found. Try switching to "Inactive Sales" tab.'}
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" style={{ marginBottom: '40px' }}>
-              {filteredSales.map((sale) => (
-                <div
-                  key={sale.id}
-                  onClick={() => handleSaleClick(sale)}
-                  className={`border bg-white cursor-pointer transition-all ${
-                    selectedSale?.id === sale.id 
-                      ? 'border-black ring-2 ring-black' 
-                      : 'border-border hover:border-gray-400'
-                  }`}
-                  style={{ padding: '20px', borderRadius: '4px' }}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 
-                      style={{ 
-                        fontFamily: 'DM Sans, sans-serif', 
-                        fontWeight: 600, 
-                        fontSize: '16px',
-                        flex: 1
-                      }}
+            <div style={{ marginBottom: '40px' }}>
+              <button
+                onClick={() => setSalesListExpanded(!salesListExpanded)}
+                className="w-full flex items-center justify-between p-4 border border-border bg-white hover:bg-gray-50 transition-colors"
+                style={{ borderRadius: '4px', marginBottom: salesListExpanded ? '16px' : '0' }}
+              >
+                <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '16px' }}>
+                  {activeTab === 'active' ? 'Active' : 'Inactive'} Sales ({filteredSales.length})
+                </span>
+                {salesListExpanded ? (
+                  <ChevronUp className="h-5 w-5" />
+                ) : (
+                  <ChevronDown className="h-5 w-5" />
+                )}
+              </button>
+              
+              {salesListExpanded && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredSales.map((sale) => (
+                    <div
+                      key={sale.id}
+                      onClick={() => handleSaleClick(sale)}
+                      className={`border bg-white cursor-pointer transition-all ${
+                        selectedSale?.id === sale.id 
+                          ? 'border-black ring-2 ring-black' 
+                          : 'border-border hover:border-gray-400'
+                      }`}
+                      style={{ padding: '20px', borderRadius: '4px' }}
                     >
-                      {sale.saleName}
-                    </h3>
-                    {sale.saleUrl && (
-                      <ExternalLink className="h-4 w-4 text-muted-foreground ml-2 flex-shrink-0" />
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-semibold" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                        {sale.percentOff}% Off
-                      </span>
-                      <span 
-                        className={`px-2 py-0.5 text-xs rounded ${
-                          sale.live === 'YES' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                        style={{ fontFamily: 'DM Sans, sans-serif' }}
-                      >
-                        {sale.live === 'YES' ? 'Live' : 'Draft'}
-                      </span>
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 
+                          style={{ 
+                            fontFamily: 'DM Sans, sans-serif', 
+                            fontWeight: 600, 
+                            fontSize: '16px',
+                            flex: 1
+                          }}
+                        >
+                          {sale.saleName}
+                        </h3>
+                        {sale.saleUrl && (
+                          <ExternalLink className="h-4 w-4 text-muted-foreground ml-2 flex-shrink-0" />
+                        )}
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="font-semibold" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                            {sale.percentOff}% Off
+                          </span>
+                          <span 
+                            className={`px-2 py-0.5 text-xs rounded ${
+                              sale.live === 'YES' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                            style={{ fontFamily: 'DM Sans, sans-serif' }}
+                          >
+                            {sale.live === 'YES' ? 'Live' : 'Draft'}
+                          </span>
+                        </div>
+                        
+                        {sale.startDate && sale.endDate && (
+                          <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                            {new Date(sale.startDate).toLocaleDateString()} - {new Date(sale.endDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    
-                    {sale.startDate && sale.endDate && (
-                      <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                        {new Date(sale.startDate).toLocaleDateString()} - {new Date(sale.endDate).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
 
@@ -255,6 +273,7 @@ export function PicksAdmin() {
                   onClick={() => {
                     setSelectedSale(null);
                     setUrls('');
+                    setSalesListExpanded(true);
                   }}
                 >
                   Cancel
