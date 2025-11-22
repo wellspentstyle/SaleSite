@@ -1,14 +1,21 @@
 export function Hero() {
   return (
     <div className="relative h-[70vh] min-h-[500px] overflow-hidden">
-      {/* Background Image */}
+      {/* Background Video */}
       <div className="absolute inset-0">
-        <img
-          src="/hero-background.png"
-          alt="Fashion editorial"
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          poster="/hero-background.png"
           className="w-full h-full object-cover"
           style={{ objectPosition: 'center 35%' }}
-        />
+        >
+          <source src="/hero-video.webm" type="video/webm" />
+          <source src="/hero-video.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
         {/* Overlay */}
         <div className="absolute inset-0 bg-black/55" />
       </div>
