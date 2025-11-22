@@ -1,0 +1,51 @@
+Key Improvements:
+1. Fixed Sale vs. Original Price Confusion:
+✅ Much clearer AI prompts with explicit rules about which price is which:
+
+Added visual separators (🚨) to make critical rules stand out
+Explicit examples: "compare_at_price is ALWAYS originalPrice, price is ALWAYS salePrice"
+Clear indicators list for both price types
+Validation rules that prevent AI from swapping them
+
+✅ Better price validation logic:
+
+Checks if originalPrice > salePrice (must be true for a discount)
+If they're equal or reversed, sets originalPrice to null automatically
+Logs warnings when prices don't make sense
+Cross-validates AI's percentOff calculation
+
+✅ Improved JSON-LD parsing:
+
+Fixed the logic that was confusing offers.price vs offers.highPrice
+Now correctly identifies which is the sale price vs original
+Handles cases where they might be reversed
+
+2. Better Department Store Handling:
+✅ Added browser-like headers to avoid bot detection:
+
+User-Agent that looks like Chrome
+Accept headers, DNT, etc.
+This helps with Nordstrom, Saks, etc.
+
+✅ Department store-specific patterns in the AI prompt:
+
+Nordstrom: "OfferPrice" vs "RetailPrice"
+Saks: sale-price vs regular-price classes
+Neiman Marcus: listPrice vs offerPrice
+
+✅ Added microdata extraction (Strategy 2 in deterministic):
+
+Many department stores use itemprop="price" and itemprop="highPrice"
+This is more reliable than regex on random HTML
+
+How to Use:
+Replace your entire server/scrapers/fast-scraper.js with this new version. No other changes needed - it's a drop-in replacement.
+What Changed Specifically:
+
+Lines 30-38: Added real browser headers
+Lines 169-189: Fixed JSON-LD price logic (was confusing which is sale vs original)
+Lines 223-246: Added microdata extraction strategy
+Lines 294-378: Completely rewritten AI prompt with crystal-clear price distinction rules
+Lines 447-483: Much stronger price validation logic that catches reversed prices
+
+This should dramatically improve accuracy, especially on department store sites and when distinguishing sale from original prices!
