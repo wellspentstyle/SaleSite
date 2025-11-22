@@ -193,7 +193,7 @@ async function fetchBrandSizes(officialDomain, brandName) {
       messages: [
         {
           role: 'system',
-          content: `Extract the maximum women's clothing size available from these size chart results. Return ONLY the numeric size or letter size (e.g., "Up to 16", "Up to L", "Up to XL"). If no clear maximum women's size found, return empty string. Do not estimate or guess.`
+          content: `Extract the maximum women's clothing size available from these size chart results. Return ONLY the size value (e.g., "16", "L", "XL", "44"). If no clear maximum women's size is found, return nothing (blank response). Do not return quotes, do not estimate or guess.`
         },
         {
           role: 'user',
@@ -212,27 +212,57 @@ async function fetchBrandSizes(officialDomain, brandName) {
   }
 }
 
-// Helper function to convert S/M/L sizes to numeric equivalents
-function convertLetterSizeToNumeric(letterSize) {
-  const sizeMap = {
-    'S': 'Up to 6',
-    'M': 'Up to 8',
-    'L': 'Up to 10',
-    'XL': 'Up to 14',
-    'XXL': 'Up to 18',
-    '1X': 'Up to 14',
-    '2X': 'Up to 18',
-    '3X': 'Up to 22'
-  };
-  
-  // Extract the size letter(s) from strings like "Up to L" or "L"
-  const match = letterSize.match(/(S|M|L|XL|XXL|1X|2X|3X)/i);
-  if (match) {
-    const size = match[1].toUpperCase();
-    return sizeMap[size] || letterSize;
+// Helper function to convert S/M/L or European sizes to US numeric equivalents
+function convertSizeToUS(sizeString) {
+  if (!sizeString || sizeString === '""' || sizeString.trim() === '') {
+    return '';
   }
   
-  return letterSize;
+  // Letter size mapping (S/M/L/XL)
+  const letterSizeMap = {
+    'S': 6,
+    'M': 8,
+    'L': 10,
+    'XL': 14,
+    'XXL': 18,
+    '1X': 14,
+    '2X': 18,
+    '3X': 22
+  };
+  
+  // European to US size conversion (women's)
+  const euToUSMap = {
+    32: 0, 34: 0, 36: 2, 38: 4, 40: 6, 
+    42: 8, 44: 10, 46: 12, 48: 14, 50: 16, 
+    52: 18, 54: 20
+  };
+  
+  // Try to extract European numeric size (e.g., "44", "Up to 44", "EU 44")
+  const euMatch = sizeString.match(/(\d{2})/);
+  if (euMatch) {
+    const euSize = parseInt(euMatch[1]);
+    if (euToUSMap[euSize]) {
+      return `Up to ${euToUSMap[euSize]}`;
+    }
+  }
+  
+  // Try to extract letter size (e.g., "L", "Up to L", "XL")
+  const letterMatch = sizeString.match(/(XXL|XL|L|M|S|1X|2X|3X)/i);
+  if (letterMatch) {
+    const size = letterMatch[1].toUpperCase();
+    if (letterSizeMap[size]) {
+      return `Up to ${letterSizeMap[size]}`;
+    }
+  }
+  
+  // If already in US numeric format (e.g., "10", "14"), ensure "Up to" prefix
+  const usMatch = sizeString.match(/^(?:Up to )?(\d{1,2})$/i);
+  if (usMatch) {
+    return `Up to ${usMatch[1]}`;
+  }
+  
+  // If no match found, return empty string
+  return '';
 }
 
 // Helper function to fetch all records from Airtable with automatic pagination
@@ -878,8 +908,8 @@ CRITICAL RULES:
       try {
         fetchedMaxSize = await fetchBrandSizes(officialDomain, brandName);
         if (fetchedMaxSize) {
-          // Convert letter sizes to numeric if needed
-          fetchedMaxSize = convertLetterSizeToNumeric(fetchedMaxSize);
+          // Convert to US numeric size
+          fetchedMaxSize = convertSizeToUS(fetchedMaxSize);
           console.log(`✅ Fetched max size: ${fetchedMaxSize}`);
         }
       } catch (error) {
