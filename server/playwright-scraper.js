@@ -29,6 +29,138 @@ async function loadPlaywright() {
   return playwrightModule;
 }
 
+// Stealth evasion scripts to hide automation
+const EVASION_SCRIPTS = `
+// Overwrite the navigator.webdriver property
+Object.defineProperty(navigator, 'webdriver', {
+  get: () => undefined
+});
+
+// Mock plugins
+Object.defineProperty(navigator, 'plugins', {
+  get: () => [1, 2, 3, 4, 5]
+});
+
+// Mock languages
+Object.defineProperty(navigator, 'languages', {
+  get: () => ['en-US', 'en']
+});
+
+// Remove automation flags
+window.chrome = {
+  runtime: {}
+};
+
+// Mock permissions
+const originalQuery = window.navigator.permissions.query;
+window.navigator.permissions.query = (parameters) => (
+  parameters.name === 'notifications' ?
+    Promise.resolve({ state: Notification.permission }) :
+    originalQuery(parameters)
+);
+`;
+
+// Detect department store and return specific handling strategy
+function detectDepartmentStore(url) {
+  const hostname = new URL(url).hostname.toLowerCase();
+  
+  const stores = {
+    'nordstrom.com': {
+      name: 'Nordstrom',
+      waitTime: 5000,
+      priceSelectors: [
+        '[data-testid="price-regular"]',
+        '[data-testid="price-sale"]',
+        '.price',
+        '[class*="Price"]'
+      ],
+      needsScroll: true
+    },
+    'saksfifthavenue.com': {
+      name: 'Saks Fifth Avenue',
+      waitTime: 4000,
+      priceSelectors: [
+        '[data-test="product-price"]',
+        '.product-price',
+        '[class*="price"]'
+      ],
+      needsScroll: true
+    },
+    'neimanmarcus.com': {
+      name: 'Neiman Marcus',
+      waitTime: 4000,
+      priceSelectors: [
+        '[data-testid="price"]',
+        '.price-sale',
+        '[class*="Price"]'
+      ],
+      needsScroll: true
+    },
+    'bloomingdales.com': {
+      name: 'Bloomingdales',
+      waitTime: 4000,
+      priceSelectors: [
+        '#priceSale',
+        '.currentPrice',
+        '[class*="price"]'
+      ],
+      needsScroll: false
+    },
+    'bergdorfgoodman.com': {
+      name: 'Bergdorf Goodman',
+      waitTime: 4000,
+      priceSelectors: [
+        '.product-price',
+        '[data-testid="price"]'
+      ],
+      needsScroll: true
+    }
+  };
+  
+  for (const [domain, config] of Object.entries(stores)) {
+    if (hostname.includes(domain)) {
+      return config;
+    }
+  }
+  
+  return null;
+}
+
+// Simulate human-like mouse movements
+async function simulateHumanBehavior(page, logger) {
+  try {
+    logger.log('[Stealth] Simulating human behavior...');
+    
+    // Random mouse movements
+    await page.mouse.move(100, 100);
+    await page.waitForTimeout(100 + Math.random() * 200);
+    await page.mouse.move(300, 400);
+    await page.waitForTimeout(100 + Math.random() * 200);
+    
+    // Scroll down slowly
+    await page.evaluate(() => {
+      window.scrollTo({
+        top: 300,
+        behavior: 'smooth'
+      });
+    });
+    await page.waitForTimeout(500 + Math.random() * 500);
+    
+    // Scroll back up
+    await page.evaluate(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    });
+    await page.waitForTimeout(300 + Math.random() * 300);
+    
+    logger.log('[Stealth] Human behavior simulation complete');
+  } catch (error) {
+    logger.warn('[Stealth] Human behavior simulation failed:', error.message);
+  }
+}
+
 export async function scrapeWithPlaywright(url, options = {}) {
   const { logger = console } = options;
   const startTime = Date.now();
@@ -36,7 +168,12 @@ export async function scrapeWithPlaywright(url, options = {}) {
   let context = null;
   
   try {
-    logger.log('[Playwright] Launching browser for:', url);
+    logger.log('[Playwright] Starting stealth scraper for:', url);
+    
+    const storeConfig = detectDepartmentStore(url);
+    if (storeConfig) {
+      logger.log(`[Stealth] Detected ${storeConfig.name} - using specialized handling`);
+    }
     
     process.env.PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = 'true';
     
@@ -49,7 +186,11 @@ export async function scrapeWithPlaywright(url, options = {}) {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor'
       ]
     };
     
@@ -60,106 +201,268 @@ export async function scrapeWithPlaywright(url, options = {}) {
     
     browser = await chromium.launch(launchOptions);
     
+    // IMPROVED: More realistic browser context
     context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 },
+      locale: 'en-US',
+      timezoneId: 'America/New_York',
+      geolocation: { latitude: 40.7128, longitude: -74.0060 },
+      permissions: ['geolocation'],
+      deviceScaleFactor: 1,
+      isMobile: false,
+      hasTouch: false,
+      colorScheme: 'light',
+      extraHTTPHeaders: {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0'
+      }
     });
     
     const page = await context.newPage();
     
-    logger.log('[Playwright] Navigating to page...');
-    await page.goto(url, { 
-      waitUntil: 'domcontentloaded',
-      timeout: 30000
-    });
+    // CRITICAL: Inject stealth scripts BEFORE navigation
+    await page.addInitScript(EVASION_SCRIPTS);
     
-    logger.log('[Playwright] Waiting for content to render...');
+    logger.log('[Playwright] Navigating to page with stealth...');
+    
+    // Set a realistic referer for department stores
+    if (storeConfig) {
+      await page.setExtraHTTPHeaders({
+        'Referer': `https://${new URL(url).hostname}/`
+      });
+    }
+    
+    try {
+      const response = await page.goto(url, { 
+        waitUntil: 'domcontentloaded',
+        timeout: 35000
+      });
+      
+      logger.log(`[Playwright] Response status: ${response.status()}`);
+      
+      // Check if we got blocked
+      if (response.status() === 403 || response.status() === 429) {
+        logger.error('[Playwright] Got blocked by bot detection (403/429)');
+        throw new Error(`Bot detection: HTTP ${response.status()}`);
+      }
+      
+    } catch (navError) {
+      logger.error('[Playwright] Navigation failed:', navError.message);
+      throw new Error(`Navigation failed: ${navError.message}`);
+    }
+    
+    // IMPROVED: Wait strategy based on store type
+    const waitTime = storeConfig?.waitTime || 3000;
+    logger.log(`[Playwright] Waiting ${waitTime}ms for content to render...`);
+    
+    await page.waitForTimeout(waitTime);
+    
+    // CRITICAL: Simulate human behavior for department stores
+    if (storeConfig && storeConfig.needsScroll) {
+      await simulateHumanBehavior(page, logger);
+    }
+    
+    // Wait for key elements
     try {
       await page.waitForSelector('body', { timeout: 5000 });
-      await page.waitForTimeout(3000);
+      logger.log('[Playwright] Body loaded');
     } catch (e) {
-      logger.warn('[Playwright] Body selector timeout, continuing anyway');
+      logger.warn('[Playwright] Body selector timeout');
+    }
+    
+    // Take screenshot for debugging (optional)
+    try {
+      await page.screenshot({ path: '/tmp/playwright-scrape.png', fullPage: false });
+      logger.log('[Playwright] Screenshot saved: /tmp/playwright-scrape.png');
+    } catch (e) {
+      logger.warn('[Playwright] Screenshot failed:', e.message);
     }
     
     logger.log('[Playwright] Extracting product data...');
-    const productData = await page.evaluate(() => {
+    
+    // IMPROVED: Extract data with better selectors and validation
+    const productData = await page.evaluate((storeConfig) => {
       const data = {
         name: null,
         imageUrl: null,
         originalPrice: null,
         salePrice: null,
-        percentOff: 0
+        percentOff: 0,
+        brand: null
       };
       
-      data.name = document.querySelector('h1')?.textContent?.trim() ||
-                  document.querySelector('[class*="product-title"]')?.textContent?.trim() ||
-                  document.querySelector('[class*="ProductName"]')?.textContent?.trim() ||
-                  document.querySelector('meta[property="og:title"]')?.content ||
-                  document.title;
+      // Extract name
+      const nameSelectors = [
+        'h1',
+        '[data-testid*="product-title"]',
+        '[data-test*="product-title"]',
+        '[class*="product-title"]',
+        '[class*="ProductTitle"]',
+        '[class*="ProductName"]',
+        '[itemprop="name"]',
+        'meta[property="og:title"]'
+      ];
       
-      data.imageUrl = document.querySelector('meta[property="og:image"]')?.content ||
-                     document.querySelector('meta[name="og:image"]')?.content ||
-                     document.querySelector('meta[property="twitter:image"]')?.content ||
-                     document.querySelector('img[class*="product"]')?.src ||
-                     document.querySelector('img[class*="main"]')?.src;
+      for (const selector of nameSelectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          data.name = selector.includes('meta') 
+            ? element.getAttribute('content')
+            : element.textContent?.trim();
+          if (data.name) break;
+        }
+      }
       
-      const priceSelectors = [
-        '[class*="price"][class*="sale"]',
-        '[class*="sale"][class*="price"]',
+      if (!data.name) {
+        data.name = document.title.split('|')[0].trim();
+      }
+      
+      // Extract brand
+      const brandSelectors = [
+        '[data-testid*="brand"]',
+        '[class*="brand"]',
+        '[class*="designer"]',
+        '[itemprop="brand"]'
+      ];
+      
+      for (const selector of brandSelectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          data.brand = element.textContent?.trim();
+          if (data.brand) break;
+        }
+      }
+      
+      // Extract image
+      const imageSelectors = [
+        'meta[property="og:image"]',
+        'meta[name="og:image"]',
+        'meta[property="twitter:image"]',
+        '[data-testid*="product-image"] img',
+        '[class*="product-image"] img',
+        '[class*="ProductImage"] img',
+        'img[class*="main"]',
+        'img[itemprop="image"]'
+      ];
+      
+      for (const selector of imageSelectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          data.imageUrl = selector.includes('meta')
+            ? element.getAttribute('content')
+            : element.src || element.getAttribute('data-src');
+          if (data.imageUrl && data.imageUrl.startsWith('http')) break;
+        }
+      }
+      
+      // Extract prices with store-specific selectors
+      let priceSelectors = [
+        '[data-testid*="price"]',
+        '[data-test*="price"]',
+        '[class*="price-sale"]',
+        '[class*="sale-price"]',
         '[class*="current-price"]',
         '[class*="currentPrice"]',
-        '[data-test*="price"]',
-        '[data-testid*="price"]',
+        '[class*="Price--sale"]',
         '.price',
         '[itemprop="price"]'
       ];
       
-      let salePriceElement = null;
-      for (const selector of priceSelectors) {
-        salePriceElement = document.querySelector(selector);
-        if (salePriceElement) break;
+      // Add store-specific selectors if available
+      if (storeConfig && storeConfig.priceSelectors) {
+        priceSelectors = [...storeConfig.priceSelectors, ...priceSelectors];
       }
       
       const originalPriceSelectors = [
-        '[class*="price"][class*="original"]',
-        '[class*="original"][class*="price"]',
+        '[data-testid*="price-regular"]',
+        '[data-testid*="original"]',
+        '[class*="price-original"]',
+        '[class*="original-price"]',
         '[class*="regular-price"]',
         '[class*="regularPrice"]',
         '[class*="was-price"]',
         '[class*="compare-at-price"]',
+        '[class*="Price--original"]',
+        's [class*="price"]',
+        'del [class*="price"]',
         '[itemprop="highPrice"]'
       ];
       
-      let originalPriceElement = null;
-      for (const selector of originalPriceSelectors) {
-        originalPriceElement = document.querySelector(selector);
-        if (originalPriceElement) break;
-      }
-      
       const extractPrice = (element) => {
         if (!element) return null;
-        const text = element.textContent || element.getAttribute('content') || '';
-        const match = text.match(/[\d,]+\.?\d*/);
-        if (match) {
-          return parseFloat(match[0].replace(/,/g, ''));
+        
+        // Try content attribute first (structured data)
+        const content = element.getAttribute('content');
+        if (content) {
+          const num = parseFloat(content.replace(/[^0-9.]/g, ''));
+          if (!isNaN(num) && num > 0) return num;
         }
+        
+        // Try text content
+        const text = element.textContent || '';
+        const priceMatch = text.match(/\$?\s*([0-9,]+\.?\d{0,2})/);
+        if (priceMatch) {
+          const num = parseFloat(priceMatch[1].replace(/,/g, ''));
+          if (!isNaN(num) && num > 0) return num;
+        }
+        
         return null;
       };
       
-      data.salePrice = extractPrice(salePriceElement);
-      data.originalPrice = extractPrice(originalPriceElement);
+      // Find sale price
+      for (const selector of priceSelectors) {
+        const elements = document.querySelectorAll(selector);
+        for (const element of elements) {
+          const price = extractPrice(element);
+          if (price) {
+            data.salePrice = price;
+            break;
+          }
+        }
+        if (data.salePrice) break;
+      }
       
+      // Find original price
+      for (const selector of originalPriceSelectors) {
+        const elements = document.querySelectorAll(selector);
+        for (const element of elements) {
+          const price = extractPrice(element);
+          if (price && (!data.salePrice || price > data.salePrice)) {
+            data.originalPrice = price;
+            break;
+          }
+        }
+        if (data.originalPrice) break;
+      }
+      
+      // Calculate discount
       if (data.originalPrice && data.salePrice && data.originalPrice > data.salePrice) {
         data.percentOff = Math.round(((data.originalPrice - data.salePrice) / data.originalPrice) * 100);
+      } else if (data.originalPrice && data.originalPrice <= data.salePrice) {
+        // Prices are reversed or equal - no discount
+        data.originalPrice = null;
+        data.percentOff = 0;
       }
       
       return data;
-    });
+    }, storeConfig);
     
-    logger.log('[Playwright] Extracted data:', productData);
+    logger.log('[Playwright] Raw extracted data:', productData);
     
+    // Normalize image URL
     const normalizeImageUrl = (imageUrl, pageUrl) => {
       if (!imageUrl) return null;
       if (imageUrl.startsWith('http')) return imageUrl;
+      if (imageUrl.startsWith('//')) return 'https:' + imageUrl;
       
       try {
         const base = new URL(pageUrl);
@@ -171,18 +474,36 @@ export async function scrapeWithPlaywright(url, options = {}) {
     
     productData.imageUrl = normalizeImageUrl(productData.imageUrl, url);
     
+    // Calculate confidence score
     let confidence = 70;
     
-    if (!productData.name) confidence -= 30;
-    if (!productData.imageUrl) confidence -= 20;
-    if (!productData.salePrice || productData.salePrice === 0) confidence -= 20;
+    if (!productData.name) {
+      confidence -= 30;
+      logger.warn('[Playwright] No product name found');
+    }
+    if (!productData.imageUrl) {
+      confidence -= 20;
+      logger.warn('[Playwright] No image URL found');
+    }
+    if (!productData.salePrice || productData.salePrice === 0) {
+      confidence -= 20;
+      logger.warn('[Playwright] No sale price found');
+    }
     
+    // Check for placeholder images
     if (productData.imageUrl && (
       productData.imageUrl.includes('example.com') ||
       productData.imageUrl.includes('placeholder') ||
       productData.imageUrl.includes('data:image')
     )) {
       confidence -= 20;
+      logger.warn('[Playwright] Placeholder image detected');
+    }
+    
+    // Boost confidence for department stores (they're harder to scrape)
+    if (storeConfig) {
+      confidence += 10;
+      logger.log(`[Stealth] Confidence boost for ${storeConfig.name}`);
     }
     
     if (confidence < 50) {
@@ -195,6 +516,7 @@ export async function scrapeWithPlaywright(url, options = {}) {
     
     logger.log(`✅ [Playwright] Extracted product (confidence: ${confidence}%):`, {
       name: productData.name,
+      brand: productData.brand,
       salePrice: productData.salePrice,
       originalPrice: productData.originalPrice
     });
@@ -203,6 +525,7 @@ export async function scrapeWithPlaywright(url, options = {}) {
       success: true,
       product: {
         name: productData.name,
+        brand: productData.brand || null,
         imageUrl: productData.imageUrl,
         originalPrice: productData.originalPrice,
         salePrice: productData.salePrice,
@@ -214,7 +537,8 @@ export async function scrapeWithPlaywright(url, options = {}) {
         method: 'playwright',
         phase: 'browser-extraction',
         confidence: confidence,
-        durationMs: Date.now() - startTime
+        durationMs: Date.now() - startTime,
+        store: storeConfig?.name || 'unknown'
       }
     };
     
