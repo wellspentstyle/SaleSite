@@ -94,17 +94,8 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
         </DialogHeader>
 
         <div className="space-y-6" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-          {/* Type */}
-          <div className="space-y-2">
-            <Label htmlFor="type" style={{ fontWeight: 600 }}>Type</Label>
-            <Input
-              id="type"
-              value={editedData.type}
-              onChange={(e) => setEditedData({ ...editedData, type: e.target.value })}
-              placeholder="e.g., Brand, Shop"
-            />
-          </div>
-
+          {/* Type - Always "Brand" (hidden, non-editable) */}
+          
           {/* Price Range */}
           <div className="space-y-2">
             <Label htmlFor="priceRange" style={{ fontWeight: 600 }}>Price Range</Label>

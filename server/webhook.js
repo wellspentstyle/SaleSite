@@ -1185,7 +1185,7 @@ Write ONLY the brief 1-2 sentence description for ${brandName}, no preamble or e
     res.json({
       success: true,
       brand: {
-        type: isShop ? 'Shop' : 'Brand',
+        type: 'Brand', // Always set to Brand (user only adds brands via this tool)
         priceRange: priceRange,
         category: finalCategory,
         values: valuesData.values || '',
