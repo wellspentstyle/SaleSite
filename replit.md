@@ -20,14 +20,16 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - Clean, minimalist design with a responsive grid layout inspired by kickpleat.com aesthetic.
 - Custom fonts (DM Sans and Crimson Pro) for a modern aesthetic.
 - Streamlined navigation with a logo-only header.
+- Hero section features looping video background (WebM + MP4 fallback) with static poster image fallback for bandwidth/autoplay restrictions.
 - Sale cards display discount percentages, and featured sales include images.
 - Interactive dialogs for detailed product picks with "Shop Now" buttons.
 - Sort and Filter controls are aligned to the right.
 - Filter sidebar slides in from the right, pushing content over with smooth transitions and synchronized margin transitions.
+- Default sort is "newest first" (DATE, NEW TO OLD) to showcase latest sales immediately.
 
 **Technical Implementations:**
 - **Filtering**: Right-sliding sidebar with checkbox-based filtering for TYPE (BRAND, SHOP, HAS PICKS), PRICE RANGE, DISCOUNT, MAX SIZE (WOMEN), and VALUES (SUSTAINABLE, WOMEN-OWNED, INDEPENDENT LABEL, SECONDHAND, BIPOC-OWNED). Filters use OR logic within categories and AND logic across categories.
-- **Sorting**: Dropdown with 6 options (FEATURED, ALPHABETICALLY A-Z/Z-A, DISCOUNT HIGH TO LOW, DATE OLD/NEW TO OLD).
+- **Sorting**: Dropdown with 6 options (FEATURED, ALPHABETICALLY A-Z/Z-A, DISCOUNT HIGH TO LOW, DATE OLD/NEW TO OLD). Bifurcated rendering: "FEATURED" sort displays featured sales first (with special styling) then regular sales; all other sorts show a unified grid with uniform card styling sorted by the selected criteria.
 - **Admin Interface**: A password-protected `/admin` panel using React Router for managing product picks, brands, and asset generation. Includes a top-level layout with password gate, a fixed-width left sidebar navigation, and app-wide Sonner toast notifications.
 - **SEO**: Comprehensive meta tags (Title, Description, Keywords, Open Graph, Twitter Card) for improved visibility.
 - **Performance Optimization**: In-memory caching with 5-minute TTL for the `/sales` endpoint and Airtable pagination across all endpoints.
