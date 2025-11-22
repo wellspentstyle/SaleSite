@@ -936,14 +936,12 @@ CRITICAL RULES:
       }
     }
     
+    // Continue even if no products found - still gather other brand information
     if (products.length === 0) {
-      return res.json({
-        success: false,
-        error: 'No products with prices found in search results'
-      });
+      console.log(`⚠️  No products with prices found - will continue with partial research`);
+    } else {
+      console.log(`✅ Extracted ${products.length} validated products from search results`);
     }
-    
-    console.log(`✅ Extracted ${products.length} validated products from search results`);
     
     // Step 3: Calculate median price and determine price tier
     const prices = products.map(p => p.price).filter(p => p > 0).sort((a, b) => a - b);
@@ -954,12 +952,16 @@ CRITICAL RULES:
       : 0;
     
     let priceRange = '';
-    if (medianPrice < 250) priceRange = '$';
-    else if (medianPrice < 500) priceRange = '$$';
-    else if (medianPrice < 1100) priceRange = '$$$';
-    else priceRange = '$$$$';
-    
-    console.log(`💰 Median price: $${medianPrice} → ${priceRange}`);
+    if (products.length > 0) {
+      if (medianPrice < 250) priceRange = '$';
+      else if (medianPrice < 500) priceRange = '$$';
+      else if (medianPrice < 1100) priceRange = '$$$';
+      else priceRange = '$$$$';
+      console.log(`💰 Median price: $${medianPrice} → ${priceRange}`);
+    } else {
+      // Leave price range empty if no products found
+      console.log(`💰 No pricing data available - leaving price range empty`);
+    }
     
     // Step 4: Ownership check - verify if independent or owned by conglomerate
     console.log(`🌐 Phase 2: Checking brand ownership...`);
@@ -1148,9 +1150,9 @@ Analyze and return JSON with values.`
 Context about ${brandName}:
 - Type: ${isShop ? 'Shop' : 'Brand'}
 - Categories: ${finalCategory || 'Not specified'}
-- Price Range: ${priceRange}
+- Price Range: ${priceRange || 'Not available'}
 - Values: ${valuesData.values || 'None'}
-- Products: ${products.slice(0, 5).map(p => p.name).join(', ')}
+- Products: ${products.length > 0 ? products.slice(0, 5).map(p => p.name).join(', ') : 'Not available'}
 
 Examples:
 Tibi: If you've ever wished The Row had a personality or that Lemaire came in colors, Tibi is probably already in your cart. Amy Smilovic designs clothes that respect your intelligence—pieces with enough edge to feel special but enough restraint to work with everything you already own.

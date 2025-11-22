@@ -67,10 +67,6 @@ externalPort = 3003
 localPort = 42279
 externalPort = 3000
 
-[[ports]]
-localPort = 43901
-externalPort = 4200
-
 [deployment]
 deploymentTarget = "autoscale"
 run = ["node", "server/webhook.js"]
