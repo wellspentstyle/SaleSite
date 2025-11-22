@@ -1087,6 +1087,10 @@ Write ONLY the brief 1-2 sentence description for ${brandName}, no preamble or e
     
     console.log(`✅ Successfully researched ${brandName}`);
     
+    // Construct the full URL from officialDomain
+    const brandUrl = officialDomain ? `https://${officialDomain}` : '';
+    console.log(`🔗 Brand URL: ${brandUrl || 'Not found'}`);
+    
     // Step 4: Return structured data with evidence
     res.json({
       success: true,
@@ -1097,6 +1101,7 @@ Write ONLY the brief 1-2 sentence description for ${brandName}, no preamble or e
         values: valuesData.values || '',
         maxWomensSize: finalMaxSize,
         description: brandDescription,
+        url: brandUrl,
         // Include evidence for audit trail
         evidence: {
           products: products.slice(0, 5).map(p => ({

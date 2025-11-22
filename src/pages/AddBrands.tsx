@@ -21,6 +21,7 @@ interface BrandResult {
   values: string;
   maxWomensSize: string;
   description: string;
+  url: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
   evidence?: {
@@ -62,6 +63,7 @@ export function AddBrands() {
       values: '',
       maxWomensSize: '',
       description: '',
+      url: '',
       status: 'pending'
     }));
 
@@ -113,6 +115,7 @@ export function AddBrands() {
               values: data.brand.values || '',
               maxWomensSize: data.brand.maxWomensSize || '',
               description: data.brand.description || '',
+              url: data.brand.url || '',
               evidence: data.brand.evidence,
               status: 'completed'
             } : r
@@ -180,6 +183,7 @@ export function AddBrands() {
             values: data.brand.values || '',
             maxWomensSize: data.brand.maxWomensSize || '',
             description: data.brand.description || '',
+            url: data.brand.url || '',
             evidence: data.brand.evidence,
             status: 'completed'
           } : r
@@ -233,6 +237,7 @@ export function AddBrands() {
           r.values, 
           r.maxWomensSize,
           r.description,
+          r.url,
           medianPrice,
           productSamples
         ].join('\t');
@@ -405,6 +410,7 @@ export function AddBrands() {
                     <th className="px-4 py-3 text-left font-medium">Values</th>
                     <th className="px-4 py-3 text-left font-medium">Max Size</th>
                     <th className="px-4 py-3 text-left font-medium">Description</th>
+                    <th className="px-4 py-3 text-left font-medium">URL</th>
                     <th className="px-4 py-3 text-left font-medium">Status</th>
                   </tr>
                 </thead>
@@ -436,6 +442,20 @@ export function AddBrands() {
                               ? result.description.substring(0, 100) + '...' 
                               : result.description}
                           </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {result.url ? (
+                          <a 
+                            href={result.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline text-sm"
+                          >
+                            {result.url.replace('https://', '').replace('www.', '')}
+                          </a>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
