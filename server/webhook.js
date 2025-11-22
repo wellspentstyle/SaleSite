@@ -191,8 +191,61 @@ async function fetchBrandSizes(officialDomain, brandName) {
       return null;
     }
     
-    // Combine snippets to find size information
-    const sizeText = results.map(r => `${r.title} ${r.snippet}`).join('\n');
+    // Strategy: Try to fetch full page content first, fallback to snippets
+    let sizeText = '';
+    let usedFullPage = false;
+    
+    // Try to fetch the first size chart URL's full content
+    if (results[0]?.link) {
+      try {
+        console.log(`📄 Fetching full size chart page: ${results[0].link}`);
+        const pageResponse = await fetch(results[0].link, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          timeout: 10000 // 10 second timeout
+        });
+        
+        if (pageResponse.ok) {
+          const html = await pageResponse.text();
+          
+          // Extract text from HTML (simple approach: remove tags and decode entities)
+          const textContent = html
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove styles
+            .replace(/<[^>]+>/g, ' ') // Remove HTML tags
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+          
+          // Look for size-related content (limit to reasonable size for AI)
+          const sizeKeywords = ['size chart', 'size guide', 'sizing', 'measurements', 'fit guide'];
+          const lines = textContent.split(/[.\n]/);
+          const relevantLines = lines.filter(line => 
+            sizeKeywords.some(keyword => line.toLowerCase().includes(keyword)) ||
+            /\b(XS|S|M|L|XL|XXL|\d{1,2})\b/.test(line) // Contains size indicators
+          );
+          
+          if (relevantLines.length > 0) {
+            // Take first 100 relevant lines to avoid token limits
+            sizeText = relevantLines.slice(0, 100).join('\n');
+            usedFullPage = true;
+            console.log(`✅ Extracted ${relevantLines.length} relevant lines from full page`);
+          }
+        }
+      } catch (fetchError) {
+        console.log(`⚠️  Failed to fetch full page, falling back to snippets: ${fetchError.message}`);
+      }
+    }
+    
+    // Fallback: Use snippets if full page fetch failed or no relevant content found
+    if (!usedFullPage) {
+      sizeText = results.map(r => `${r.title} ${r.snippet}`).join('\n');
+      console.log(`📝 Using search result snippets for size extraction`);
+    }
     
     // Use AI to extract max women's size from the text
     const sizeCompletion = await openai.chat.completions.create({
@@ -200,11 +253,15 @@ async function fetchBrandSizes(officialDomain, brandName) {
       messages: [
         {
           role: 'system',
-          content: `Extract the maximum women's clothing size available from these size chart results. Return ONLY the size value (e.g., "16", "L", "XL", "44"). If no clear maximum women's size is found, return nothing (blank response). Do not return quotes, do not estimate or guess.`
+          content: `Extract the maximum women's clothing size available from the size chart information provided. Look for the highest numeric size, letter size (XS-XXL), or European size in women's/ladies' size charts.
+
+Return ONLY the size value (e.g., "16", "L", "XL", "44"). If multiple size systems are shown, prefer US numeric sizes.
+
+If no clear maximum women's size is found, return nothing (blank response). Do not return quotes, do not estimate or guess. Be precise - use only what's explicitly stated in the current size chart.`
         },
         {
           role: 'user',
-          content: `Size information for ${brandName}:\n\n${sizeText}`
+          content: `Size information for ${brandName}:\n\n${sizeText.substring(0, 8000)}`
         }
       ],
       temperature: 0.1
@@ -1134,6 +1191,33 @@ Analyze and return JSON with values.`
       console.error('Failed to parse values data:', parseError);
       // Provide defaults if parsing fails
       valuesData = { values: '' };
+    }
+    
+    // Enforce independence constraint: brands owned by conglomerates cannot be Women-owned or BIPOC-owned
+    // Check ownership results directly for parent company mentions
+    const parentCompanies = ['LVMH', 'Kering', 'Richemont', 'H&M Group', 'VF Corporation', 'PVH Corp', 'Tapestry', 'Capri Holdings'];
+    const ownershipText = JSON.stringify(ownershipResults).toLowerCase();
+    const hasParentCompany = parentCompanies.some(company => 
+      ownershipText.includes(company.toLowerCase()) && 
+      (ownershipText.includes('owned by') || ownershipText.includes('part of') || ownershipText.includes('subsidiary'))
+    );
+    
+    if (valuesData.values) {
+      const valuesArray = valuesData.values.split(',').map(v => v.trim());
+      const isIndependent = valuesArray.includes('Independent label');
+      
+      // Remove Women-owned/BIPOC-owned if: (1) brand is explicitly owned by parent company OR (2) not marked as independent
+      if (hasParentCompany || !isIndependent) {
+        const filteredValues = valuesArray.filter(v => 
+          v !== 'Women-owned' && v !== 'BIPOC-owned'
+        );
+        
+        if (filteredValues.length !== valuesArray.length) {
+          const reason = hasParentCompany ? 'owned by parent company' : 'not marked as independent';
+          console.log(`🔒 Removed ownership values (${reason}): ${valuesArray.filter(v => v === 'Women-owned' || v === 'BIPOC-owned').join(', ')}`);
+          valuesData.values = filteredValues.join(', ');
+        }
+      }
     }
     
     // Use fetched categories and sizes (more accurate than AI inference)
