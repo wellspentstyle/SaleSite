@@ -31,7 +31,16 @@ export async function scrapeProduct(url, options = {}) {
 
     const response = await fetchImpl(url, {
       redirect: 'follow',
-      timeout: 10000
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+      }
     });
     const html = await response.text();
     logger.log(`📄 [Fast Scraper] Fetched HTML: ${html.length} characters`);
@@ -186,18 +195,28 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
 
           const offers = Array.isArray(item.offers) ? item.offers[0] : item.offers;
           if (offers) {
-            const salePrice = parseFloat(offers.price);
-            const originalPrice = offers.priceSpecification?.price || offers.highPrice || null;
+            const currentPrice = parseFloat(offers.price);
+            const comparePrice = offers.highPrice ? parseFloat(offers.highPrice) : 
+                                 offers.priceSpecification?.price ? parseFloat(offers.priceSpecification.price) : null;
 
-            if (name && imageUrl && !isNaN(salePrice)) {
-              const finalOriginalPrice = originalPrice && !isNaN(parseFloat(originalPrice)) ? parseFloat(originalPrice) : null;
-              let percentOff = 0;
-
-              if (finalOriginalPrice && finalOriginalPrice > salePrice) {
-                percentOff = Math.round(((finalOriginalPrice - salePrice) / finalOriginalPrice) * 100);
+            if (name && imageUrl && !isNaN(currentPrice)) {
+              let salePrice, originalPrice;
+              
+              if (comparePrice && comparePrice > currentPrice) {
+                salePrice = currentPrice;
+                originalPrice = comparePrice;
+              } else if (comparePrice && comparePrice < currentPrice) {
+                salePrice = comparePrice;
+                originalPrice = currentPrice;
+                logger.log(`⚠️  Unusual: offers.price > highPrice, swapping them`);
+              } else {
+                salePrice = currentPrice;
+                originalPrice = null;
               }
 
-              logger.log('✅ Extracted from JSON-LD (confidence: 95):', { name, salePrice, originalPrice: finalOriginalPrice });
+              const percentOff = originalPrice ? Math.round(((originalPrice - salePrice) / originalPrice) * 100) : 0;
+
+              logger.log('✅ Extracted from JSON-LD (confidence: 95):', { name, salePrice, originalPrice });
 
               testMetadata.phaseUsed = 'json-ld';
               testMetadata.imageExtraction.source = 'json-ld';
@@ -205,7 +224,7 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
               return {
                 name,
                 imageUrl,
-                originalPrice: finalOriginalPrice,
+                originalPrice,
                 salePrice,
                 percentOff,
                 url,
@@ -233,7 +252,7 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
 }
 
 async function extractFromHtmlDeterministic(html, url, testMetadata, logger) {
-  logger.log('🔬 Starting deterministic HTML extraction (Shopify only)...');
+  logger.log('🔬 Starting deterministic HTML extraction...');
   
   let foundPrices = {
     salePrice: null,
@@ -241,8 +260,6 @@ async function extractFromHtmlDeterministic(html, url, testMetadata, logger) {
     source: null
   };
 
-  // ONLY trust Shopify's data-product-json attribute (guaranteed to be main product)
-  // For other stores (Nordstrom, Saks, etc.), the AI handles extraction better
   const shopifyJsonMatch = html.match(/<script[^>]*type=["']application\/json["'][^>]*data-product-json[^>]*>([\s\S]*?)<\/script>/i);
   if (shopifyJsonMatch) {
     try {
@@ -266,11 +283,28 @@ async function extractFromHtmlDeterministic(html, url, testMetadata, logger) {
     }
   }
 
-  // Note: We intentionally DO NOT scan for other JSON sources, strikethrough tags, or price classes
-  // because it's too risky to identify the correct product vs recommendation carousels.
-  // The AI extraction is more context-aware and handles non-Shopify stores better.
+  if (!foundPrices.source) {
+    const microdataPattern = /<[^>]*itemprop=["']price["'][^>]*content=["']([^"']+)["'][^>]*>/gi;
+    const comparePricePattern = /<[^>]*itemprop=["'](?:highPrice|listPrice)["'][^>]*content=["']([^"']+)["'][^>]*>/gi;
+    
+    const priceMatches = [...html.matchAll(microdataPattern)];
+    const compareMatches = [...html.matchAll(comparePricePattern)];
+    
+    if (priceMatches.length > 0) {
+      const currentPrice = parseFloat(priceMatches[0][1]);
+      const comparePrice = compareMatches.length > 0 ? parseFloat(compareMatches[0][1]) : null;
+      
+      if (!isNaN(currentPrice)) {
+        if (comparePrice && comparePrice > currentPrice) {
+          foundPrices.salePrice = currentPrice;
+          foundPrices.originalPrice = comparePrice;
+          foundPrices.source = 'microdata';
+          logger.log(`💰 Found microdata prices: $${currentPrice} (was $${comparePrice})`);
+        }
+      }
+    }
+  }
 
-  // Return results if we found valid prices
   if (foundPrices.source && foundPrices.salePrice && foundPrices.originalPrice > foundPrices.salePrice) {
     const percentOff = Math.round(((foundPrices.originalPrice - foundPrices.salePrice) / foundPrices.originalPrice) * 100);
     
@@ -283,8 +317,8 @@ async function extractFromHtmlDeterministic(html, url, testMetadata, logger) {
       salePrice: foundPrices.salePrice,
       percentOff: percentOff,
       source: foundPrices.source,
-      complete: false, // Still need name and image from AI
-      confidence: 88 // High confidence for deterministic extraction
+      complete: false,
+      confidence: 88
     };
   }
 
@@ -317,14 +351,15 @@ async function extractWithAI(html, url, openai, testMetadata, logger, jsonLdResu
   if (jsonLdResult && jsonLdResult.rawJsonLd) {
     contentToSend = JSON.stringify(jsonLdResult.rawJsonLd, null, 2);
     isJsonLd = true;
-    logger.log(`📊 Sending JSON-LD to OpenAI (${contentToSend.length} chars) - saving ~${Math.round((1 - contentToSend.length / 50000) * 100)}% tokens`);
+    logger.log(`📊 Sending JSON-LD to OpenAI (${contentToSend.length} chars)`);
   } else {
     const pricePatterns = [
       /<[^>]*class="[^"]*price[^"]*"[^>]*>[\s\S]{0,500}<\/[^>]+>/gi,
       /<[^>]*class="[^"]*product[^"]*"[^>]*>[\s\S]{0,1000}<\/[^>]+>/gi,
       /<script type="application\/json"[^>]*>[\s\S]{0,5000}<\/script>/gi,
       /<meta[^>]*property="og:(?:title|image|price)"[^>]*>/gi,
-      /<h1[^>]*>[\s\S]{0,200}<\/h1>/gi
+      /<h1[^>]*>[\s\S]{0,200}<\/h1>/gi,
+      /<[^>]*itemprop=["'](?:price|name|image)["'][^>]*>/gi
     ];
 
     let extractedSnippets = [];
@@ -343,27 +378,18 @@ async function extractWithAI(html, url, openai, testMetadata, logger, jsonLdResu
   }
 
   const systemPrompt = isJsonLd 
-    ? `You are a product data parser. You will receive structured JSON-LD product data (schema.org Product format). Extract the product information and return ONLY valid JSON.
+    ? `You are a product data parser. Extract from JSON-LD (schema.org Product format) and return ONLY valid JSON.
 
-INSTRUCTIONS FOR JSON-LD PARSING:
-1. Look for Product objects with @type: "Product"
-2. Extract name, brand, image, and offers data
-3. For product name and brand:
-   - Look for "brand" field with "@type": "Brand" and extract brand name
-   - Extract product name WITHOUT the brand (e.g., "Glove Hinge Pumps" not "Proenza Schouler Glove Hinge Pumps")
-   - If brand is included in name, remove it
-4. For prices:
-   - offers.price or offers[0].price = salePrice (current price)
-   - offers.highPrice or offers.priceSpecification.price = originalPrice (compare-at price)
-   - If only one price exists, set originalPrice to null
-5. For images:
-   - Use image field (can be string, object with url, or array)
-   - Ensure it's a valid absolute URL
-6. Calculate percentOff if both prices exist and originalPrice > salePrice
+PRICE EXTRACTION RULES:
+1. "offers.price" = CURRENT selling price (this is salePrice)
+2. "offers.highPrice" OR "offers.priceSpecification.price" = ORIGINAL/regular price (this is originalPrice)
+3. If BOTH exist and highPrice > price, then there's a discount
+4. If only ONE price exists, set originalPrice to null and percentOff to 0
+5. NEVER swap the prices - current price is ALWAYS the lower sale price
 
-Return this exact structure:
+Return this structure:
 {
-  "name": "Product Name Only",
+  "name": "Product Name (without brand)",
   "brand": "Brand Name",
   "imageUrl": "https://...",
   "originalPrice": 999.99,
@@ -373,98 +399,83 @@ Return this exact structure:
 }
 
 Rules:
-- name: Product name WITHOUT brand prefix
-- brand: Extract brand name if available (may be null)
-- confidence: Use 85-95 for JSON-LD data (it's highly reliable)
-- If originalPrice is null or equals salePrice, set percentOff to 0
-- Return ONLY the JSON object, no markdown, no explanations
-- If you can't extract basic product info, return: {"error": "Could not extract product data"}`
-    : `You are a product page parser. Extract product information from HTML and return ONLY valid JSON.
+- Remove brand from product name
+- confidence: 85-95 for JSON-LD
+- If no discount, originalPrice = null, percentOff = 0`
+    : `You are a product page parser. Extract data from HTML and return ONLY valid JSON.
 
-CRITICAL INSTRUCTIONS FOR BRAND EXTRACTION:
-- Look for the ACTUAL product brand name, NOT the website name
-- Example: On Shopbop.com, extract "Proenza Schouler" not "Shopbop"
-- Check for: brand labels, designer names, manufacturer info near the product title
-- The brand is usually displayed prominently near or before the product name
-- If you can't find a specific brand, set brand to null
+🚨 CRITICAL PRICE RULES (READ CAREFULLY):
 
-CRITICAL INSTRUCTIONS FOR PRODUCT NAME:
-- Extract ONLY the product name WITHOUT the brand prefix
-- Example: "Glove Hinge Pumps" not "Proenza Schouler Glove Hinge Pumps"
-- Remove brand name if it's included in the title
+You MUST identify TWO prices if a sale is active:
+1. **ORIGINAL PRICE** = The HIGHER, crossed-out, or "was" price (what it cost before the sale)
+2. **SALE PRICE** = The LOWER, current, active price (what you pay now)
 
-CRITICAL INSTRUCTIONS FOR PRICE EXTRACTION:
-1. Look for TWO distinct prices on the page:
-   - Original/Compare-at/Regular price (usually crossed out or higher price)
-   - Current/Sale price (the active selling price)
+ORIGINAL PRICE indicators:
+- Inside <s>, <del>, <strike> tags
+- Classes: "compare-price", "was-price", "original-price", "line-through", "strike-through"
+- Text near: "Was $", "Originally $", "Compare at $", "Regular price $", "Retail $"
+- In Shopify JSON: "compare_at_price" field (divide by 100 if in cents)
+- In structured data: "highPrice", "listPrice" in microdata/JSON-LD
 
-2. SHOPIFY-SPECIFIC PATTERNS (check these FIRST):
-   - <compare-at-price> tags containing the regular price
-   - <sale-price> tags containing the sale price  
-   - JSON in <script type="application/json"> with "compare_at_price" and "price" fields (prices in CENTS, divide by 100)
-   - Example: "price":13100,"compare_at_price":43500 means salePrice=$131, originalPrice=$435
+SALE PRICE indicators:
+- The prominent, active selling price
+- Usually larger font, red/highlighted
+- Classes: "sale-price", "current-price", "final-price"
+- In Shopify JSON: "price" field (divide by 100 if in cents)
+- In structured data: "price" in microdata/JSON-LD
 
-3. OTHER HTML PATTERNS:
-   - <s>, <del>, <strike> tags with higher price
-   - Classes: "compare-price", "was-price", "original-price", "line-through"
-   - Text: "Was $X", "Originally $X", "Compare at $X", "Regular price $X"
-   - Meta tags: og:price, product:price
+⚠️ VALIDATION CHECKS:
+1. originalPrice MUST be HIGHER than salePrice (if both exist)
+2. If you find two prices but they're equal, set originalPrice = null
+3. If you only find ONE price, set originalPrice = null, percentOff = 0
+4. NEVER return the same value for both prices
+5. For Shopify stores: "compare_at_price" is ALWAYS originalPrice, "price" is ALWAYS salePrice
 
-4. If BOTH prices exist, originalPrice MUST be HIGHER than salePrice
-5. If only ONE price exists, set originalPrice to null and percentOff to 0
+DEPARTMENT STORE SPECIFIC:
+- Nordstrom: Look for "OfferPrice" (sale) and "RetailPrice" (original) in JSON
+- Saks: Check for sale-price vs regular-price classes
+- Neiman Marcus: Look for "listPrice" vs "offerPrice"
 
-CRITICAL INSTRUCTIONS FOR IMAGE EXTRACTION:
-- Look for <meta property="og:image"> or <meta name="twitter:image"> tags FIRST
-- Then look for large product images in <img> tags
-- NEVER use placeholder domains like example.com, placeholder.com, cdn.example.com, or similar
-- The imageUrl MUST be a real, working URL from the actual website
-- If you can't find a real image URL, use the first large image you can find
-
-Return this exact structure (do NOT copy these example values, extract REAL data):
+Return this structure:
 {
-  "name": "ACTUAL_PRODUCT_NAME_ONLY",
-  "brand": "ACTUAL_BRAND_NAME_OR_NULL",
-  "imageUrl": "ACTUAL_IMAGE_URL_FROM_PAGE",
-  "originalPrice": 999.99,
-  "salePrice": 499.99,
-  "percentOff": 50,
+  "name": "Product Name Only (no brand)",
+  "brand": "Actual Brand (not store name)",
+  "imageUrl": "Real product image URL",
+  "originalPrice": 435.00,
+  "salePrice": 131.00,
+  "percentOff": 70,
   "confidence": 85
 }
 
-Rules:
-- name: Extract product name WITHOUT brand (required)
-- brand: Extract the PRODUCT brand (not website name), set to null if not found
-- imageUrl: Find the main product image URL - must be a REAL absolute URL from the website, NOT a placeholder (required)
-- originalPrice: The HIGHER regular/compare-at price. Set to null if only one price exists.
-- salePrice: The CURRENT selling price (required)
-- percentOff: Calculate as Math.round(((originalPrice - salePrice) / originalPrice) * 100). Set to 0 if originalPrice is null.
-- confidence: Rate your confidence 1-100. Use 90-100 for prices clearly visible in structured data, 70-89 for prices in HTML with clear patterns, 50-69 for estimates, below 50 for highly uncertain.
-- For Shopify JSON prices in cents, divide by 100 to get dollar amounts
-- NEVER set originalPrice equal to salePrice
-- Return ONLY the JSON object, no markdown, no explanations
-- If you can't extract basic product info, return: {"error": "Could not extract product data"}`;
+Confidence scoring:
+- 90-100: Prices in structured data (JSON, microdata) with clear original/sale distinction
+- 70-89: Prices in HTML with clear patterns (strikethrough, "was" text)
+- 50-69: Ambiguous or only one price found
+- Below 50: Highly uncertain, missing data
+
+NEVER use placeholder images. Return {"error": "..."} if you can't extract required data.`;
 
   let userPrompt = contentToSend;
   
   if (isJsonLd) {
     userPrompt = `Here is the JSON-LD structured product data:\n\n${contentToSend}`;
     if (preExtractedImage) {
-      userPrompt += `\n\nNOTE: The product image URL has been pre-extracted as: ${preExtractedImage} - use this for imageUrl if the JSON-LD image is missing or invalid.`;
+      userPrompt += `\n\nNOTE: Pre-extracted image URL: ${preExtractedImage} - use this if JSON-LD image is missing.`;
     }
   } else {
     if (preExtractedImage) {
-      userPrompt = `${contentToSend}\n\nNOTE: The product image URL has been pre-extracted as: ${preExtractedImage} - use this for imageUrl.`;
+      userPrompt = `${contentToSend}\n\nNOTE: Pre-extracted image URL: ${preExtractedImage} - use this for imageUrl.`;
     }
   }
   
-  // Add deterministic prices to the prompt if found
   if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
-    userPrompt += `\n\nIMPORTANT - DETERMINISTIC PRICES FOUND:
-- Sale Price: ${deterministicResult.salePrice}
-- Original Price: ${deterministicResult.originalPrice}
+    userPrompt += `\n\n✅ VERIFIED PRICES (use these exact values):
+- Sale Price (current price): $${deterministicResult.salePrice}
+- Original Price (was price): $${deterministicResult.originalPrice}
+- Percent Off: ${deterministicResult.percentOff}%
 - Source: ${deterministicResult.source}
 
-These prices were extracted from reliable structured data (${deterministicResult.source}). You MUST use these exact prices in your response. Only extract the product name and image URL.`;
+These were extracted from reliable structured data. Use these EXACT prices. Only extract name and image.`;
   }
 
   const completion = await openai.chat.completions.create({
@@ -504,92 +515,87 @@ These prices were extracted from reliable structured data (${deterministicResult
   const placeholderDomains = ['example.com', 'placeholder.com', 'via.placeholder.com', 'placehold.it', 'dummyimage.com'];
   const imageUrl = productData.imageUrl.toLowerCase();
   if (placeholderDomains.some(domain => imageUrl.includes(domain))) {
-    throw new Error('AI returned placeholder image URL instead of real product image');
+    throw new Error('AI returned placeholder image URL');
   }
 
-  // Override AI prices with deterministic prices if found
   let originalPrice, salePrice, percentOff = 0;
   let confidence = productData.confidence ? parseInt(productData.confidence) : 50;
   
   if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
-    // Use deterministic prices (highly reliable)
     originalPrice = deterministicResult.originalPrice;
     salePrice = deterministicResult.salePrice;
     percentOff = deterministicResult.percentOff;
-    confidence = Math.max(confidence, 88); // Boost confidence for deterministic extraction
-    logger.log(`✅ Using deterministic prices: $${salePrice} (was $${originalPrice}) from ${deterministicResult.source}`);
-    testMetadata.priceValidation.foundInHtml = true;
-    testMetadata.priceValidation.checkedFormats.push(deterministicResult.source);
+    confidence = Math.max(confidence, 88);
+    logger.log(`✅ Using deterministic prices: $${salePrice} (was $${originalPrice})`);
   } else {
-    // Use AI-extracted prices
     originalPrice = productData.originalPrice !== null && productData.originalPrice !== undefined ? parseFloat(productData.originalPrice) : null;
     salePrice = parseFloat(productData.salePrice);
 
-    if (isNaN(salePrice) || (originalPrice !== null && isNaN(originalPrice))) {
-      throw new Error('Invalid price data');
+    if (isNaN(salePrice)) {
+      throw new Error('Invalid sale price');
     }
 
-    if (originalPrice !== null && originalPrice <= salePrice) {
-      logger.log(`⚠️  Invalid discount: originalPrice (${originalPrice}) <= salePrice (${salePrice}). Setting originalPrice to null.`);
-      originalPrice = null;
-      percentOff = 0;
-      confidence = Math.max(30, confidence - 20);
+    if (originalPrice !== null) {
+      if (isNaN(originalPrice)) {
+        logger.log(`⚠️  Invalid originalPrice (${productData.originalPrice}), setting to null`);
+        originalPrice = null;
+        percentOff = 0;
+        confidence = Math.max(30, confidence - 20);
+      } else if (originalPrice <= salePrice) {
+        logger.log(`⚠️  Invalid: originalPrice ($${originalPrice}) <= salePrice ($${salePrice}). Setting originalPrice to null.`);
+        originalPrice = null;
+        percentOff = 0;
+        confidence = Math.max(30, confidence - 25);
+      } else if (originalPrice === salePrice) {
+        logger.log(`⚠️  Prices are equal ($${originalPrice}), no discount. Setting originalPrice to null.`);
+        originalPrice = null;
+        percentOff = 0;
+        confidence = Math.max(40, confidence - 15);
+      } else {
+        percentOff = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
+        
+        if (productData.percentOff && Math.abs(percentOff - productData.percentOff) > 2) {
+          logger.log(`⚠️  Percent off mismatch: AI said ${productData.percentOff}%, calculated ${percentOff}%`);
+          confidence = Math.max(40, confidence - 15);
+        }
+      }
     }
   }
 
-  // Calculate percentOff for AI prices (deterministic already has it)
-  if (!deterministicResult && originalPrice !== null && originalPrice > salePrice) {
-    const calculatedPercentOff = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
-
-    if (productData.percentOff && Math.abs(calculatedPercentOff - productData.percentOff) > 2) {
-      logger.log(`⚠️  Percent off mismatch: AI said ${productData.percentOff}%, calculated ${calculatedPercentOff}%`);
-      confidence = Math.max(40, confidence - 15);
-    }
-
-    percentOff = calculatedPercentOff;
-  }
-
-  // Skip HTML validation for deterministic prices (already validated)
   if (!deterministicResult) {
     const priceVariants = [
       `$${salePrice.toFixed(2)}`,
       salePrice.toFixed(2),
-      `$${salePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      salePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      `${salePrice.toFixed(2).replace('.', ',')}`,
       String(Math.round(salePrice * 100)),
-      `${Math.floor(salePrice)}.${String(Math.round((salePrice % 1) * 100)).padStart(2, '0')}`,
-      `$${Math.round(salePrice)}`,
-      `$${Math.round(salePrice).toLocaleString('en-US')}`,
-      String(Math.round(salePrice)),
+      `${Math.floor(salePrice)}`,
     ];
 
     const matchedFormat = priceVariants.find(variant => html.includes(variant));
     const foundInHtml = matchedFormat !== undefined;
 
     testMetadata.priceValidation.foundInHtml = foundInHtml;
-    testMetadata.priceValidation.checkedFormats = priceVariants.map((variant, idx) => ({
-      format: variant,
-      matched: html.includes(variant)
-    }));
-    testMetadata.priceValidation.matchedFormat = matchedFormat || null;
 
     if (!foundInHtml) {
-      logger.log(`⚠️  Sale price ${salePrice} not found in HTML, possible hallucination`);
-      const originalConfidence = confidence;
+      logger.log(`⚠️  Sale price $${salePrice} not found in HTML, possible hallucination`);
       confidence = Math.max(30, confidence - 20);
       testMetadata.confidenceAdjustments.push({
         reason: 'price_not_found_in_html',
-        adjustment: confidence - originalConfidence
+        adjustment: -20
       });
     }
   }
 
   if (confidence < 50) {
-    throw new Error(`Low confidence (${confidence}%) - prices may be inaccurate`);
+    throw new Error(`Low confidence (${confidence}%) - data may be inaccurate`);
   }
 
-  logger.log(`✅ Extracted product (confidence: ${confidence}%):`, { name: productData.name, brand: productData.brand, salePrice, originalPrice, percentOff });
+  logger.log(`✅ Extracted product (confidence: ${confidence}%):`, { 
+    name: productData.name, 
+    brand: productData.brand, 
+    salePrice, 
+    originalPrice, 
+    percentOff 
+  });
 
   testMetadata.phaseUsed = 'ai-extraction';
 
