@@ -45,6 +45,7 @@ console.log(`📊 Using Airtable Base: ${AIRTABLE_BASE_ID?.substring(0, 10)}...`
 
 const TABLE_NAME = 'Sales';
 const PICKS_TABLE_NAME = 'Picks';
+const COMPANY_TABLE_NAME = 'Companies';
 
 // Admin password
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -508,6 +509,51 @@ app.get('/sales', async (req, res) => {
     res.json({ success: true, sales });
   } catch (error) {
     console.error('❌ Error fetching sales:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get all companies/brands (no auth required - for public brands directory)
+app.get('/companies', async (req, res) => {
+  try {
+    // Fetch ALL companies from Airtable with pagination
+    const companyRecords = await fetchAllAirtableRecords(COMPANY_TABLE_NAME, {
+      pageSize: '100'
+    });
+    
+    console.log(`📦 Fetched ${companyRecords.length} companies from Airtable`);
+    
+    // Map companies to frontend format
+    const companies = companyRecords.map(record => {
+      // Values is likely a multi-select, keep as array
+      let values = Array.isArray(record.fields.Values) 
+        ? record.fields.Values 
+        : (record.fields.Values ? [record.fields.Values] : []);
+      
+      // Normalize legacy values for backward compatibility
+      values = values.map(v => {
+        if (v === 'Female-founded') return 'Women-owned';
+        if (v === 'BIPOC-founded') return 'BIPOC-owned';
+        if (v === 'Ethical manufacturing') return null; // Remove deprecated value
+        return v;
+      }).filter(v => v !== null); // Remove nulls
+      
+      return {
+        id: record.id,
+        name: record.fields.Company || '',
+        type: record.fields.Type || '',
+        priceRange: record.fields.PriceRange || '',
+        category: record.fields.Category || '',
+        maxWomensSize: record.fields.MaxWomensSize || '',
+        values: values,
+        description: record.fields.Description || '',
+        url: record.fields.URL || ''
+      };
+    });
+    
+    res.json({ success: true, companies });
+  } catch (error) {
+    console.error('❌ Error fetching companies:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

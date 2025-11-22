@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
+import { BrandsPage } from './pages/BrandsPage';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { AddPicks } from './pages/AddPicks';
 import { FinalizePicks } from './pages/FinalizePicks';
@@ -14,6 +15,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/brands" element={<BrandsPage />} />
         
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="/admin/picks" replace />} />

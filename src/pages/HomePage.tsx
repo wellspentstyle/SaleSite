@@ -191,6 +191,15 @@ export function HomePage() {
                 className="h-16"
               />
             </Link>
+            <nav>
+              <Link 
+                to="/brands" 
+                className="text-sm tracking-widest uppercase font-medium hover:opacity-60 transition-opacity"
+                style={{ fontFamily: 'DM Sans, sans-serif' }}
+              >
+                Our Brands
+              </Link>
+            </nav>
           </div>
         </div>
       </header>
