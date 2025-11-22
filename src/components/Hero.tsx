@@ -1,30 +1,33 @@
+import { useIsMobile } from '@/components/ui/use-mobile';
+
 export function Hero() {
+  const isMobile = useIsMobile();
+
   return (
     <div className="relative h-[70vh] min-h-[500px] overflow-hidden">
-      {/* Background Video 
-          TODO: To use GIF on mobile, add /public/hero-mobile.gif and uncomment the conditional rendering below
-          
-          const isMobile = useIsMobile();
-          {isMobile ? (
-            <img src="/hero-mobile.gif" alt="Hero background" className="w-full h-full object-cover" style={{ objectPosition: 'center 35%' }} />
-          ) : (
-            <video...>
-          )}
-      */}
       <div className="absolute inset-0">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          poster="/hero-background.png"
-          className="w-full h-full object-cover"
-          style={{ objectPosition: 'center 35%' }}
-        >
-          <source src="/hero-video.webm" type="video/webm" />
-          <source src="/hero-video.mp4" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+        {isMobile ? (
+          <img 
+            src="/hero-mobile.gif" 
+            alt="Hero background" 
+            className="w-full h-full object-cover" 
+            style={{ objectPosition: 'center 35%' }} 
+          />
+        ) : (
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            poster="/hero-background.png"
+            className="w-full h-full object-cover"
+            style={{ objectPosition: 'center 35%' }}
+          >
+            <source src="/hero-video.webm" type="video/webm" />
+            <source src="/hero-video.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        )}
         {/* Overlay */}
         <div className="absolute inset-0 bg-black/55" />
       </div>
