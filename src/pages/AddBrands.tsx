@@ -213,6 +213,7 @@ export function AddBrands() {
 
   const handleCopyTable = () => {
     // Create TSV format with evidence columns (no headers, multi-values comma-separated)
+    // Note: Type is always "Brand" so we hardcode it instead of using r.type
     const completedResults = results.filter(r => r.status === 'completed');
     
     if (completedResults.length === 0) {
@@ -233,7 +234,7 @@ export function AddBrands() {
         
         return [
           r.name, 
-          r.type, 
+          'Brand', // Always "Brand" for this tool
           r.priceRange, 
           r.category, 
           r.values, 
@@ -407,28 +408,26 @@ export function AddBrands() {
 
             {/* Results Table */}
             <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
-              <table className="w-full text-sm" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              <div className="overflow-x-auto" style={{ maxWidth: '100%' }}>
+              <table className="text-sm" style={{ fontFamily: 'DM Sans, sans-serif', minWidth: '100%' }}>
                 <thead className="bg-muted">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">Name</th>
-                    <th className="px-4 py-3 text-left font-medium">Type</th>
-                    <th className="px-4 py-3 text-left font-medium">Price Range</th>
-                    <th className="px-4 py-3 text-left font-medium">Median Price</th>
-                    <th className="px-4 py-3 text-left font-medium">Category</th>
-                    <th className="px-4 py-3 text-left font-medium">Values</th>
-                    <th className="px-4 py-3 text-left font-medium">Max Size</th>
-                    <th className="px-4 py-3 text-left font-medium">Description</th>
-                    <th className="px-4 py-3 text-left font-medium">URL</th>
-                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                    <th className="px-4 py-3 text-left font-medium">Actions</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '150px' }}>Name</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '100px' }}>Price Range</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '120px' }}>Median Price</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '150px' }}>Category</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '180px' }}>Values</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '100px' }}>Max Size</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '250px' }}>Description</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '150px' }}>URL</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '120px' }}>Status</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '100px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {results.map((result, index) => (
                     <tr key={index} className="border-t">
                       <td className="px-4 py-3 font-medium">{result.name}</td>
-                      <td className="px-4 py-3">{result.type}</td>
                       <td className="px-4 py-3">{result.priceRange}</td>
                       <td className="px-4 py-3">
                         {result.evidence?.medianPrice ? (
