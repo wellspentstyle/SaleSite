@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const API_BASE = '/api';
 
@@ -52,7 +53,7 @@ export function GenerateAssets() {
 
   const handleGenerateAssets = async () => {
     if (selectedAssetSales.size === 0) {
-      alert('Please select at least one sale');
+      toast.error('Please select at least one sale');
       return;
     }
 

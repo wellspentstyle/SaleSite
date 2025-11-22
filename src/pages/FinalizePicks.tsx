@@ -4,6 +4,7 @@ import { Loader2, Trash2, ExternalLink, Edit2 } from 'lucide-react';
 import { ManualEntryForm, ManualProductData } from '../components/ManualEntryForm';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -158,7 +159,7 @@ export function FinalizePicks() {
   const applyPercentOff = (pick: Product, percentOff: number): Product => {
     // If no original price, cannot apply percent off - need MSRP first
     if (pick.originalPrice === null || pick.originalPrice === undefined) {
-      alert(`Cannot apply percent off to "${pick.name}" - missing original price. Please enter original price first.`);
+      toast.error(`Cannot apply percent off to "${pick.name}" - missing original price. Please enter original price first.`);
       return pick;
     }
     
@@ -178,7 +179,7 @@ export function FinalizePicks() {
 
   const handleBulkApplySalePercentOff = () => {
     if (!salePercentOff) {
-      alert('No sale percent off available');
+      toast.error('No sale percent off available');
       return;
     }
     setPicks(picks.map(pick => applyPercentOff(pick, salePercentOff)));
@@ -187,7 +188,7 @@ export function FinalizePicks() {
   const handleBulkApplyCustomPercentOff = () => {
     const percentOff = parseFloat(customPercentOff);
     if (isNaN(percentOff) || percentOff < 0 || percentOff > 100) {
-      alert('Please enter a valid percent off between 0 and 100');
+      toast.error('Please enter a valid percent off between 0 and 100');
       return;
     }
     setPicks(picks.map(pick => applyPercentOff(pick, percentOff)));
@@ -213,7 +214,7 @@ export function FinalizePicks() {
 
   const handleIndividualApplySalePercentOff = (index: number) => {
     if (!salePercentOff) {
-      alert('No sale percent off available');
+      toast.error('No sale percent off available');
       return;
     }
     const updatedPicks = [...picks];
@@ -225,7 +226,7 @@ export function FinalizePicks() {
     const percentOffStr = individualCustomPercent.get(index) || '';
     const percentOff = parseFloat(percentOffStr);
     if (isNaN(percentOff) || percentOff < 0 || percentOff > 100) {
-      alert('Please enter a valid percent off between 0 and 100');
+      toast.error('Please enter a valid percent off between 0 and 100');
       return;
     }
     const updatedPicks = [...picks];
@@ -254,7 +255,7 @@ export function FinalizePicks() {
   const handleUpdateSale = async () => {
     const percentOff = parseFloat(editedPercentOff);
     if (isNaN(percentOff) || percentOff < 0 || percentOff > 100) {
-      alert('Please enter a valid percent off between 0 and 100');
+      toast.error('Please enter a valid percent off between 0 and 100');
       return;
     }
 
@@ -279,11 +280,11 @@ export function FinalizePicks() {
         setIsEditingSale(false);
         setEditedPercentOff('');
       } else {
-        alert(`Failed to update sale: ${data.message}`);
+        toast.error(`Failed to update sale: ${data.message}`);
       }
     } catch (error) {
       console.error('Update error:', error);
-      alert('An error occurred while updating the sale');
+      toast.error('An error occurred while updating the sale');
     }
   };
 
@@ -308,7 +309,7 @@ export function FinalizePicks() {
     const allPicks = [...manualPicks, ...autoPicks];
 
     if (allPicks.length === 0) {
-      alert('No picks to save');
+      toast.error('No picks to save');
       return;
     }
 
@@ -331,14 +332,14 @@ export function FinalizePicks() {
       const data = await response.json();
 
       if (data.success) {
-        alert(`Successfully saved ${allPicks.length} picks!`);
+        toast.success(`Successfully saved ${allPicks.length} picks!`);
         navigate('/admin/picks');
       } else {
-        alert(`Failed to save picks: ${data.message}`);
+        toast.error(`Failed to save picks: ${data.message}`);
       }
     } catch (error) {
       console.error('Save error:', error);
-      alert('An error occurred while saving picks');
+      toast.error('An error occurred while saving picks');
     } finally {
       setIsSaving(false);
     }

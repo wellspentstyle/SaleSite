@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Loader2, ExternalLink, ArrowLeft } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { toast } from 'sonner';
 
 const API_BASE = '/api';
 
@@ -20,6 +20,7 @@ interface Sale {
 }
 
 type View = 'sales-list' | 'url-entry';
+type FilterType = 'active-no-picks' | 'active-with-picks' | 'inactive';
 
 export function PicksAdmin() {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ export function PicksAdmin() {
   const [urls, setUrls] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingSales, setLoadingSales] = useState(true);
-  const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
+  const [filterType, setFilterType] = useState<FilterType>('active-no-picks');
   const [currentView, setCurrentView] = useState<View>('sales-list');
 
   useEffect(() => {
@@ -73,12 +74,12 @@ export function PicksAdmin() {
     e.preventDefault();
     
     if (!selectedSale) {
-      alert('Please select a sale');
+      toast.error('Please select a sale');
       return;
     }
 
     if (!urls.trim()) {
-      alert('Please enter at least one URL');
+      toast.error('Please enter at least one URL');
       return;
     }
 
@@ -118,24 +119,27 @@ export function PicksAdmin() {
           }
         });
       } else {
-        alert('An error occurred while scraping. Please try again.');
+        toast.error('An error occurred while scraping. Please try again.');
         setIsLoading(false);
       }
     } catch (error) {
       console.error('Scraping error:', error);
-      alert('An error occurred while scraping. Please try again.');
+      toast.error('An error occurred while scraping. Please try again.');
       setIsLoading(false);
     }
   };
 
   const filteredSales = sales.filter(sale => {
-    const hasNoPicks = sale.picksCount === 0;
+    const hasPicks = sale.picksCount > 0;
     const isActive = sale.live === 'YES';
     
-    if (activeTab === 'inactive') {
-      return hasNoPicks && !isActive;
+    if (filterType === 'active-no-picks') {
+      return isActive && !hasPicks;
+    } else if (filterType === 'active-with-picks') {
+      return isActive && hasPicks;
+    } else { // inactive
+      return !isActive;
     }
-    return hasNoPicks && isActive;
   });
 
   return (
@@ -153,19 +157,97 @@ export function PicksAdmin() {
               className="text-muted-foreground mb-6" 
               style={{ fontFamily: 'Crimson Pro, serif', fontSize: '18px' }}
             >
-              Select a sale to add curated product picks. Sales without picks are shown first.
+              Select a sale to add curated product picks.
             </p>
             
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'active' | 'inactive')}>
-              <TabsList>
-                <TabsTrigger value="active" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                  Active Sales
-                </TabsTrigger>
-                <TabsTrigger value="inactive" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                  Inactive Sales
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setFilterType('active-no-picks')}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: '14px',
+                  padding: '8px 16px',
+                  backgroundColor: filterType === 'active-no-picks' ? '#000' : '#fff',
+                  color: filterType === 'active-no-picks' ? '#fff' : '#000',
+                  border: '1px solid',
+                  borderColor: filterType === 'active-no-picks' ? '#000' : '#ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: filterType === 'active-no-picks' ? 600 : 400,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (filterType !== 'active-no-picks') {
+                    e.currentTarget.style.borderColor = '#999';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (filterType !== 'active-no-picks') {
+                    e.currentTarget.style.borderColor = '#ddd';
+                  }
+                }}
+              >
+                Active Sales Without Picks
+              </button>
+              
+              <button
+                onClick={() => setFilterType('active-with-picks')}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: '14px',
+                  padding: '8px 16px',
+                  backgroundColor: filterType === 'active-with-picks' ? '#000' : '#fff',
+                  color: filterType === 'active-with-picks' ? '#fff' : '#000',
+                  border: '1px solid',
+                  borderColor: filterType === 'active-with-picks' ? '#000' : '#ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: filterType === 'active-with-picks' ? 600 : 400,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (filterType !== 'active-with-picks') {
+                    e.currentTarget.style.borderColor = '#999';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (filterType !== 'active-with-picks') {
+                    e.currentTarget.style.borderColor = '#ddd';
+                  }
+                }}
+              >
+                Active Sales With Picks
+              </button>
+              
+              <button
+                onClick={() => setFilterType('inactive')}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: '14px',
+                  padding: '8px 16px',
+                  backgroundColor: filterType === 'inactive' ? '#000' : '#fff',
+                  color: filterType === 'inactive' ? '#fff' : '#000',
+                  border: '1px solid',
+                  borderColor: filterType === 'inactive' ? '#000' : '#ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: filterType === 'inactive' ? 600 : 400,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (filterType !== 'inactive') {
+                    e.currentTarget.style.borderColor = '#999';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (filterType !== 'inactive') {
+                    e.currentTarget.style.borderColor = '#ddd';
+                  }
+                }}
+              >
+                Inactive Sales
+              </button>
+            </div>
           </div>
 
           {loadingSales ? (
@@ -176,9 +258,11 @@ export function PicksAdmin() {
           ) : filteredSales.length === 0 ? (
             <div className="border border-dashed border-border bg-muted/20" style={{ padding: '60px', textAlign: 'center', borderRadius: '8px' }}>
               <p className="text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                {activeTab === 'inactive' 
-                  ? 'No inactive sales without picks found.' 
-                  : 'No active sales without picks found. Try switching to "Inactive Sales" tab.'}
+                {filterType === 'active-no-picks' 
+                  ? 'No active sales without picks found.' 
+                  : filterType === 'active-with-picks'
+                  ? 'No active sales with picks found.'
+                  : 'No inactive sales found.'}
               </p>
             </div>
           ) : (
