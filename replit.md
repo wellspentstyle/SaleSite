@@ -7,7 +7,7 @@ A modern React + Vite web application designed to showcase upcoming designer sal
 I prefer simple language and clear, concise explanations. I want iterative development with frequent, small updates. Ask for my approval before making any major architectural changes or introducing new third-party dependencies. I prefer functional components in React and a modular file structure.
 
 ## System Architecture
-The application is built with React 18 and TypeScript, using Vite for a fast development experience. Styling is managed with a custom-themed Tailwind CSS v4, complemented by Radix UI primitives for accessible and customizable UI components. State management primarily utilizes React hooks.
+The application is built with React 18 and TypeScript, using Vite for a fast development experience. Styling is managed with Tailwind CSS v3 (configured via tailwind.config.ts with proper content paths scanning .tsx files), complemented by Radix UI primitives for accessible and customizable UI components. State management primarily utilizes React hooks.
 
 **Deployment Architecture:**
 - **Development**: Vite dev server + Backend server + Vite proxy for API requests.
