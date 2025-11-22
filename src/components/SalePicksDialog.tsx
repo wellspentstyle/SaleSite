@@ -25,14 +25,13 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '32px' }}>
-            {sale.brandName} Sale Picks
+            Our Faves from {sale.brandName}
           </DialogTitle>
-          <DialogDescription>
-            Kari's curated selection from the {sale.discount} sale
-            {sale.discountCode && (
-              <div className="mt-1">Promo Code: {sale.discountCode}</div>
-            )}
-          </DialogDescription>
+          {sale.companyType === 'Brand' && sale.description && (
+            <DialogDescription style={{ fontFamily: 'Crimson Pro, serif', fontSize: '16px', lineHeight: '1.6', marginTop: '8px' }}>
+              {sale.description}
+            </DialogDescription>
+          )}
         </DialogHeader>
         
         <ScrollArea className="h-[60vh] pr-4">

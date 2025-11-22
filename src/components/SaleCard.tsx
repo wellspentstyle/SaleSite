@@ -84,7 +84,7 @@ export function SaleCard({ sale, onViewPicks }: SaleCardProps) {
             style={{ fontFamily: 'DM Sans, sans-serif' }}
             onClick={() => onViewPicks(sale)}
           >
-            View Picks
+            Our Faves
           </Button>
         )}
         <Button

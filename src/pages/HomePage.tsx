@@ -285,6 +285,7 @@ export function HomePage() {
             filters={filters}
             onFilterChange={setFilters}
             isOpen={isFilterOpen}
+            onClose={() => setIsFilterOpen(false)}
           />
         </div>
       </main>

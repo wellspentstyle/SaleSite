@@ -95,7 +95,7 @@ export function FeaturedSaleCard({ sale, onViewPicks }: FeaturedSaleCardProps) {
               style={{ fontFamily: 'DM Sans, sans-serif' }}
               onClick={() => onViewPicks(sale)}
             >
-              View Picks
+              Our Faves
             </Button>
           )}
           <Button

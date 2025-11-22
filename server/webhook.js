@@ -475,6 +475,11 @@ app.get('/sales', async (req, res) => {
         return v;
       }).filter(v => v !== null); // Remove nulls
       
+      // Extract description from Company lookup field
+      const description = Array.isArray(record.fields.Description) 
+        ? record.fields.Description[0] 
+        : record.fields.Description;
+      
       return {
         id: record.id,
         brandName: companyName,
@@ -492,7 +497,8 @@ app.get('/sales', async (req, res) => {
         priceRange: priceRange,
         companyType: companyType,
         maxWomensSize: maxWomensSize,
-        values: values
+        values: values,
+        description: description
       };
     });
     

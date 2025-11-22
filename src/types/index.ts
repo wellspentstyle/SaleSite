@@ -33,6 +33,7 @@ export interface Sale {
   companyType?: string;
   maxWomensSize?: string;
   values?: string[];
+  description?: string;
 }
 
 export interface FilterOptions {

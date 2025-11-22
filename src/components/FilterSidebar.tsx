@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { FilterOptions } from '../types';
 import { Checkbox } from './ui/checkbox';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, X } from 'lucide-react';
 
 interface FilterSidebarProps {
   filters: FilterOptions;
   onFilterChange: (filters: FilterOptions) => void;
   isOpen: boolean;
+  onClose: () => void;
 }
 
-export function FilterSidebar({ filters, onFilterChange, isOpen }: FilterSidebarProps) {
+export function FilterSidebar({ filters, onFilterChange, isOpen, onClose }: FilterSidebarProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     type: true,
     priceRange: true,
@@ -107,8 +108,16 @@ export function FilterSidebar({ filters, onFilterChange, isOpen }: FilterSidebar
         transform: isOpen ? 'translateX(0)' : 'translateX(280px)'
       }}
     >
-      <div className="mb-8" style={{ minWidth: '256px' }}>
+      <div className="mb-8 flex items-center justify-between" style={{ minWidth: '256px' }}>
+        <button
+          onClick={onClose}
+          className="p-1 hover:opacity-70 transition-opacity"
+          aria-label="Close filters"
+        >
+          <X className="w-5 h-5" />
+        </button>
         <h2 className="text-sm tracking-widest uppercase font-medium">FILTERS</h2>
+        <div className="w-5" />
       </div>
 
       <div style={{ minWidth: '256px' }}>
