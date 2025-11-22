@@ -51,6 +51,11 @@ interface AirtablePickRecord {
     SaleID?: string[];
     ShopMyURL?: string;
     CreateStory?: string;
+    AvailabilityStatus?: 'In Stock' | 'Low' | 'Sold Out' | 'Unknown';
+    LastValidatedAt?: string;
+    NextCheckDue?: string;
+    HiddenUntilFresh?: boolean;
+    Company?: string[];
   };
 }
 
@@ -70,7 +75,7 @@ async function fetchPicksFromAirtable(): Promise<Map<string, SalePick[]>> {
     const allRecords: AirtablePickRecord[] = [];
     let offset: string | undefined = undefined;
     
-    const fields = ['ProductURL', 'ProductName', 'ImageURL', 'OriginalPrice', 'SalePrice', 'PercentOff', 'SaleID', 'ShopMyURL'];
+    const fields = ['ProductURL', 'ProductName', 'ImageURL', 'OriginalPrice', 'SalePrice', 'PercentOff', 'SaleID', 'ShopMyURL', 'AvailabilityStatus', 'LastValidatedAt', 'NextCheckDue', 'HiddenUntilFresh', 'Company'];
     
     do {
       const params = new URLSearchParams({
@@ -132,7 +137,35 @@ async function fetchPicksFromAirtable(): Promise<Map<string, SalePick[]>> {
         salePrice: fields.SalePrice || 0,
         percentOff: fields.PercentOff || 0,
         shopMyUrl: shopMyUrl,
+        availabilityStatus: fields.AvailabilityStatus,
+        lastValidatedAt: fields.LastValidatedAt,
+        nextCheckDue: fields.NextCheckDue,
+        hiddenUntilFresh: fields.HiddenUntilFresh,
       };
+      
+      // Filter out picks that should be hidden
+      // Hide if: Sold Out, HiddenUntilFresh, or Unknown/stale (>14 days old)
+      if (fields.HiddenUntilFresh) {
+        return; // Skip this pick
+      }
+      
+      if (fields.AvailabilityStatus === 'Sold Out') {
+        return; // Skip sold out picks
+      }
+      
+      // Check freshness - hide if Unknown or not validated in last 14 days
+      if (fields.LastValidatedAt) {
+        const lastValidated = new Date(fields.LastValidatedAt);
+        const now = new Date();
+        const daysSinceValidation = (now.getTime() - lastValidated.getTime()) / (1000 * 60 * 60 * 24);
+        
+        if (daysSinceValidation > 14 && (!fields.AvailabilityStatus || fields.AvailabilityStatus === 'Unknown')) {
+          return; // Skip stale picks
+        }
+      } else if (!fields.AvailabilityStatus || fields.AvailabilityStatus === 'Unknown') {
+        // No validation date and Unknown status - skip for safety
+        return;
+      }
 
       // Add this pick to each linked sale
       saleIds.forEach(saleId => {

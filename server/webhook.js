@@ -1755,6 +1755,425 @@ app.post('/admin/generate-featured-assets', async (req, res) => {
   }
 });
 
+// ========== FRESHNESS TRACKING ENDPOINTS ==========
+
+// Get all picks with freshness data for admin panel
+app.get('/admin/picks', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    // Fetch all picks from Airtable with freshness fields
+    const allRecords = [];
+    let offset = undefined;
+    
+    const fields = [
+      'ProductURL', 'ProductName', 'ImageURL', 'OriginalPrice', 'SalePrice', 'PercentOff', 
+      'SaleID', 'Company', 'ShopMyURL', 'AvailabilityStatus', 'LastValidatedAt', 
+      'NextCheckDue', 'HiddenUntilFresh'
+    ];
+    
+    do {
+      const params = new URLSearchParams({
+        fields: fields.join(','),
+        pageSize: '100'
+      });
+      
+      if (offset) {
+        params.set('offset', offset);
+      }
+      
+      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?${params}`;
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Airtable API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      allRecords.push(...data.records);
+      offset = data.offset;
+    } while (offset);
+    
+    // Also fetch sales to get active sales list
+    const salesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?fields[]=Company&fields[]=Live&fields[]=StartDate&fields[]=EndDate`;
+    const salesResponse = await fetch(salesUrl, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+      },
+    });
+    
+    const salesData = await salesResponse.json();
+    const activeSaleIds = new Set(
+      salesData.records
+        .filter(r => r.fields.Live === 'YES')
+        .map(r => r.id)
+    );
+    
+    // Transform picks data
+    const picks = allRecords.map(record => ({
+      id: record.id,
+      name: record.fields.ProductName,
+      url: record.fields.ProductURL,
+      imageUrl: record.fields.ImageURL,
+      originalPrice: record.fields.OriginalPrice,
+      salePrice: record.fields.SalePrice,
+      percentOff: record.fields.PercentOff,
+      saleIds: record.fields.SaleID || [],
+      company: record.fields.Company || [],
+      availabilityStatus: record.fields.AvailabilityStatus || 'Unknown',
+      lastValidatedAt: record.fields.LastValidatedAt,
+      nextCheckDue: record.fields.NextCheckDue,
+      hiddenUntilFresh: record.fields.HiddenUntilFresh || false,
+      isActivelyDisplayed: (record.fields.SaleID || []).some(id => activeSaleIds.has(id))
+    }));
+    
+    res.json({
+      success: true,
+      picks
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fetching picks:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+});
+
+// Refresh specific picks (check availability)
+app.post('/admin/picks/refresh', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { pickIds } = req.body;
+    
+    if (!pickIds || !Array.isArray(pickIds) || pickIds.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please provide an array of pick IDs' 
+      });
+    }
+    
+    console.log(`\n🔄 Refreshing ${pickIds.length} picks...`);
+    
+    const results = [];
+    
+    for (const pickId of pickIds) {
+      try {
+        // Fetch the pick data
+        const pickUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pickId}`;
+        const pickResponse = await fetch(pickUrl, {
+          headers: {
+            'Authorization': `Bearer ${AIRTABLE_PAT}`,
+          },
+        });
+        
+        if (!pickResponse.ok) {
+          results.push({ pickId, success: false, error: 'Pick not found' });
+          continue;
+        }
+        
+        const pickData = await pickResponse.json();
+        const productUrl = pickData.fields.ProductURL;
+        
+        if (!productUrl) {
+          results.push({ pickId, success: false, error: 'No product URL' });
+          continue;
+        }
+        
+        console.log(`  Checking: ${pickData.fields.ProductName}`);
+        
+        // Use the existing hybrid scraper to check the product
+        const scrapeResult = await scrapeProduct(productUrl);
+        
+        let availabilityStatus = 'Unknown';
+        let confidence = scrapeResult.confidence || 0;
+        
+        // Determine availability based on scrape results
+        if (scrapeResult.success && confidence > 50) {
+          // Product found with good confidence - assume in stock
+          availabilityStatus = 'In Stock';
+          
+          // Check for low stock indicators in the HTML (if we had it)
+          // For now, we'll default to "In Stock" if scrape succeeds
+        } else if (confidence <= 50) {
+          // Low confidence or product not found clearly
+          availabilityStatus = 'Unknown';
+        }
+        
+        // Calculate next check date (14 days from now)
+        const today = new Date();
+        const nextCheckDue = new Date(today.getTime() + (14 * 24 * 60 * 60 * 1000));
+        
+        // Update the pick in Airtable
+        const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pickId}`;
+        const updateResponse = await fetch(updateUrl, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${AIRTABLE_PAT}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fields: {
+              AvailabilityStatus: availabilityStatus,
+              LastValidatedAt: today.toISOString().split('T')[0],
+              NextCheckDue: nextCheckDue.toISOString().split('T')[0],
+              HiddenUntilFresh: false // Unhide when refreshed
+            }
+          })
+        });
+        
+        if (updateResponse.ok) {
+          results.push({ 
+            pickId, 
+            success: true, 
+            status: availabilityStatus,
+            confidence
+          });
+          console.log(`  ✅ Updated: ${availabilityStatus} (confidence: ${confidence}%)`);
+        } else {
+          results.push({ pickId, success: false, error: 'Update failed' });
+        }
+        
+      } catch (error) {
+        console.error(`  ❌ Error checking pick ${pickId}:`, error.message);
+        results.push({ pickId, success: false, error: error.message });
+      }
+    }
+    
+    // Clear sales cache after updating picks
+    clearSalesCache();
+    
+    const successCount = results.filter(r => r.success).length;
+    
+    res.json({
+      success: true,
+      message: `Refreshed ${successCount}/${pickIds.length} picks`,
+      results
+    });
+    
+  } catch (error) {
+    console.error('❌ Error refreshing picks:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+});
+
+// Mark picks as sold out
+app.post('/admin/picks/mark-sold-out', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { pickIds } = req.body;
+    
+    if (!pickIds || !Array.isArray(pickIds) || pickIds.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please provide an array of pick IDs' 
+      });
+    }
+    
+    console.log(`\n🚫 Marking ${pickIds.length} picks as sold out...`);
+    
+    const results = [];
+    const today = new Date().toISOString().split('T')[0];
+    
+    for (const pickId of pickIds) {
+      try {
+        const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pickId}`;
+        const updateResponse = await fetch(updateUrl, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${AIRTABLE_PAT}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fields: {
+              AvailabilityStatus: 'Sold Out',
+              LastValidatedAt: today
+            }
+          })
+        });
+        
+        if (updateResponse.ok) {
+          results.push({ pickId, success: true });
+          console.log(`  ✅ Marked sold out: ${pickId}`);
+        } else {
+          results.push({ pickId, success: false, error: 'Update failed' });
+        }
+        
+      } catch (error) {
+        results.push({ pickId, success: false, error: error.message });
+      }
+    }
+    
+    // Clear sales cache
+    clearSalesCache();
+    
+    const successCount = results.filter(r => r.success).length;
+    
+    res.json({
+      success: true,
+      message: `Marked ${successCount}/${pickIds.length} picks as sold out`,
+      results
+    });
+    
+  } catch (error) {
+    console.error('❌ Error marking sold out:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+});
+
+// Nightly freshness check - checks picks from active sales
+app.post('/admin/picks/nightly-check', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    console.log(`\n🌙 Running nightly freshness check...`);
+    
+    // Fetch active sales
+    const salesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?filterByFormula={Live}='YES'&fields[]=Company`;
+    const salesResponse = await fetch(salesUrl, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+      },
+    });
+    
+    if (!salesResponse.ok) {
+      throw new Error('Failed to fetch active sales');
+    }
+    
+    const salesData = await salesResponse.json();
+    const activeSaleIds = salesData.records.map(r => r.id);
+    
+    console.log(`  Found ${activeSaleIds.length} active sales`);
+    
+    // Fetch picks from active sales that are due for checking
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Build filter: picks linked to active sales AND (no NextCheckDue OR NextCheckDue <= today)
+    const saleIdFilters = activeSaleIds.map(id => `FIND('${id}', ARRAYJOIN({SaleID}))`).join(',');
+    const filterFormula = `AND(OR(${saleIdFilters}), OR({NextCheckDue}='', {NextCheckDue}<='${today}'))`;
+    
+    const picksUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?filterByFormula=${encodeURIComponent(filterFormula)}&pageSize=20&fields[]=ProductURL&fields[]=ProductName`;
+    
+    const picksResponse = await fetch(picksUrl, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+      },
+    });
+    
+    if (!picksResponse.ok) {
+      throw new Error('Failed to fetch picks for checking');
+    }
+    
+    const picksData = await picksResponse.json();
+    const pickIds = picksData.records.map(r => r.id);
+    
+    console.log(`  Found ${pickIds.length} picks to check`);
+    
+    if (pickIds.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No picks due for checking',
+        checkedCount: 0
+      });
+    }
+    
+    // Use the refresh endpoint logic to check these picks
+    const results = [];
+    
+    for (const pickId of pickIds) {
+      try {
+        const pickData = picksData.records.find(r => r.id === pickId);
+        const productUrl = pickData.fields.ProductURL;
+        
+        if (!productUrl) continue;
+        
+        console.log(`  Checking: ${pickData.fields.ProductName}`);
+        
+        const scrapeResult = await scrapeProduct(productUrl);
+        
+        let availabilityStatus = 'Unknown';
+        let confidence = scrapeResult.confidence || 0;
+        
+        if (scrapeResult.success && confidence > 50) {
+          availabilityStatus = 'In Stock';
+        } else if (confidence <= 50) {
+          availabilityStatus = 'Unknown';
+        }
+        
+        const nextCheckDue = new Date(new Date().getTime() + (14 * 24 * 60 * 60 * 1000));
+        
+        const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pickId}`;
+        const updateResponse = await fetch(updateUrl, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${AIRTABLE_PAT}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fields: {
+              AvailabilityStatus: availabilityStatus,
+              LastValidatedAt: today,
+              NextCheckDue: nextCheckDue.toISOString().split('T')[0]
+            }
+          })
+        });
+        
+        if (updateResponse.ok) {
+          results.push({ pickId, success: true, status: availabilityStatus });
+        }
+        
+      } catch (error) {
+        console.error(`  ❌ Error checking pick:`, error.message);
+      }
+    }
+    
+    clearSalesCache();
+    
+    res.json({
+      success: true,
+      message: `Checked ${results.length} picks`,
+      checkedCount: results.length,
+      results
+    });
+    
+  } catch (error) {
+    console.error('❌ Nightly check error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+});
+
 // CloudMailin/AgentMail webhook endpoint - handle both JSON and multipart
 app.post('/webhook/agentmail', upload.none(), async (req, res) => {
   console.log('📧 Received email webhook');

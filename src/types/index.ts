@@ -8,6 +8,10 @@ export interface SalePick {
   salePrice: number;
   percentOff: number;
   shopMyUrl: string;
+  availabilityStatus?: 'In Stock' | 'Low' | 'Sold Out' | 'Unknown';
+  lastValidatedAt?: string;
+  nextCheckDue?: string;
+  hiddenUntilFresh?: boolean;
 }
 
 export interface Sale {
