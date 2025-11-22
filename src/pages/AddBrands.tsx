@@ -255,13 +255,18 @@ export function AddBrands() {
     });
   };
 
-  const handleClear = () => {
-    // Abort any in-flight requests
+  const handleCancel = () => {
+    // Abort in-flight requests but keep results
     if (abortController) {
       abortController.abort();
       setAbortController(null);
     }
-    
+    setIsProcessing(false);
+    setCurrentIndex(-1);
+    toast.info('Processing cancelled - results preserved');
+  };
+
+  const handleClear = () => {
     // Reset all state
     setBrandNames('');
     setResults([]);
@@ -344,22 +349,40 @@ export function AddBrands() {
                 )}
               </Button>
               
-              <Button 
-                type="button"
-                onClick={handleClear}
-                disabled={!brandNames.trim() && results.length === 0}
-                variant="outline"
-                style={{ 
-                  fontFamily: 'DM Sans, sans-serif',
-                  height: '48px',
-                  paddingLeft: '32px',
-                  paddingRight: '32px',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                <X className="mr-2 h-4 w-4" />
-                {isProcessing ? 'Cancel & Clear' : 'Clear'}
-              </Button>
+              {isProcessing ? (
+                <Button 
+                  type="button"
+                  onClick={handleCancel}
+                  variant="outline"
+                  style={{ 
+                    fontFamily: 'DM Sans, sans-serif',
+                    height: '48px',
+                    paddingLeft: '32px',
+                    paddingRight: '32px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+              ) : (
+                <Button 
+                  type="button"
+                  onClick={handleClear}
+                  disabled={!brandNames.trim() && results.length === 0}
+                  variant="outline"
+                  style={{ 
+                    fontFamily: 'DM Sans, sans-serif',
+                    height: '48px',
+                    paddingLeft: '32px',
+                    paddingRight: '32px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Clear
+                </Button>
+              )}
             </div>
           </form>
 
@@ -407,9 +430,8 @@ export function AddBrands() {
             </div>
 
             {/* Results Table */}
-            <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-x-auto" style={{ maxWidth: '100%' }}>
-              <table className="text-sm" style={{ fontFamily: 'DM Sans, sans-serif', minWidth: '100%' }}>
+            <div className="border rounded-lg overflow-x-auto">
+              <table className="text-sm w-full" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                 <thead className="bg-muted">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '150px' }}>Name</th>
