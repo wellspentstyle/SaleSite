@@ -104,6 +104,137 @@ function cleanUrl(url) {
   }
 }
 
+// Helper function to fetch categories from brand's website using Serper and product data
+async function fetchBrandCategories(officialDomain, brandName, products) {
+  try {
+    // Search for site navigation pages
+    const searchQuery = `site:${officialDomain}`;
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: searchQuery,
+        num: 10
+      })
+    });
+    
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    const results = data.organic?.slice(0, 10) || [];
+    
+    // Combine search results with product names for category detection
+    const searchText = results.map(r => `${r.title} ${r.snippet}`).join(' ').toLowerCase();
+    const productText = products.map(p => p.name).join(' ').toLowerCase();
+    const combinedText = `${searchText} ${productText}`;
+    
+    // Category keywords to look for
+    const categoryKeywords = {
+      'Clothing': ['clothing', 'apparel', 'ready-to-wear', 'rtw', 'dress', 'top', 'pant', 'shirt', 'jacket', 'coat'],
+      'Shoes': ['shoe', 'footwear', 'sneaker', 'boot', 'heel', 'sandal'],
+      'Bags': ['bag', 'handbag', 'purse', 'tote', 'clutch'],
+      'Accessories': ['accessories', 'belt', 'scarf', 'hat', 'glove'],
+      'Jewelry': ['jewelry', 'jewellery', 'necklace', 'earring', 'ring', 'bracelet', 'bangle'],
+      'Swimwear': ['swimwear', 'swim', 'bikini', 'swimsuit'],
+      'Homewares': ['home', 'homeware', 'tableware', 'decor', 'bowl', 'vase', 'plate', 'platter', 'coaster']
+    };
+    
+    const foundCategories = new Set();
+    
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      // Check if any keyword appears in the combined text
+      if (keywords.some(keyword => combinedText.includes(keyword))) {
+        foundCategories.add(category);
+      }
+    }
+    
+    return Array.from(foundCategories);
+  } catch (error) {
+    console.error(`Error fetching categories for ${officialDomain}:`, error.message);
+    return [];
+  }
+}
+
+// Helper function to fetch size chart data from brand's website using Serper
+async function fetchBrandSizes(officialDomain, brandName) {
+  try {
+    // Search for size chart/guide pages
+    const searchQuery = `site:${officialDomain} size chart OR size guide women`;
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: searchQuery,
+        num: 5
+      })
+    });
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const results = data.organic?.slice(0, 3) || [];
+    
+    if (results.length === 0) {
+      return null;
+    }
+    
+    // Combine snippets to find size information
+    const sizeText = results.map(r => `${r.title} ${r.snippet}`).join('\n');
+    
+    // Use AI to extract max women's size from the text
+    const sizeCompletion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `Extract the maximum women's clothing size available from these size chart results. Return ONLY the numeric size or letter size (e.g., "Up to 16", "Up to L", "Up to XL"). If no clear maximum women's size found, return empty string. Do not estimate or guess.`
+        },
+        {
+          role: 'user',
+          content: `Size information for ${brandName}:\n\n${sizeText}`
+        }
+      ],
+      temperature: 0.1
+    });
+    
+    const maxSize = sizeCompletion.choices[0]?.message?.content?.trim() || '';
+    return maxSize;
+    
+  } catch (error) {
+    console.error(`Error fetching sizes for ${officialDomain}:`, error.message);
+    return null;
+  }
+}
+
+// Helper function to convert S/M/L sizes to numeric equivalents
+function convertLetterSizeToNumeric(letterSize) {
+  const sizeMap = {
+    'S': 'Up to 6',
+    'M': 'Up to 8',
+    'L': 'Up to 10',
+    'XL': 'Up to 14',
+    'XXL': 'Up to 18',
+    '1X': 'Up to 14',
+    '2X': 'Up to 18',
+    '3X': 'Up to 22'
+  };
+  
+  // Extract the size letter(s) from strings like "Up to L" or "L"
+  const match = letterSize.match(/(S|M|L|XL|XXL|1X|2X|3X)/i);
+  if (match) {
+    const size = match[1].toUpperCase();
+    return sizeMap[size] || letterSize;
+  }
+  
+  return letterSize;
+}
+
 // Helper function to fetch all records from Airtable with automatic pagination
 async function fetchAllAirtableRecords(tableName, params = {}) {
   const allRecords = [];
@@ -443,10 +574,71 @@ app.post('/admin/brand-research', async (req, res) => {
       });
     }
     
-    // Extract official domain from top result for validation
-    const topResult = searchData.organic[0];
-    const officialDomain = topResult?.link ? new URL(topResult.link).hostname.replace('www.', '') : null;
-    console.log(`🏢 Detected official domain: ${officialDomain}`);
+    // Resale/marketplace domains to block
+    const resaleDomains = [
+      'therealreal.com',
+      'vestiairecollective.com',
+      'poshmark.com',
+      'ebay.com',
+      'tradesy.com',
+      'etsy.com',
+      'depop.com',
+      'grailed.com',
+      'mercari.com',
+      'vinted.com',
+      'thredup.com',
+      'rebag.com',
+      'fashionphile.com',
+      'yoox.com',
+      'farfetch.com',
+      'ssense.com',
+      'net-a-porter.com',
+      'mrporter.com',
+      'nordstrom.com',
+      'saksfifthavenue.com',
+      'bergdorfgoodman.com',
+      'neimanmarcus.com',
+      'bloomingdales.com',
+      'shopbop.com',
+      'revolve.com',
+      'fwrd.com',
+      'matchesfashion.com',
+      'mytheresa.com',
+      'selfridges.com',
+      'harrods.com',
+      'davidjones.com',
+      'lyst.com',
+      'lovethesales.com',
+      'shopual.com'
+    ];
+    
+    // Find official brand domain (must contain brand name, skip resale/marketplace sites)
+    const brandNameLower = brandName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let officialDomain = null;
+    
+    for (const result of searchData.organic.slice(0, 10)) {
+      if (!result.link) continue;
+      
+      const hostname = new URL(result.link).hostname.replace('www.', '').toLowerCase();
+      
+      // Skip resale/marketplace domains
+      if (resaleDomains.some(resale => hostname.includes(resale))) {
+        continue;
+      }
+      
+      // Check if domain contains brand name
+      const domainParts = hostname.split('.')[0].replace(/[-_]/g, '');
+      if (domainParts.includes(brandNameLower) || brandNameLower.includes(domainParts)) {
+        officialDomain = hostname;
+        break;
+      }
+    }
+    
+    if (!officialDomain) {
+      console.warn(`⚠️  Could not identify official domain for ${brandName}`);
+    } else {
+      console.log(`🏢 Detected official domain: ${officialDomain}`);
+    }
     
     // Step 2: Use AI to extract product data from search results
     console.log(`🤖 Phase 2: Extracting product information...`);
@@ -520,11 +712,11 @@ CRITICAL RULES:
     let products = productData.products || [];
     const isShop = productData.isShop || false;
     
-    // FALLBACK: If no products with prices found, try a more specific price-focused search
-    if (products.length === 0) {
-      console.log(`⚠️  No prices in initial search - trying price-specific search...`);
+    // FALLBACK: If no products with prices found, try a more specific price-focused search with domain filter
+    if (products.length === 0 && officialDomain) {
+      console.log(`⚠️  No prices in initial search - trying price-specific search with site filter...`);
       
-      const priceSearchQuery = `${brandName} dress shirt pants price $`;
+      const priceSearchQuery = `site:${officialDomain} price $`;
       const priceSearchResponse = await fetch('https://google.serper.dev/search', {
         method: 'POST',
         headers: {
@@ -663,80 +855,39 @@ CRITICAL RULES:
       snippet: r.snippet
     })) || [];
     
-    // Step 6: Size check - find actual pants/trousers sizing
-    console.log(`🌐 Phase 4: Checking size availability...`);
-    
-    const sizeQuery = `${brandName} pants trousers women size largest available`;
-    const sizeResponse = await fetch('https://google.serper.dev/search', {
-      method: 'POST',
-      headers: {
-        'X-API-KEY': process.env.SERPER_API_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        q: sizeQuery,
-        num: 8
-      })
-    });
-    
-    const sizeData = sizeResponse.ok ? await sizeResponse.json() : {};
-    let sizeResults = sizeData.organic?.slice(0, 6).map(r => ({
-      title: r.title,
-      snippet: r.snippet
-    })) || [];
-    
-    // FALLBACK: If no size info found, try size chart search
-    if (sizeResults.length === 0 || !sizeResults.some(r => r.snippet.includes('size'))) {
-      console.log(`⚠️  No sizing in initial search - trying size chart search...`);
-      
-      const sizeChartQuery = `${brandName} women size chart guide`;
-      const sizeChartResponse = await fetch('https://google.serper.dev/search', {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': process.env.SERPER_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          q: sizeChartQuery,
-          num: 6
-        })
-      });
-      
-      if (sizeChartResponse.ok) {
-        const sizeChartData = await sizeChartResponse.json();
-        const fallbackResults = sizeChartData.organic?.slice(0, 5).map(r => ({
-          title: r.title,
-          snippet: r.snippet
-        })) || [];
-        
-        if (fallbackResults.length > 0) {
-          sizeResults = fallbackResults;
-          console.log(`💡 Fallback size chart search found ${sizeResults.length} results`);
-        }
+    // Step 6: Fetch categories from actual website using Serper
+    console.log(`🌐 Phase 4: Fetching product categories from site...`);
+    let fetchedCategories = [];
+    if (officialDomain) {
+      try {
+        fetchedCategories = await fetchBrandCategories(officialDomain, brandName, products);
+        console.log(`✅ Fetched categories: ${fetchedCategories.join(', ') || 'none'}`);
+      } catch (error) {
+        console.error(`❌ Failed to fetch categories:`, error.message);
       }
     }
     
-    // Step 7: Category detection - comprehensive product type search
-    console.log(`🌐 Phase 5: Detecting product categories...`);
+    // Step 7: Fetch size chart from actual website using Serper (skip for accessories-only brands)
+    console.log(`🌐 Phase 5: Fetching size chart from site...`);
+    let fetchedMaxSize = null;
     
-    const categoryQuery = `${brandName} shop shoes bags accessories jewelry swimwear`;
-    const categorySearchResponse = await fetch('https://google.serper.dev/search', {
-      method: 'POST',
-      headers: {
-        'X-API-KEY': process.env.SERPER_API_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        q: categoryQuery,
-        num: 8
-      })
-    });
+    // Only fetch sizes if brand sells clothing (skip accessories/jewelry/homewares-only brands)
+    const sellsClothing = fetchedCategories.includes('Clothing') || fetchedCategories.includes('Swimwear');
     
-    const categorySearchData = categorySearchResponse.ok ? await categorySearchResponse.json() : {};
-    const categoryResults = categorySearchData.organic?.slice(0, 6).map(r => ({
-      title: r.title,
-      snippet: r.snippet
-    })) || [];
+    if (officialDomain && sellsClothing) {
+      try {
+        fetchedMaxSize = await fetchBrandSizes(officialDomain, brandName);
+        if (fetchedMaxSize) {
+          // Convert letter sizes to numeric if needed
+          fetchedMaxSize = convertLetterSizeToNumeric(fetchedMaxSize);
+          console.log(`✅ Fetched max size: ${fetchedMaxSize}`);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to fetch sizes:`, error.message);
+      }
+    } else {
+      console.log(`⏭️  Skipping size fetch (no clothing detected)`);
+    }
     
     // Step 8: Ownership & diversity check - women-owned, BIPOC-owned
     console.log(`🌐 Phase 6: Checking ownership & diversity...`);
@@ -760,22 +911,17 @@ CRITICAL RULES:
       snippet: r.snippet
     })) || [];
     
-    // Step 9: Use AI to categorize brand based on targeted search results
-    console.log(`🤖 Phase 7: Analyzing all search data...`);
+    // Step 9: Use AI to analyze values based on search results (categories/sizes already scraped)
+    console.log(`🤖 Phase 7: Analyzing ownership, sustainability & diversity...`);
     
     const categorizeCompletion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         {
           role: 'system',
-          content: `You analyze fashion brand data from targeted web searches. Extract ONLY facts visible in the provided search results.
+          content: `You analyze fashion brand ownership and values from targeted web searches. Extract ONLY facts visible in the provided search results.
 
-TASK 1 - CATEGORIES (required):
-Check CATEGORY SEARCH RESULTS to identify all product types sold:
-Options: Clothing, Shoes, Accessories, Bags, Swimwear, Jewelry (comma-separated)
-Look for mentions of these product types in titles/snippets
-
-TASK 2 - VALUES (be selective, cite source arrays):
+VALUES (be selective, cite source arrays):
 - "Independent label" = Check OWNERSHIP SEARCH RESULTS ONLY. Include ONLY if NO major parent company mentioned (H&M Group, LVMH, Kering, Richemont, etc.)
   If you see "owned by" or "part of" a major group in those results, DO NOT include this.
   
@@ -789,17 +935,9 @@ TASK 2 - VALUES (be selective, cite source arrays):
 - "BIPOC-owned" = Check OWNERSHIP & DIVERSITY SEARCH RESULTS ONLY. Include ONLY if BIPOC/Black-owned explicitly stated
 - "Secondhand" = Check products/category. Include ONLY if resale/vintage platform
 
-TASK 3 - MAX SIZE:
-From size search results, extract the LARGEST numerical size mentioned for pants/trousers:
-- Look for: "size 16", "up to 18", "XL (size 14)", etc.
-- Convert to buckets: "Up to 10", "Up to 12", "Up to 14", "Up to 16", "Up to 18", "Up to 20+"
-- Leave empty if no pants sizing found
-
 Return ONLY valid JSON with comma-separated values (use exact names with hyphens):
 {
-  "category": "Clothing, Bags",
-  "values": "Independent label, Sustainable, Women-owned",
-  "maxWomensSize": "Up to 14"
+  "values": "Independent label, Sustainable, Women-owned"
 }`
         },
         {
@@ -814,16 +952,10 @@ ${JSON.stringify(ownershipResults, null, 2)}
 SUSTAINABILITY SEARCH RESULTS:
 ${JSON.stringify(sustainabilityResults, null, 2)}
 
-CATEGORY SEARCH RESULTS:
-${JSON.stringify(categoryResults, null, 2)}
-
-SIZE SEARCH RESULTS:
-${JSON.stringify(sizeResults, null, 2)}
-
 OWNERSHIP & DIVERSITY SEARCH RESULTS:
 ${JSON.stringify(ownershipDiversityResults, null, 2)}
 
-Analyze and return JSON with category, values, and maxWomensSize.`
+Analyze and return JSON with values.`
         }
       ],
       temperature: 0.2
@@ -835,22 +967,26 @@ Analyze and return JSON with category, values, and maxWomensSize.`
       throw new Error('No response from categorization');
     }
     
-    console.log(`📊 Category response: ${categoryResponse}`);
+    console.log(`📊 Values response: ${categoryResponse}`);
     
-    // Parse categorization
-    let categoryData;
+    // Parse values data
+    let valuesData;
     try {
       const jsonMatch = categoryResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        categoryData = JSON.parse(jsonMatch[0]);
+        valuesData = JSON.parse(jsonMatch[0]);
       } else {
-        categoryData = JSON.parse(categoryResponse);
+        valuesData = JSON.parse(categoryResponse);
       }
     } catch (parseError) {
-      console.error('Failed to parse category data:', parseError);
+      console.error('Failed to parse values data:', parseError);
       // Provide defaults if parsing fails
-      categoryData = { category: '', values: '', maxWomensSize: '' };
+      valuesData = { values: '' };
     }
+    
+    // Use fetched categories and sizes (more accurate than AI inference)
+    const finalCategory = fetchedCategories.length > 0 ? fetchedCategories.join(', ') : '';
+    const finalMaxSize = fetchedMaxSize || '';
     
     console.log(`✅ Successfully researched ${brandName}`);
     
@@ -860,9 +996,9 @@ Analyze and return JSON with category, values, and maxWomensSize.`
       brand: {
         type: isShop ? 'Shop' : 'Brand',
         priceRange: priceRange,
-        category: categoryData.category || '',
-        values: categoryData.values || '',
-        maxWomensSize: categoryData.maxWomensSize || '',
+        category: finalCategory,
+        values: valuesData.values || '',
+        maxWomensSize: finalMaxSize,
         // Include evidence for audit trail
         evidence: {
           products: products.slice(0, 5).map(p => ({
