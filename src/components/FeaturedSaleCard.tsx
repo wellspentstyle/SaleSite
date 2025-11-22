@@ -44,7 +44,7 @@ export function FeaturedSaleCard({ sale, onViewPicks }: FeaturedSaleCardProps) {
         </div>
       )}
       
-      <div className="p-8 flex-1 flex flex-col">
+      <div className="p-5 md:p-8 flex-1 flex flex-col">
         <div className="flex-1 space-y-5">
           {/* Brand Logo */}
           <div className="flex items-start justify-between">

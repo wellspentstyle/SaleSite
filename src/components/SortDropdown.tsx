@@ -27,10 +27,10 @@ export function SortDropdown({ currentSort, onSortChange }: SortDropdownProps) {
   };
 
   return (
-    <div className="relative">
+    <div className="relative w-full md:w-auto">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-3 px-6 py-3 border border-border bg-background hover:bg-muted transition-colors whitespace-nowrap"
+        className="flex items-center justify-center gap-3 px-6 py-3 border border-border bg-background hover:bg-muted transition-colors whitespace-nowrap w-full md:w-auto min-h-[48px]"
         style={{ fontFamily: 'DM Sans, sans-serif' }}
       >
         <Menu className="w-4 h-4" />

@@ -32,7 +32,7 @@ export function SaleCard({ sale, onViewPicks }: SaleCardProps) {
   };
 
   return (
-    <div className="border border-border p-8 hover:border-foreground transition-colors bg-white h-full flex flex-col">
+    <div className="border border-border p-5 md:p-8 hover:border-foreground transition-colors bg-white h-full flex flex-col">
       <div className="flex-1 space-y-5">
         {/* Brand Logo - styled text placeholder for actual logo */}
         <div className="flex items-start justify-between">

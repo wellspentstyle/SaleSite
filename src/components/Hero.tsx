@@ -1,7 +1,16 @@
 export function Hero() {
   return (
     <div className="relative h-[70vh] min-h-[500px] overflow-hidden">
-      {/* Background Video */}
+      {/* Background Video 
+          TODO: To use GIF on mobile, add /public/hero-mobile.gif and uncomment the conditional rendering below
+          
+          const isMobile = useIsMobile();
+          {isMobile ? (
+            <img src="/hero-mobile.gif" alt="Hero background" className="w-full h-full object-cover" style={{ objectPosition: 'center 35%' }} />
+          ) : (
+            <video...>
+          )}
+      */}
       <div className="absolute inset-0">
         <video
           autoPlay

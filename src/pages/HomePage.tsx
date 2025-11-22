@@ -206,7 +206,7 @@ export function HomePage() {
 
       <Hero />
 
-      <main className="container mx-auto px-4 py-20 flex-1">
+      <main className="container mx-auto px-4 py-8 md:py-16 lg:py-20 flex-1">
         <div className="flex">
           <div 
             className="flex-1 transition-all duration-300"
@@ -214,14 +214,14 @@ export function HomePage() {
               marginRight: isFilterOpen ? '32px' : '0px'
             }}
           >
-            <div className="mb-10 flex justify-end items-start gap-3">
+            <div className="mb-10 flex flex-col md:flex-row justify-end items-stretch md:items-start gap-3">
               <SortDropdown
                 currentSort={sortOption}
                 onSortChange={setSortOption}
               />
               <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="flex items-center gap-3 px-6 py-3 border border-border bg-background hover:bg-muted transition-colors whitespace-nowrap"
+                className="flex items-center justify-center gap-3 px-6 py-3 border border-border bg-background hover:bg-muted transition-colors whitespace-nowrap min-h-[48px]"
                 style={{ fontFamily: 'DM Sans, sans-serif' }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -246,7 +246,7 @@ export function HomePage() {
             ) : allSales ? (
               <div>
                 <section>
-                  <div className={`grid grid-cols-1 gap-8 transition-all duration-300 ${isFilterOpen ? 'md:grid-cols-1 lg:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
+                  <div className={`grid grid-cols-1 gap-5 md:gap-8 transition-all duration-300 ${isFilterOpen ? 'md:grid-cols-1 lg:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
                     {allSales.map((sale) => (
                       <SaleCard
                         key={sale.id}
@@ -261,7 +261,7 @@ export function HomePage() {
               <div>
                 {featuredSales.length > 0 && (
                   <section style={{ marginBottom: '2.5rem' }}>
-                    <div className={`grid grid-cols-1 gap-8 transition-all duration-300 ${isFilterOpen ? 'md:grid-cols-1 lg:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
+                    <div className={`grid grid-cols-1 gap-5 md:gap-8 transition-all duration-300 ${isFilterOpen ? 'md:grid-cols-1 lg:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
                       {featuredSales.map((sale) => (
                         <FeaturedSaleCard
                           key={sale.id}
@@ -275,7 +275,7 @@ export function HomePage() {
 
                 {regularSales.length > 0 && (
                   <section>
-                    <div className={`grid grid-cols-1 gap-8 transition-all duration-300 ${isFilterOpen ? 'md:grid-cols-1 lg:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
+                    <div className={`grid grid-cols-1 gap-5 md:gap-8 transition-all duration-300 ${isFilterOpen ? 'md:grid-cols-1 lg:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
                       {regularSales.map((sale) => (
                         <SaleCard
                           key={sale.id}
