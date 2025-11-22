@@ -1029,7 +1029,7 @@ Analyze and return JSON with values.`
     
     let brandDescription = '';
     try {
-      const descriptionPrompt = `Write a 2-sentence brand description for ${brandName}. The audience is a smart, savvy shopper who actively seeks out new brands and likely already shops at similar labels—they're discerning, know quality when they see it, and are turned off by generic marketing speak or jargon. The description should: (1) position the brand in relation to other brands this shopper would know, highlighting what makes it different or fill a gap, (2) communicate the brand's design philosophy or point of view in specific, concrete terms rather than vague aspirational language, (3) acknowledge what makes the shopper themselves discerning (e.g., "if you notice when a seam is placed just right" or "if you've moved past logo worship"), and (4) feel like insider knowledge from a trusted friend who actually knows fashion, not a brand's marketing copy. Avoid words like "elevated," "timeless," "effortless," "curated," or "elevated basics" unless using them ironically. Be specific about fabrics, cuts, details, or the actual experience of wearing/owning the clothes. Keep it concise—each sentence should make one clear point, and don't over-explain or add unnecessary clauses at the end.
+      const descriptionPrompt = `Write a concise 1-2 sentence brand description for ${brandName} (aim for ~60 words total). The audience is a smart, savvy shopper who actively seeks out new brands and likely already shops at similar labels—they're discerning, know quality when they see it, and are turned off by generic marketing speak or jargon. The description should: (1) position the brand in relation to other brands this shopper would know, highlighting what makes it different or fill a gap, (2) communicate the brand's design philosophy or point of view in specific, concrete terms rather than vague aspirational language. Avoid words like "elevated," "timeless," "effortless," "curated," or "elevated basics" unless using them ironically. Be specific about fabrics, cuts, details, or the actual experience of wearing/owning the clothes. Keep it punchy and direct—no unnecessary clauses.
 
 Context about ${brandName}:
 - Type: ${isShop ? 'Shop' : 'Brand'}
@@ -1040,15 +1040,14 @@ Context about ${brandName}:
 
 Examples:
 Tibi: If you've ever wished The Row had a personality or that Lemaire came in colors, Tibi is probably already in your cart. Amy Smilovic designs clothes that respect your intelligence—pieces with enough edge to feel special but enough restraint to work with everything you already own.
-Toteme: If you're drawn to Scandinavian minimalism but find COS too mall-adjacent and The Row too expensive, Toteme is the answer you didn't know you needed. Elin Kling and Karl Lindman design clothes where every proportion feels considered—the kind of pieces that look deceptively simple until you try them on and realize the cut is doing all the work.
-Khaite: For when you want clothes that feel like fashion without the performance anxiety of actually wearing "fashion." Catherine Holstein takes classic American sportswear codes—the cashmere sweater, the perfect jean, the white shirt—and tweaks them just enough that you look like you have a secret.
-Rachel Comey: If you love the idea of artsy Brooklyn but want clothes that actually work in your life, Rachel Comey has been doing this longer and better than anyone else. She's a master of the unexpected detail—a twisted seam, an asymmetric hem, a print that somehow reads as neutral—so you get to feel interesting without looking like you're trying.
+Khaite: For when you want clothes that feel like fashion without the performance anxiety of actually wearing "fashion." Catherine Holstein takes classic American sportswear codes and tweaks them just enough that you look like you have a secret.
+Rachel Comey: If you love the idea of artsy Brooklyn but want clothes that actually work in your life, Rachel Comey has been doing this longer and better than anyone else. She's a master of the unexpected detail—a twisted seam, an asymmetric hem, a print that somehow reads as neutral.
 
-Write ONLY the 2-sentence description for ${brandName}, no preamble or explanation.`;
+Write ONLY the brief 1-2 sentence description for ${brandName}, no preamble or explanation.`;
 
       const descriptionResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-5',
-        max_tokens: 300,
+        max_tokens: 180,
         messages: [
           {
             role: 'user',
