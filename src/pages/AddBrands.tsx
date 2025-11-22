@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
-import { Loader2, Copy, RotateCcw, X } from 'lucide-react';
+import { Loader2, Copy, RotateCcw, X, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { EditBrandDialog } from '../components/EditBrandDialog';
 
 const API_BASE = '/api';
 
@@ -37,6 +38,7 @@ export function AddBrands() {
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [totalBrands, setTotalBrands] = useState<number>(0);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -269,6 +271,13 @@ export function AddBrands() {
     toast.success('Table and input cleared');
   };
 
+  const handleEditSave = (index: number, updatedData: BrandResult) => {
+    setResults(prev => prev.map((r, idx) => 
+      idx === index ? { ...r, ...updatedData } : r
+    ));
+    toast.success('Brand data updated');
+  };
+
   const completedCount = results.filter(r => r.status === 'completed').length;
   const failedCount = results.filter(r => r.status === 'failed').length;
 
@@ -412,6 +421,7 @@ export function AddBrands() {
                     <th className="px-4 py-3 text-left font-medium">Description</th>
                     <th className="px-4 py-3 text-left font-medium">URL</th>
                     <th className="px-4 py-3 text-left font-medium">Status</th>
+                    <th className="px-4 py-3 text-left font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -489,6 +499,19 @@ export function AddBrands() {
                           </div>
                         )}
                       </td>
+                      <td className="px-4 py-3">
+                        {result.status === 'completed' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditingIndex(index)}
+                            className="h-8 px-2"
+                          >
+                            <Edit2 className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -496,6 +519,25 @@ export function AddBrands() {
             </div>
           </div>
         </div>
+        )}
+
+        {/* Edit Brand Dialog */}
+        {editingIndex !== null && results[editingIndex] && (
+          <EditBrandDialog
+            open={editingIndex !== null}
+            onOpenChange={(open) => !open && setEditingIndex(null)}
+            brandData={{
+              name: results[editingIndex].name,
+              type: results[editingIndex].type,
+              priceRange: results[editingIndex].priceRange,
+              category: results[editingIndex].category,
+              values: results[editingIndex].values,
+              maxWomensSize: results[editingIndex].maxWomensSize,
+              description: results[editingIndex].description,
+              url: results[editingIndex].url
+            }}
+            onSave={(updatedData) => handleEditSave(editingIndex, updatedData)}
+          />
         )}
       </div>
     </div>
