@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Loader2, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, ExternalLink, ArrowLeft } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 
 const API_BASE = '/api';
@@ -19,6 +19,8 @@ interface Sale {
   endDate?: string;
 }
 
+type View = 'sales-list' | 'url-entry';
+
 export function PicksAdmin() {
   const navigate = useNavigate();
   const [sales, setSales] = useState<Sale[]>([]);
@@ -27,7 +29,7 @@ export function PicksAdmin() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingSales, setLoadingSales] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
-  const [salesListExpanded, setSalesListExpanded] = useState(true);
+  const [currentView, setCurrentView] = useState<View>('sales-list');
 
   useEffect(() => {
     fetchSales();
@@ -54,11 +56,17 @@ export function PicksAdmin() {
   const handleSaleClick = (sale: Sale) => {
     setSelectedSale(sale);
     setUrls('');
-    setSalesListExpanded(false);
+    setCurrentView('url-entry');
     
     if (sale.saleUrl) {
       window.open(sale.saleUrl, '_blank');
     }
+  };
+
+  const handleBackToSales = () => {
+    setCurrentView('sales-list');
+    setSelectedSale(null);
+    setUrls('');
   };
 
   const handleScrapePicks = async (e: React.FormEvent) => {
@@ -132,40 +140,40 @@ export function PicksAdmin() {
 
   return (
     <div style={{ padding: '40px 24px', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '40px' }}>
-        <h1 
-          className="mb-2 tracking-tight" 
-          style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
-        >
-          Add Picks to Sales
-        </h1>
-        <p 
-          className="text-muted-foreground mb-6" 
-          style={{ fontFamily: 'Crimson Pro, serif', fontSize: '18px' }}
-        >
-          Select a sale to add curated product picks. Sales without picks are shown first.
-        </p>
-        
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'active' | 'inactive')}>
-          <TabsList>
-            <TabsTrigger value="active" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-              Active Sales
-            </TabsTrigger>
-            <TabsTrigger value="inactive" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-              Inactive Sales
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {loadingSales ? (
-        <div className="flex items-center justify-center gap-2 text-muted-foreground" style={{ padding: '60px' }}>
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Loading sales...</span>
-        </div>
-      ) : (
+      {currentView === 'sales-list' ? (
         <>
-          {filteredSales.length === 0 ? (
+          <div style={{ marginBottom: '40px' }}>
+            <h1 
+              className="mb-2 tracking-tight" 
+              style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
+            >
+              Add Picks to Sales
+            </h1>
+            <p 
+              className="text-muted-foreground mb-6" 
+              style={{ fontFamily: 'Crimson Pro, serif', fontSize: '18px' }}
+            >
+              Select a sale to add curated product picks. Sales without picks are shown first.
+            </p>
+            
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'active' | 'inactive')}>
+              <TabsList>
+                <TabsTrigger value="active" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                  Active Sales
+                </TabsTrigger>
+                <TabsTrigger value="inactive" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                  Inactive Sales
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          {loadingSales ? (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground" style={{ padding: '60px' }}>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Loading sales...</span>
+            </div>
+          ) : filteredSales.length === 0 ? (
             <div className="border border-dashed border-border bg-muted/20" style={{ padding: '60px', textAlign: 'center', borderRadius: '8px' }}>
               <p className="text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                 {activeTab === 'inactive' 
@@ -174,157 +182,130 @@ export function PicksAdmin() {
               </p>
             </div>
           ) : (
-            <div style={{ marginBottom: '40px' }}>
-              <button
-                onClick={() => setSalesListExpanded(!salesListExpanded)}
-                className="w-full flex items-center justify-between p-4 border border-border bg-white hover:bg-gray-50 transition-colors"
-                style={{ borderRadius: '4px', marginBottom: salesListExpanded ? '16px' : '0' }}
-              >
-                <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '16px' }}>
-                  {activeTab === 'active' ? 'Active' : 'Inactive'} Sales ({filteredSales.length})
-                </span>
-                {salesListExpanded ? (
-                  <ChevronUp className="h-5 w-5" />
-                ) : (
-                  <ChevronDown className="h-5 w-5" />
-                )}
-              </button>
-              
-              {salesListExpanded && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredSales.map((sale) => (
-                    <div
-                      key={sale.id}
-                      onClick={() => handleSaleClick(sale)}
-                      className={`border bg-white cursor-pointer transition-all ${
-                        selectedSale?.id === sale.id 
-                          ? 'border-black ring-2 ring-black' 
-                          : 'border-border hover:border-gray-400'
-                      }`}
-                      style={{ padding: '20px', borderRadius: '4px' }}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredSales.map((sale) => (
+                <div
+                  key={sale.id}
+                  onClick={() => handleSaleClick(sale)}
+                  className="border bg-white cursor-pointer transition-all border-border hover:border-gray-400 hover:shadow-md"
+                  style={{ padding: '20px', borderRadius: '4px' }}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 
+                      style={{ 
+                        fontFamily: 'DM Sans, sans-serif', 
+                        fontWeight: 600, 
+                        fontSize: '16px',
+                        flex: 1
+                      }}
                     >
-                      <div className="flex items-start justify-between mb-3">
-                        <h3 
-                          style={{ 
-                            fontFamily: 'DM Sans, sans-serif', 
-                            fontWeight: 600, 
-                            fontSize: '16px',
-                            flex: 1
-                          }}
-                        >
-                          {sale.saleName}
-                        </h3>
-                        {sale.saleUrl && (
-                          <ExternalLink className="h-4 w-4 text-muted-foreground ml-2 flex-shrink-0" />
-                        )}
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="font-semibold" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                            {sale.percentOff}% Off
-                          </span>
-                          <span 
-                            className={`px-2 py-0.5 text-xs rounded ${
-                              sale.live === 'YES' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                            style={{ fontFamily: 'DM Sans, sans-serif' }}
-                          >
-                            {sale.live === 'YES' ? 'Live' : 'Draft'}
-                          </span>
-                        </div>
-                        
-                        {sale.startDate && sale.endDate && (
-                          <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                            {new Date(sale.startDate).toLocaleDateString()} - {new Date(sale.endDate).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
+                      {sale.saleName}
+                    </h3>
+                    {sale.saleUrl && (
+                      <ExternalLink className="h-4 w-4 text-muted-foreground ml-2 flex-shrink-0" />
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-semibold" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                        {sale.percentOff}% Off
+                      </span>
+                      <span 
+                        className={`px-2 py-0.5 text-xs rounded ${
+                          sale.live === 'YES' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        {sale.live === 'YES' ? 'Live' : 'Draft'}
+                      </span>
                     </div>
-                  ))}
+                    
+                    {sale.startDate && sale.endDate && (
+                      <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                        {new Date(sale.startDate).toLocaleDateString()} - {new Date(sale.endDate).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
-
-          {selectedSale && (
-            <div className="border border-border bg-white" style={{ padding: '32px', borderRadius: '4px' }}>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 
-                    style={{ 
-                      fontFamily: 'DM Sans, sans-serif', 
-                      fontWeight: 700, 
-                      fontSize: '20px',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Add Picks to: {selectedSale.saleName}
-                  </h2>
-                  <p className="text-sm text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                    Paste product URLs below to scrape and add picks to this sale.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedSale(null);
-                    setUrls('');
-                    setSalesListExpanded(true);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-
-              <form onSubmit={handleScrapePicks}>
-                <div className="space-y-2" style={{ marginBottom: '24px' }}>
-                  <Label 
-                    htmlFor="urls"
-                    style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px' }}
-                  >
-                    Product URLs
-                  </Label>
-                  <Textarea
-                    id="urls"
-                    value={urls}
-                    onChange={(e) => setUrls(e.target.value)}
-                    placeholder="Paste product URLs here, one per line:&#10;https://example.com/product-1&#10;https://example.com/product-2&#10;https://example.com/product-3"
-                    className="min-h-[200px] text-sm"
-                    style={{ fontFamily: 'monospace' }}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <Button 
-                  type="submit" 
-                  style={{ 
-                    fontFamily: 'DM Sans, sans-serif',
-                    backgroundColor: '#000',
-                    color: '#fff',
-                    height: '44px',
-                    paddingLeft: '24px',
-                    paddingRight: '24px'
-                  }}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Scraping...
-                    </>
-                  ) : (
-                    'Scrape Picks'
-                  )}
-                </Button>
-              </form>
+              ))}
             </div>
           )}
         </>
+      ) : (
+        <div className="border border-border bg-white" style={{ padding: '32px', borderRadius: '4px' }}>
+          <div className="mb-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackToSales}
+              className="mb-4"
+              style={{ fontFamily: 'DM Sans, sans-serif' }}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Sales List
+            </Button>
+            
+            <h2 
+              style={{ 
+                fontFamily: 'DM Sans, sans-serif', 
+                fontWeight: 700, 
+                fontSize: '20px',
+                marginBottom: '4px'
+              }}
+            >
+              Add Picks to: {selectedSale?.saleName}
+            </h2>
+            <p className="text-sm text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Paste product URLs below to scrape and add picks to this sale.
+            </p>
+          </div>
+
+          <form onSubmit={handleScrapePicks}>
+            <div className="space-y-2" style={{ marginBottom: '24px' }}>
+              <Label 
+                htmlFor="urls"
+                style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px' }}
+              >
+                Product URLs
+              </Label>
+              <Textarea
+                id="urls"
+                value={urls}
+                onChange={(e) => setUrls(e.target.value)}
+                placeholder="Paste product URLs here, one per line:&#10;https://example.com/product-1&#10;https://example.com/product-2&#10;https://example.com/product-3"
+                className="min-h-[200px] text-sm"
+                style={{ fontFamily: 'monospace' }}
+                required
+                disabled={isLoading}
+              />
+            </div>
+
+            <Button 
+              type="submit" 
+              style={{ 
+                fontFamily: 'DM Sans, sans-serif',
+                backgroundColor: '#000',
+                color: '#fff',
+                height: '44px',
+                paddingLeft: '24px',
+                paddingRight: '24px'
+              }}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scraping...
+                </>
+              ) : (
+                'Scrape Picks'
+              )}
+            </Button>
+          </form>
+        </div>
       )}
     </div>
   );

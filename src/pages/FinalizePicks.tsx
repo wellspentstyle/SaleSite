@@ -57,6 +57,11 @@ export function FinalizePicks() {
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
   const [isEditingSale, setIsEditingSale] = useState(false);
   const [editedPercentOff, setEditedPercentOff] = useState<string>('');
+  
+  // Price calculator state
+  const [calcSalePrice, setCalcSalePrice] = useState<string>('');
+  const [calcPercentOff, setCalcPercentOff] = useState<string>('');
+  const [calcOriginalPrice, setCalcOriginalPrice] = useState<number | null>(null);
 
   useEffect(() => {
     if (!state?.scrapedProducts || !state?.selectedSaleId) {
@@ -230,6 +235,20 @@ export function FinalizePicks() {
     const newMap = new Map(individualCustomPercent);
     newMap.delete(index);
     setIndividualCustomPercent(newMap);
+  };
+
+  const handleCalculateOriginal = () => {
+    const sale = parseFloat(calcSalePrice);
+    const percent = parseFloat(calcPercentOff);
+    
+    if (isNaN(sale) || isNaN(percent) || percent >= 100 || percent <= 0) {
+      setCalcOriginalPrice(null);
+      return;
+    }
+    
+    // Formula: original = sale / (1 - percentOff/100)
+    const original = sale / (1 - percent / 100);
+    setCalcOriginalPrice(Math.round(original * 100) / 100); // Round to 2 decimal places
   };
 
   const handleUpdateSale = async () => {
@@ -442,6 +461,120 @@ export function FinalizePicks() {
                 >
                   Cancel
                 </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Price Calculator */}
+        <div style={{ marginBottom: '40px', padding: '24px', border: '1px solid #e5e5e5', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+          <h3 
+            style={{ 
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: '16px',
+              fontWeight: 700,
+              marginBottom: '8px',
+              color: '#000'
+            }}
+          >
+            Price Calculator
+          </h3>
+          <p 
+            style={{ 
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: '13px',
+              color: '#666',
+              marginBottom: '16px'
+            }}
+          >
+            Calculate original price when you only know the sale price and discount percentage:
+          </p>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <Label 
+                htmlFor="calc-sale-price"
+                style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600 }}
+              >
+                Sale Price
+              </Label>
+              <Input
+                id="calc-sale-price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={calcSalePrice}
+                onChange={(e) => setCalcSalePrice(e.target.value)}
+                placeholder="80.00"
+                style={{
+                  width: '120px',
+                  height: '36px',
+                  fontSize: '14px',
+                  fontFamily: 'DM Sans, sans-serif'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <Label 
+                htmlFor="calc-percent-off"
+                style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600 }}
+              >
+                % Off
+              </Label>
+              <Input
+                id="calc-percent-off"
+                type="number"
+                min="1"
+                max="99"
+                step="1"
+                value={calcPercentOff}
+                onChange={(e) => setCalcPercentOff(e.target.value)}
+                placeholder="20"
+                style={{
+                  width: '100px',
+                  height: '36px',
+                  fontSize: '14px',
+                  fontFamily: 'DM Sans, sans-serif'
+                }}
+              />
+            </div>
+            <button
+              onClick={handleCalculateOriginal}
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '14px',
+                padding: '8px 20px',
+                height: '36px',
+                backgroundColor: '#000',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                transition: 'opacity 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            >
+              Calculate Original
+            </button>
+            {calcOriginalPrice !== null && (
+              <div 
+                style={{ 
+                  padding: '8px 16px',
+                  height: '36px',
+                  backgroundColor: '#e8f5e9',
+                  border: '1px solid #4caf50',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600, color: '#2e7d32' }}>
+                  Original Price:
+                </span>
+                <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '16px', fontWeight: 700, color: '#1b5e20' }}>
+                  ${calcOriginalPrice.toFixed(2)}
+                </span>
               </div>
             )}
           </div>
