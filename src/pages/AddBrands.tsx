@@ -432,8 +432,8 @@ export function AddBrands() {
 
             {/* Results Table */}
             <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-x-auto" style={{ maxHeight: '600px' }}>
-                <table className="text-sm w-full" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '600px' }}>
+                <table className="text-sm" style={{ fontFamily: 'DM Sans, sans-serif', width: '100%', minWidth: '1400px' }}>
                 <thead className="bg-muted">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '150px' }}>Name</th>
