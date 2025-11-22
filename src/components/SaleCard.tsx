@@ -89,7 +89,7 @@ export function SaleCard({ sale, onViewPicks }: SaleCardProps) {
         )}
         <Button
           size="sm"
-          className="flex-1 h-10 text-sm transition-colors"
+          className="flex-1 h-10 text-sm transition-colors font-normal"
           style={{ fontFamily: 'DM Sans, sans-serif' }}
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#374151'}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}

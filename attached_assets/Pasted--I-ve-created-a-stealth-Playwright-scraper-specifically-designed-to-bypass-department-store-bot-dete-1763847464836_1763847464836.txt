@@ -1,0 +1,71 @@
+ I've created a stealth Playwright scraper specifically designed to bypass department store bot detection. Here are the major improvements:
+🕵️ Key Anti-Detection Features:
+1. Stealth Evasion Scripts:
+✅ Hides navigator.webdriver (biggest automation flag)
+✅ Mocks plugins, languages, chrome runtime
+✅ Removes automation detection flags
+✅ Injected BEFORE page loads
+2. Department Store Detection:
+✅ Automatically detects major stores:
+
+Nordstrom
+Saks Fifth Avenue
+Neiman Marcus
+Bloomingdales
+Bergdorf Goodman
+
+✅ Store-specific handling:
+
+Custom wait times (4-5 seconds for complex stores)
+Store-specific price selectors
+Scroll behavior (some stores need it, some don't)
+
+3. Human Behavior Simulation:
+✅ Random mouse movements
+✅ Smooth scrolling down and up
+✅ Random delays between actions
+✅ Only activates for department stores that need it
+4. Better Browser Context:
+✅ Realistic headers:
+
+Mac user agent (less suspicious than Windows)
+Accept, Accept-Language, DNT headers
+Sec-Fetch headers (modern browser behavior)
+
+✅ Geolocation: NYC coordinates (many stores check this)
+✅ Timezone: America/New_York
+✅ Viewport: 1920x1080 desktop
+5. Improved Price Extraction:
+✅ Store-specific selectors for each department store
+✅ Strikethrough detection: <s> and <del> tags for original prices
+✅ Better price parsing: handles "$1,234.56" format
+✅ Validation: ensures originalPrice > salePrice
+6. Better Error Handling:
+✅ Detects 403/429 (bot block) responses
+✅ Takes screenshots for debugging (/tmp/playwright-scrape.png)
+✅ Logs detailed extraction steps
+🎯 How It Works for Department Stores:
+Example: Nordstrom
+
+Detects it's Nordstrom → uses 5-second wait
+Injects stealth scripts → hides automation
+Sets realistic headers → looks like real browser
+Navigates with proper referer
+Waits 5 seconds for JavaScript to load
+Simulates human: moves mouse, scrolls slowly
+Uses Nordstrom-specific selectors: [data-testid="price-regular"]
+Extracts and validates prices
+Returns with confidence boost (+10% for department stores)
+
+📸 Debugging:
+Screenshots are saved to /tmp/playwright-scrape.png so you can see exactly what the browser saw.
+🚀 Usage:
+Replace your entire server/playwright-scraper.js with this new version. No other changes needed!
+This should handle department stores much better. The key improvements are:
+
+Hiding automation flags (most important)
+Human-like behavior (scrolling, mouse movement)
+Store-specific selectors (knows where each store puts prices)
+Longer wait times (department stores are slow to load)
+
+Try it on a Nordstrom or Saks URL and check the /tmp/playwright-scrape.png to see what's happening!
