@@ -39,6 +39,7 @@ export function AddBrands() {
   const [totalBrands, setTotalBrands] = useState<number>(0);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<number>>(new Set());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -430,8 +431,9 @@ export function AddBrands() {
             </div>
 
             {/* Results Table */}
-            <div className="border rounded-lg overflow-x-auto">
-              <table className="text-sm w-full" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+            <div className="border rounded-lg overflow-hidden">
+              <div className="overflow-x-auto" style={{ maxHeight: '600px' }}>
+                <table className="text-sm w-full" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                 <thead className="bg-muted">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '150px' }}>Name</th>
@@ -468,10 +470,23 @@ export function AddBrands() {
                       <td className="px-4 py-3">{result.maxWomensSize}</td>
                       <td className="px-4 py-3" style={{ maxWidth: '300px' }}>
                         {result.description ? (
-                          <span className="text-sm text-muted-foreground" title={result.description}>
-                            {result.description.length > 100 
-                              ? result.description.substring(0, 100) + '...' 
-                              : result.description}
+                          <span 
+                            className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                            onClick={() => {
+                              setExpandedDescriptions(prev => {
+                                const next = new Set(prev);
+                                if (next.has(index)) {
+                                  next.delete(index);
+                                } else {
+                                  next.add(index);
+                                }
+                                return next;
+                              });
+                            }}
+                          >
+                            {expandedDescriptions.has(index) || result.description.length <= 100
+                              ? result.description
+                              : result.description.substring(0, 100) + '...'}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
@@ -521,12 +536,13 @@ export function AddBrands() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {result.status === 'completed' && (
+                        {(result.status === 'completed' || result.status === 'failed') && (
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => setEditingIndex(index)}
                             className="h-8 px-2"
+                            style={{ fontFamily: 'DM Sans, sans-serif' }}
                           >
                             <Edit2 className="h-3 w-3 mr-1" />
                             Edit
@@ -537,6 +553,7 @@ export function AddBrands() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}

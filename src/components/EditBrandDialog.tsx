@@ -48,6 +48,12 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
   const [valuesArray, setValuesArray] = useState<string[]>(parseToArray(brandData.values));
   const [newCategoryItem, setNewCategoryItem] = useState('');
   const [newValueItem, setNewValueItem] = useState('');
+  const [newSizeItem, setNewSizeItem] = useState('');
+
+  // Predefined options for dropdowns
+  const categoryOptions = ['Clothing', 'Shoes', 'Bags', 'Accessories', 'Jewelry', 'Dresses', 'Tops', 'Bottoms', 'Outerwear', 'Swimwear', 'Activewear'];
+  const valueOptions = ['Sustainable', 'Women-Owned', 'Independent label', 'Secondhand', 'BIPOC-Owned'];
+  const sizeOptions = ['Up to 10', 'Up to 12', 'Up to 14', 'Up to 16', 'Up to 18', 'Up to 20', 'Up to 24', 'Up to 28'];
 
   const handleSave = () => {
     const updatedData = {
@@ -93,12 +99,12 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+        <div className="space-y-10" style={{ fontFamily: 'DM Sans, sans-serif' }}>
           {/* Type - Always "Brand" (hidden, non-editable) */}
           
           {/* Price Range */}
           <div className="space-y-2">
-            <Label htmlFor="priceRange" style={{ fontWeight: 600 }}>Price Range</Label>
+            <Label htmlFor="priceRange" style={{ fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Price Range</Label>
             <Input
               id="priceRange"
               value={editedData.priceRange}
@@ -109,7 +115,7 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
 
           {/* Categories (Array Editor) */}
           <div className="space-y-2">
-            <Label style={{ fontWeight: 600 }}>Categories</Label>
+            <Label style={{ fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Categories</Label>
             <div className="flex flex-wrap gap-2 mb-2">
               {categoryArray.map((item, index) => (
                 <div
@@ -130,16 +136,29 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
               <Input
                 value={newCategoryItem}
                 onChange={(e) => setNewCategoryItem(e.target.value)}
-                placeholder="Add category (e.g., Shoes, Dresses)"
+                placeholder="Type or select from suggestions"
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
+                list="category-options"
               />
-              <Button onClick={handleAddCategory} type="button">Add</Button>
+              <datalist id="category-options">
+                {categoryOptions.map(opt => (
+                  <option key={opt} value={opt} />
+                ))}
+              </datalist>
+              <Button 
+                onClick={handleAddCategory} 
+                type="button"
+                variant="outline"
+                style={{ fontFamily: 'DM Sans, sans-serif', backgroundColor: '#fff' }}
+              >
+                Add
+              </Button>
             </div>
           </div>
 
           {/* Values (Array Editor) */}
           <div className="space-y-2">
-            <Label style={{ fontWeight: 600 }}>Values</Label>
+            <Label style={{ fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Values</Label>
             <div className="flex flex-wrap gap-2 mb-2">
               {valuesArray.map((item, index) => (
                 <div
@@ -160,27 +179,74 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
               <Input
                 value={newValueItem}
                 onChange={(e) => setNewValueItem(e.target.value)}
-                placeholder="Add value (e.g., Sustainable, Women-Owned)"
+                placeholder="Type or select from suggestions"
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddValue())}
+                list="value-options"
               />
-              <Button onClick={handleAddValue} type="button">Add</Button>
+              <datalist id="value-options">
+                {valueOptions.map(opt => (
+                  <option key={opt} value={opt} />
+                ))}
+              </datalist>
+              <Button 
+                onClick={handleAddValue} 
+                type="button"
+                variant="outline"
+                style={{ fontFamily: 'DM Sans, sans-serif', backgroundColor: '#fff' }}
+              >
+                Add
+              </Button>
             </div>
           </div>
 
           {/* Max Women's Size */}
           <div className="space-y-2">
-            <Label htmlFor="maxWomensSize" style={{ fontWeight: 600 }}>Max Women's Size</Label>
-            <Input
-              id="maxWomensSize"
-              value={editedData.maxWomensSize}
-              onChange={(e) => setEditedData({ ...editedData, maxWomensSize: e.target.value })}
-              placeholder="e.g., Up to 14, Up to 18"
-            />
+            <Label htmlFor="maxWomensSize" style={{ fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Max Women's Size</Label>
+            <div className="flex gap-2">
+              <Input
+                value={newSizeItem}
+                onChange={(e) => setNewSizeItem(e.target.value)}
+                placeholder="Type or select from suggestions"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (newSizeItem.trim()) {
+                      setEditedData({ ...editedData, maxWomensSize: newSizeItem.trim() });
+                      setNewSizeItem('');
+                    }
+                  }
+                }}
+                list="size-options"
+              />
+              <datalist id="size-options">
+                {sizeOptions.map(opt => (
+                  <option key={opt} value={opt} />
+                ))}
+              </datalist>
+              <Button 
+                onClick={() => {
+                  if (newSizeItem.trim()) {
+                    setEditedData({ ...editedData, maxWomensSize: newSizeItem.trim() });
+                    setNewSizeItem('');
+                  }
+                }}
+                type="button"
+                variant="outline"
+                style={{ fontFamily: 'DM Sans, sans-serif', backgroundColor: '#fff' }}
+              >
+                Add
+              </Button>
+            </div>
+            {editedData.maxWomensSize && (
+              <div className="text-sm text-muted-foreground mt-1">
+                Current: <span className="font-medium">{editedData.maxWomensSize}</span>
+              </div>
+            )}
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description" style={{ fontWeight: 600 }}>Description</Label>
+            <Label htmlFor="description" style={{ fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Description</Label>
             <Textarea
               id="description"
               value={editedData.description}
@@ -192,7 +258,7 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
 
           {/* URL */}
           <div className="space-y-2">
-            <Label htmlFor="url" style={{ fontWeight: 600 }}>URL</Label>
+            <Label htmlFor="url" style={{ fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>URL</Label>
             <Input
               id="url"
               value={editedData.url}
@@ -203,10 +269,17 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            style={{ fontFamily: 'DM Sans, sans-serif' }}
+          >
             Cancel
           </Button>
-          <Button onClick={handleSave} style={{ backgroundColor: '#000', color: '#fff' }}>
+          <Button 
+            onClick={handleSave} 
+            style={{ backgroundColor: '#000', color: '#fff', fontFamily: 'DM Sans, sans-serif' }}
+          >
             Save Changes
           </Button>
         </DialogFooter>
