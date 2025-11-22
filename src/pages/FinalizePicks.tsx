@@ -177,8 +177,19 @@ export function FinalizePicks() {
   // Individual pricing operations
   const handleIndividualSwapPrices = (index: number) => {
     const updatedPicks = [...picks];
+    const beforeSwap = updatedPicks[index];
     updatedPicks[index] = swapPrices(updatedPicks[index]);
     setPicks(updatedPicks);
+    
+    // If swap resulted in null salePrice, auto-focus the sale price input
+    if (updatedPicks[index].salePrice === null && beforeSwap.salePrice !== null) {
+      setTimeout(() => {
+        const input = document.getElementById(`sale-price-${index}`) as HTMLInputElement;
+        if (input) {
+          input.focus();
+        }
+      }, 50);
+    }
   };
 
   const handleIndividualApplySalePercentOff = (index: number) => {
@@ -641,7 +652,9 @@ export function FinalizePicks() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {pick.percentOff !== null && pick.percentOff !== undefined && pick.percentOff > 0 && (
+                        {pick.percentOff !== null && pick.percentOff !== undefined && pick.percentOff > 0 && 
+                         pick.salePrice !== null && pick.salePrice !== undefined &&
+                         pick.originalPrice !== null && pick.originalPrice !== undefined && (
                           <div 
                             style={{ 
                               fontFamily: 'DM Sans, sans-serif',
@@ -676,24 +689,30 @@ export function FinalizePicks() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <button
                           onClick={() => handleIndividualSwapPrices(index)}
+                          disabled={pick.salePrice === null || pick.salePrice === undefined}
                           style={{
                             fontFamily: 'DM Sans, sans-serif',
                             fontSize: '11px',
                             padding: '6px 10px',
-                            backgroundColor: '#fff',
+                            backgroundColor: (pick.salePrice === null || pick.salePrice === undefined) ? '#f5f5f5' : '#fff',
                             border: '1px solid #e0e0e0',
                             borderRadius: '3px',
-                            cursor: 'pointer',
+                            cursor: (pick.salePrice === null || pick.salePrice === undefined) ? 'not-allowed' : 'pointer',
                             transition: 'all 0.2s',
-                            textAlign: 'left'
+                            textAlign: 'left',
+                            opacity: (pick.salePrice === null || pick.salePrice === undefined) ? 0.5 : 1
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#f5f5f5';
-                            e.currentTarget.style.borderColor = '#999';
+                            if (pick.salePrice !== null && pick.salePrice !== undefined) {
+                              e.currentTarget.style.backgroundColor = '#f5f5f5';
+                              e.currentTarget.style.borderColor = '#999';
+                            }
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#fff';
-                            e.currentTarget.style.borderColor = '#e0e0e0';
+                            if (pick.salePrice !== null && pick.salePrice !== undefined) {
+                              e.currentTarget.style.backgroundColor = '#fff';
+                              e.currentTarget.style.borderColor = '#e0e0e0';
+                            }
                           }}
                         >
                           Swap Prices
