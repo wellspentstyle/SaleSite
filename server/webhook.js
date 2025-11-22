@@ -806,7 +806,7 @@ app.post('/admin/brand-research', async (req, res) => {
 
 Your task:
 1. Identify 3-5 product pages from the official brand website (ignore aggregators, resellers)
-2. For each product, extract: product name, price (USD), and URL
+2. For each product, extract: product name, ORIGINAL/REGULAR price (USD), and URL
 3. ONLY include products where you can see a price in the title or snippet
 4. Determine if this is a single brand or multi-brand shop
 
@@ -820,6 +820,8 @@ Return ONLY valid JSON:
 
 CRITICAL RULES:
 - ONLY extract prices you actually see in the search results
+- ALWAYS use the ORIGINAL/REGULAR price, NOT the sale price (e.g., if you see "$200 was $400", use 400)
+- If both sale and original prices are shown, use the higher original price
 - If no prices are visible in snippets, return empty array
 - URLs must be from the official brand domain
 - Price must be numeric (e.g., 450 not "$450")`
@@ -892,7 +894,7 @@ CRITICAL RULES:
             messages: [
               {
                 role: 'system',
-                content: `Extract 3-5 products with prices ONLY if prices are visible in the search results. Never estimate or guess prices. Return JSON: {"products": [{"name": "...", "price": 150, "url": "..."}], "isShop": false}. If no prices visible, return empty products array.`
+                content: `Extract 3-5 products with ORIGINAL/REGULAR prices ONLY if prices are visible in the search results. Never estimate or guess prices. ALWAYS use the original price, NOT the sale price (e.g., if "$200 was $400", use 400). Return JSON: {"products": [{"name": "...", "price": 150, "url": "..."}], "isShop": false}. If no prices visible, return empty products array.`
               },
               {
                 role: 'user',
