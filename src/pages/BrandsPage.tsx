@@ -8,8 +8,8 @@ interface Company {
   id: string;
   name: string;
   type: string;
-  priceRange: string;
-  category: string;
+  priceRange: string | string[];
+  category: string | string[];
   maxWomensSize: string;
   values: string[];
   description: string;
@@ -62,7 +62,11 @@ export function BrandsPage() {
 
       // Price range filter
       if (filters.priceRange.length > 0) {
-        if (!filters.priceRange.includes(company.priceRange)) {
+        const companyPriceRanges = Array.isArray(company.priceRange) 
+          ? company.priceRange 
+          : [company.priceRange];
+        const hasMatchingPriceRange = companyPriceRanges.some(pr => filters.priceRange.includes(pr));
+        if (!hasMatchingPriceRange) {
           return false;
         }
       }
@@ -224,7 +228,8 @@ export function BrandsPage() {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                transition: 'opacity 0.2s'
+                transition: 'opacity 0.2s',
+                textTransform: 'uppercase'
               }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.6'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
@@ -245,7 +250,8 @@ export function BrandsPage() {
                 border: 'none',
                 cursor: 'pointer',
                 transition: 'opacity 0.2s',
-                marginTop: '4px'
+                marginTop: '4px',
+                textTransform: 'uppercase'
               }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.6'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
@@ -383,9 +389,10 @@ function CompanyCard({ company }: { company: Company }) {
     >
       <h3 style={{
         fontSize: '20px',
-        fontWeight: 600,
+        fontWeight: 700,
         marginBottom: '12px',
-        fontFamily: 'DM Sans, sans-serif'
+        fontFamily: 'DM Sans, sans-serif',
+        letterSpacing: '0.15em'
       }}>
         {company.name}
       </h3>
@@ -414,7 +421,7 @@ function CompanyCard({ company }: { company: Company }) {
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
           }}>
-            {company.priceRange}
+            {Array.isArray(company.priceRange) ? company.priceRange[0] : company.priceRange}
           </span>
         )}
         {company.maxWomensSize && (
