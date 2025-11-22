@@ -3,16 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Loader2 } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select';
+import { Loader2, ExternalLink } from 'lucide-react';
+import { Switch } from '../components/ui/switch';
 
-// API requests go through Vite proxy to webhook server
 const API_BASE = '/api';
 
 interface Sale {
@@ -20,15 +13,20 @@ interface Sale {
   saleName: string;
   percentOff: number;
   live: string;
+  saleUrl?: string;
+  picksCount: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 export function PicksAdmin() {
   const navigate = useNavigate();
   const [sales, setSales] = useState<Sale[]>([]);
-  const [selectedSaleId, setSelectedSaleId] = useState<string>('');
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [urls, setUrls] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingSales, setLoadingSales] = useState(true);
+  const [showInactive, setShowInactive] = useState(false);
 
   useEffect(() => {
     fetchSales();
@@ -52,10 +50,19 @@ export function PicksAdmin() {
     }
   };
 
+  const handleSaleClick = (sale: Sale) => {
+    setSelectedSale(sale);
+    setUrls('');
+    
+    if (sale.saleUrl) {
+      window.open(sale.saleUrl, '_blank');
+    }
+  };
+
   const handleScrapePicks = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedSaleId) {
+    if (!selectedSale) {
       alert('Please select a sale');
       return;
     }
@@ -95,7 +102,8 @@ export function PicksAdmin() {
         navigate('/admin/picks/finalize', {
           state: {
             scrapedProducts,
-            selectedSaleId,
+            selectedSaleId: selectedSale.id,
+            salePercentOff: selectedSale.percentOff,
             failures
           }
         });
@@ -110,120 +118,195 @@ export function PicksAdmin() {
     }
   };
 
+  const filteredSales = sales.filter(sale => {
+    const hasNoPicks = sale.picksCount === 0;
+    const isActive = sale.live === 'YES';
+    
+    if (showInactive) {
+      return hasNoPicks;
+    }
+    return hasNoPicks && isActive;
+  });
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
-      <div style={{ width: '100%', maxWidth: '700px' }}>
-        <div className="border border-border bg-white" style={{ padding: '48px' }}>
-            <h1 
-              className="mb-2 tracking-tight" 
-              style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
-            >
-              Manage Picks
-            </h1>
-            <p 
-              className="text-muted-foreground mb-10" 
-              style={{ fontFamily: 'Crimson Pro, serif' }}
-            >
-              Upload product URLs to scrape and add curated picks to your sales.
-            </p>
-            <form onSubmit={handleScrapePicks}>
-              {/* Sale Selection */}
-              <div className="space-y-2" style={{ marginBottom: '32px' }}>
-                <Label 
-                  htmlFor="sale"
-                  style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px' }}
-                >
-                  Select Sale
-                </Label>
-                {loadingSales ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Loading sales...</span>
-                  </div>
-                ) : (
-                  <Select value={selectedSaleId} onValueChange={setSelectedSaleId}>
-                    <SelectTrigger className="h-12 text-sm">
-                      <SelectValue placeholder="Choose a sale to add picks to..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sales.map((sale) => (
-                        <SelectItem key={sale.id} value={sale.id}>
-                          {sale.saleName} ({sale.live === 'YES' ? 'Live' : 'Draft'})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              {/* URL Input */}
-              <div className="space-y-2" style={{ marginBottom: '32px' }}>
-                <Label 
-                  htmlFor="urls"
-                  style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px' }}
-                >
-                  Product URLs
-                </Label>
-                <Textarea
-                  id="urls"
-                  value={urls}
-                  onChange={(e) => setUrls(e.target.value)}
-                  placeholder="Paste product URLs here, one per line:&#10;https://example.com/product-1&#10;https://example.com/product-2&#10;https://example.com/product-3"
-                  className="min-h-[300px] text-sm"
-                  style={{ fontFamily: 'monospace' }}
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-
-              {/* Submit Button */}
-              <div style={{ marginTop: '24px' }}>
-                <div className="flex gap-4">
-                  <Button 
-                    type="submit" 
-                    style={{ 
-                      fontFamily: 'DM Sans, sans-serif',
-                      backgroundColor: '#000',
-                      color: '#fff',
-                      height: '48px',
-                      paddingLeft: '32px',
-                      paddingRight: '32px',
-                      whiteSpace: 'nowrap'
-                    }}
-                    disabled={isLoading || loadingSales}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Scraping...
-                      </>
-                    ) : (
-                      'Scrape Picks'
-                    )}
-                  </Button>
-                  <Button 
-                    type="button"
-                    variant="outline"
-                    style={{ 
-                      fontFamily: 'DM Sans, sans-serif',
-                      height: '48px',
-                      paddingLeft: '32px',
-                      paddingRight: '32px',
-                      whiteSpace: 'nowrap'
-                    }}
-                    onClick={() => {
-                      setUrls('');
-                      setSelectedSaleId('');
-                    }}
-                    disabled={isLoading}
-                  >
-                    Clear
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </div>
+    <div style={{ padding: '40px 24px', maxWidth: '1400px', margin: '0 auto' }}>
+      <div style={{ marginBottom: '40px' }}>
+        <h1 
+          className="mb-2 tracking-tight" 
+          style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
+        >
+          Add Picks to Sales
+        </h1>
+        <p 
+          className="text-muted-foreground mb-6" 
+          style={{ fontFamily: 'Crimson Pro, serif', fontSize: '18px' }}
+        >
+          Select a sale to add curated product picks. Sales without picks are shown first.
+        </p>
+        
+        <div className="flex items-center gap-3">
+          <Switch
+            id="show-inactive"
+            checked={showInactive}
+            onCheckedChange={setShowInactive}
+          />
+          <Label 
+            htmlFor="show-inactive"
+            style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', cursor: 'pointer' }}
+          >
+            Show inactive sales
+          </Label>
         </div>
       </div>
+
+      {loadingSales ? (
+        <div className="flex items-center justify-center gap-2 text-muted-foreground" style={{ padding: '60px' }}>
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading sales...</span>
+        </div>
+      ) : (
+        <>
+          {filteredSales.length === 0 ? (
+            <div className="border border-dashed border-border bg-muted/20" style={{ padding: '60px', textAlign: 'center', borderRadius: '8px' }}>
+              <p className="text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                {showInactive 
+                  ? 'No sales without picks found.' 
+                  : 'No active sales without picks found. Try toggling "Show inactive sales".'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" style={{ marginBottom: '40px' }}>
+              {filteredSales.map((sale) => (
+                <div
+                  key={sale.id}
+                  onClick={() => handleSaleClick(sale)}
+                  className={`border bg-white cursor-pointer transition-all ${
+                    selectedSale?.id === sale.id 
+                      ? 'border-black ring-2 ring-black' 
+                      : 'border-border hover:border-gray-400'
+                  }`}
+                  style={{ padding: '20px', borderRadius: '4px' }}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 
+                      style={{ 
+                        fontFamily: 'DM Sans, sans-serif', 
+                        fontWeight: 600, 
+                        fontSize: '16px',
+                        flex: 1
+                      }}
+                    >
+                      {sale.saleName}
+                    </h3>
+                    {sale.saleUrl && (
+                      <ExternalLink className="h-4 w-4 text-muted-foreground ml-2 flex-shrink-0" />
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-semibold" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                        {sale.percentOff}% Off
+                      </span>
+                      <span 
+                        className={`px-2 py-0.5 text-xs rounded ${
+                          sale.live === 'YES' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        {sale.live === 'YES' ? 'Live' : 'Draft'}
+                      </span>
+                    </div>
+                    
+                    {sale.startDate && sale.endDate && (
+                      <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                        {new Date(sale.startDate).toLocaleDateString()} - {new Date(sale.endDate).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {selectedSale && (
+            <div className="border border-border bg-white" style={{ padding: '32px', borderRadius: '4px' }}>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 
+                    style={{ 
+                      fontFamily: 'DM Sans, sans-serif', 
+                      fontWeight: 700, 
+                      fontSize: '20px',
+                      marginBottom: '4px'
+                    }}
+                  >
+                    Add Picks to: {selectedSale.saleName}
+                  </h2>
+                  <p className="text-sm text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                    Paste product URLs below to scrape and add picks to this sale.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedSale(null);
+                    setUrls('');
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+
+              <form onSubmit={handleScrapePicks}>
+                <div className="space-y-2" style={{ marginBottom: '24px' }}>
+                  <Label 
+                    htmlFor="urls"
+                    style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px' }}
+                  >
+                    Product URLs
+                  </Label>
+                  <Textarea
+                    id="urls"
+                    value={urls}
+                    onChange={(e) => setUrls(e.target.value)}
+                    placeholder="Paste product URLs here, one per line:&#10;https://example.com/product-1&#10;https://example.com/product-2&#10;https://example.com/product-3"
+                    className="min-h-[200px] text-sm"
+                    style={{ fontFamily: 'monospace' }}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+
+                <Button 
+                  type="submit" 
+                  style={{ 
+                    fontFamily: 'DM Sans, sans-serif',
+                    backgroundColor: '#000',
+                    color: '#fff',
+                    height: '44px',
+                    paddingLeft: '24px',
+                    paddingRight: '24px'
+                  }}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Scraping...
+                    </>
+                  ) : (
+                    'Scrape Picks'
+                  )}
+                </Button>
+              </form>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

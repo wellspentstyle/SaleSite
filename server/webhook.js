@@ -543,6 +543,20 @@ app.get('/admin/sales', async (req, res) => {
       pageSize: '100'
     });
     
+    // Fetch ALL picks to count them per sale
+    const picksRecords = await fetchAllAirtableRecords('Picks', {
+      pageSize: '100'
+    });
+    
+    // Count picks per sale
+    const picksCountBySale = new Map();
+    picksRecords.forEach(record => {
+      const saleIds = record.fields.SaleID || [];
+      saleIds.forEach(saleId => {
+        picksCountBySale.set(saleId, (picksCountBySale.get(saleId) || 0) + 1);
+      });
+    });
+    
     const sales = salesRecords.map(record => ({
       id: record.id,
       saleName: record.fields.SaleName || record.fields.Company || 'Unnamed Sale',
@@ -550,7 +564,9 @@ app.get('/admin/sales', async (req, res) => {
       percentOff: record.fields.PercentOff,
       startDate: record.fields.StartDate,
       endDate: record.fields.EndDate,
-      live: record.fields.Live
+      live: record.fields.Live,
+      saleUrl: record.fields.SaleURL || record.fields.CleanURL,
+      picksCount: picksCountBySale.get(record.id) || 0
     }));
     
     res.json({ success: true, sales });

@@ -11,8 +11,8 @@ interface Product {
   brand?: string;
   imageUrl: string;
   originalPrice: number | null;
-  salePrice: number;
-  percentOff: number;
+  salePrice: number | null;
+  percentOff: number | null;
   confidence?: number;
   entryType?: string;
 }
@@ -25,6 +25,7 @@ interface Failure {
 interface LocationState {
   scrapedProducts: Product[];
   selectedSaleId: string;
+  salePercentOff?: number;
   failures?: Failure[];
 }
 
@@ -40,6 +41,9 @@ export function FinalizePicks() {
   const [failedUrls, setFailedUrls] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState<string>('');
+  const [salePercentOff, setSalePercentOff] = useState<number>(0);
+  const [customPercentOff, setCustomPercentOff] = useState<string>('');
+  const [individualCustomPercent, setIndividualCustomPercent] = useState<Map<number, string>>(new Map());
 
   useEffect(() => {
     if (!state?.scrapedProducts || !state?.selectedSaleId) {
@@ -49,6 +53,7 @@ export function FinalizePicks() {
     
     setPicks(state.scrapedProducts);
     setSelectedSaleId(state.selectedSaleId);
+    setSalePercentOff(state.salePercentOff || 0);
     setFailedUrls((state.failures || []).map(f => f.url));
   }, [state, navigate]);
 
@@ -62,6 +67,26 @@ export function FinalizePicks() {
     setPicks(updatedPicks);
   };
 
+  const handlePriceChange = (index: number, field: 'salePrice' | 'originalPrice', value: string) => {
+    const updatedPicks = [...picks];
+    // Properly handle empty string vs 0 vs valid number
+    const numValue = value === '' ? null : parseFloat(value);
+    const finalValue = isNaN(numValue as number) ? null : numValue;
+    updatedPicks[index] = { ...updatedPicks[index], [field]: finalValue };
+    
+    // Only recalculate percent off if BOTH prices are present and valid
+    // Preserve existing percentOff if prices are incomplete
+    const sale = updatedPicks[index].salePrice;
+    const original = updatedPicks[index].originalPrice;
+    if (sale !== null && original !== null && original > 0) {
+      const percentOff = Math.round(((original - sale) / original) * 100);
+      updatedPicks[index].percentOff = percentOff;
+    }
+    // Don't reset percentOff when prices are incomplete - preserve it
+    
+    setPicks(updatedPicks);
+  };
+
   const handleManualDataChange = (url: string, data: ManualProductData) => {
     setManualEntries(new Map(manualEntries.set(url, data)));
   };
@@ -71,6 +96,115 @@ export function FinalizePicks() {
     newEntries.delete(url);
     setManualEntries(newEntries);
     setFailedUrls(failedUrls.filter(u => u !== url));
+  };
+
+  // Pricing override functions
+  const swapPrices = (pick: Product): Product => {
+    // Case 1: No original price - move sale to original, set sale to null
+    // Admin must then manually enter the correct sale price
+    // Prevent toggling back if sale is already null
+    if ((pick.originalPrice === null || pick.originalPrice === undefined) && pick.salePrice !== null) {
+      return {
+        ...pick,
+        originalPrice: pick.salePrice,
+        salePrice: null,
+        // Preserve existing percentOff, don't fabricate a value
+        percentOff: pick.percentOff
+      };
+    }
+    
+    // If both are null or sale is null, do nothing (prevents oscillation)
+    if (pick.salePrice === null || pick.salePrice === undefined) {
+      return pick;
+    }
+    
+    // Case 2: Both prices exist - swap them directly
+    const newSalePrice = pick.originalPrice;
+    const newOriginalPrice = pick.salePrice;
+    
+    // Calculate percent off using the swapped values if both are valid
+    let newPercentOff: number | null = null;
+    if (newOriginalPrice !== null && newSalePrice !== null && newOriginalPrice > 0) {
+      newPercentOff = Math.round(((newOriginalPrice - newSalePrice) / newOriginalPrice) * 100);
+    }
+    
+    return {
+      ...pick,
+      salePrice: newSalePrice,
+      originalPrice: newOriginalPrice,
+      percentOff: newPercentOff
+    };
+  };
+
+  const applyPercentOff = (pick: Product, percentOff: number): Product => {
+    // If no original price, cannot apply percent off - need MSRP first
+    if (pick.originalPrice === null || pick.originalPrice === undefined) {
+      alert(`Cannot apply percent off to "${pick.name}" - missing original price. Please enter original price first.`);
+      return pick;
+    }
+    
+    const original = pick.originalPrice;
+    const sale = original * (1 - percentOff / 100);
+    return {
+      ...pick,
+      salePrice: Math.round(sale * 100) / 100,
+      percentOff: percentOff
+    };
+  };
+
+  // Bulk pricing operations
+  const handleBulkSwapPrices = () => {
+    setPicks(picks.map(pick => swapPrices(pick)));
+  };
+
+  const handleBulkApplySalePercentOff = () => {
+    if (!salePercentOff) {
+      alert('No sale percent off available');
+      return;
+    }
+    setPicks(picks.map(pick => applyPercentOff(pick, salePercentOff)));
+  };
+
+  const handleBulkApplyCustomPercentOff = () => {
+    const percentOff = parseFloat(customPercentOff);
+    if (isNaN(percentOff) || percentOff < 0 || percentOff > 100) {
+      alert('Please enter a valid percent off between 0 and 100');
+      return;
+    }
+    setPicks(picks.map(pick => applyPercentOff(pick, percentOff)));
+  };
+
+  // Individual pricing operations
+  const handleIndividualSwapPrices = (index: number) => {
+    const updatedPicks = [...picks];
+    updatedPicks[index] = swapPrices(updatedPicks[index]);
+    setPicks(updatedPicks);
+  };
+
+  const handleIndividualApplySalePercentOff = (index: number) => {
+    if (!salePercentOff) {
+      alert('No sale percent off available');
+      return;
+    }
+    const updatedPicks = [...picks];
+    updatedPicks[index] = applyPercentOff(updatedPicks[index], salePercentOff);
+    setPicks(updatedPicks);
+  };
+
+  const handleIndividualApplyCustomPercentOff = (index: number) => {
+    const percentOffStr = individualCustomPercent.get(index) || '';
+    const percentOff = parseFloat(percentOffStr);
+    if (isNaN(percentOff) || percentOff < 0 || percentOff > 100) {
+      alert('Please enter a valid percent off between 0 and 100');
+      return;
+    }
+    const updatedPicks = [...picks];
+    updatedPicks[index] = applyPercentOff(updatedPicks[index], percentOff);
+    setPicks(updatedPicks);
+    // Clear the input after applying
+    const newMap = new Map(individualCustomPercent);
+    newMap.delete(index);
+    setIndividualCustomPercent(newMap);
   };
 
   const handleLaunch = async () => {
@@ -200,6 +334,105 @@ export function FinalizePicks() {
                 onRemove={() => handleRemoveManualEntry(url)}
               />
             ))}
+          </div>
+        )}
+
+        {/* Bulk Pricing Override Controls */}
+        {picks.length > 0 && (
+          <div style={{ marginBottom: '40px', padding: '24px', border: '1px solid #e5e5e5', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+            <h3 
+              style={{ 
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '16px',
+                fontWeight: 700,
+                marginBottom: '16px',
+                color: '#000'
+              }}
+            >
+              Bulk Pricing Overrides
+            </h3>
+            <p 
+              style={{ 
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '13px',
+                color: '#666',
+                marginBottom: '16px'
+              }}
+            >
+              Apply pricing changes to all products at once:
+            </p>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <button
+                onClick={handleBulkSwapPrices}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: '13px',
+                  padding: '8px 16px',
+                  backgroundColor: '#fff',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#000'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#ddd'}
+              >
+                Swap Sale ↔ Original
+              </button>
+              {salePercentOff > 0 && (
+                <button
+                  onClick={handleBulkApplySalePercentOff}
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: '13px',
+                    padding: '8px 16px',
+                    backgroundColor: '#fff',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = '#000'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = '#ddd'}
+                >
+                  Apply {salePercentOff}% Off
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={customPercentOff}
+                  onChange={(e) => setCustomPercentOff(e.target.value)}
+                  placeholder="% off"
+                  style={{
+                    width: '80px',
+                    height: '32px',
+                    fontSize: '13px',
+                    fontFamily: 'DM Sans, sans-serif'
+                  }}
+                />
+                <button
+                  onClick={handleBulkApplyCustomPercentOff}
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: '13px',
+                    padding: '8px 16px',
+                    backgroundColor: '#fff',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = '#000'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = '#ddd'}
+                >
+                  Apply Custom %
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -345,39 +578,76 @@ export function FinalizePicks() {
                       {pick.name}
                     </h3>
 
-                    {/* Pricing */}
+                    {/* Pricing - Editable */}
                     <div style={{ marginBottom: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                        <span 
-                          style={{ 
-                            fontFamily: 'DM Sans, sans-serif',
-                            fontSize: '14px',
-                            fontWeight: 600,
-                            color: '#000'
-                          }}
-                        >
-                          ${pick.salePrice}
-                        </span>
-                        {pick.originalPrice && (
-                          <span 
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                        <div>
+                          <Label 
+                            htmlFor={`sale-price-${index}`}
                             style={{ 
-                              fontFamily: 'DM Sans, sans-serif',
-                              fontSize: '14px',
-                              textDecoration: 'line-through',
-                              color: '#999'
+                              fontFamily: 'DM Sans, sans-serif', 
+                              fontWeight: 600, 
+                              fontSize: '10px',
+                              color: '#666',
+                              marginBottom: '4px',
+                              display: 'block'
                             }}
                           >
-                            ${pick.originalPrice}
-                          </span>
-                        )}
+                            Sale Price
+                          </Label>
+                          <Input
+                            id={`sale-price-${index}`}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={pick.salePrice ?? ''}
+                            onChange={(e) => handlePriceChange(index, 'salePrice', e.target.value)}
+                            style={{
+                              height: '32px',
+                              fontSize: '13px',
+                              fontFamily: 'DM Sans, sans-serif',
+                              fontWeight: 600
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label 
+                            htmlFor={`original-price-${index}`}
+                            style={{ 
+                              fontFamily: 'DM Sans, sans-serif', 
+                              fontWeight: 600, 
+                              fontSize: '10px',
+                              color: '#666',
+                              marginBottom: '4px',
+                              display: 'block'
+                            }}
+                          >
+                            Original Price
+                          </Label>
+                          <Input
+                            id={`original-price-${index}`}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={pick.originalPrice ?? ''}
+                            onChange={(e) => handlePriceChange(index, 'originalPrice', e.target.value)}
+                            placeholder="Optional"
+                            style={{
+                              height: '32px',
+                              fontSize: '13px',
+                              fontFamily: 'DM Sans, sans-serif'
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                        {pick.percentOff !== null && pick.percentOff !== undefined && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {pick.percentOff !== null && pick.percentOff !== undefined && pick.percentOff > 0 && (
                           <div 
                             style={{ 
                               fontFamily: 'DM Sans, sans-serif',
-                              fontSize: '12px',
-                              color: '#999'
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: '#16a34a'
                             }}
                           >
                             {pick.percentOff}% OFF
@@ -387,7 +657,7 @@ export function FinalizePicks() {
                           <div 
                             style={{ 
                               fontFamily: 'DM Sans, sans-serif',
-                              fontSize: '11px',
+                              fontSize: '10px',
                               fontWeight: 600,
                               padding: '2px 6px',
                               borderRadius: '3px',
@@ -398,6 +668,106 @@ export function FinalizePicks() {
                             {pick.confidence}% confidence
                           </div>
                         )}
+                      </div>
+                    </div>
+
+                    {/* Individual Pricing Override Buttons */}
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f0f0f0' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <button
+                          onClick={() => handleIndividualSwapPrices(index)}
+                          style={{
+                            fontFamily: 'DM Sans, sans-serif',
+                            fontSize: '11px',
+                            padding: '6px 10px',
+                            backgroundColor: '#fff',
+                            border: '1px solid #e0e0e0',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            textAlign: 'left'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f5f5f5';
+                            e.currentTarget.style.borderColor = '#999';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#fff';
+                            e.currentTarget.style.borderColor = '#e0e0e0';
+                          }}
+                        >
+                          Swap Prices
+                        </button>
+                        {salePercentOff > 0 && (
+                          <button
+                            onClick={() => handleIndividualApplySalePercentOff(index)}
+                            style={{
+                              fontFamily: 'DM Sans, sans-serif',
+                              fontSize: '11px',
+                              padding: '6px 10px',
+                              backgroundColor: '#fff',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              textAlign: 'left'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f5f5f5';
+                              e.currentTarget.style.borderColor = '#999';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#fff';
+                              e.currentTarget.style.borderColor = '#e0e0e0';
+                            }}
+                          >
+                            Apply {salePercentOff}% Off
+                          </button>
+                        )}
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            placeholder="%"
+                            value={individualCustomPercent.get(index) ?? ''}
+                            onChange={(e) => {
+                              const newMap = new Map(individualCustomPercent);
+                              newMap.set(index, e.target.value);
+                              setIndividualCustomPercent(newMap);
+                            }}
+                            style={{
+                              flex: 1,
+                              height: '28px',
+                              fontSize: '11px',
+                              fontFamily: 'DM Sans, sans-serif'
+                            }}
+                          />
+                          <button
+                            onClick={() => handleIndividualApplyCustomPercentOff(index)}
+                            style={{
+                              fontFamily: 'DM Sans, sans-serif',
+                              fontSize: '11px',
+                              padding: '6px 10px',
+                              backgroundColor: '#fff',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              whiteSpace: 'nowrap'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f5f5f5';
+                              e.currentTarget.style.borderColor = '#999';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#fff';
+                              e.currentTarget.style.borderColor = '#e0e0e0';
+                            }}
+                          >
+                            Apply
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
