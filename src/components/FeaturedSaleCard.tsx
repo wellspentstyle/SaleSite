@@ -100,7 +100,7 @@ export function FeaturedSaleCard({ sale, onViewPicks }: FeaturedSaleCardProps) {
           )}
           <Button
             size="sm"
-            className="flex-1 h-10 text-sm transition-colors font-normal"
+            className="flex-1 h-10 text-sm transition-colors"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#374151'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
