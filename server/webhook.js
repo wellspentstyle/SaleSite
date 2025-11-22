@@ -1563,6 +1563,23 @@ app.post('/admin/picks', async (req, res) => {
   try {
     console.log(`💾 Saving ${picks.length} picks for sale ${saleId}`);
     
+    // Fetch the sale record to get its Company field
+    const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`;
+    const saleResponse = await fetch(saleUrl, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+      },
+    });
+    
+    if (!saleResponse.ok) {
+      throw new Error('Failed to fetch sale record');
+    }
+    
+    const saleData = await saleResponse.json();
+    const companyIds = saleData.fields.Company || [];
+    
+    console.log(`📦 Sale company: ${companyIds.length > 0 ? companyIds[0] : 'None'}`);
+    
     // Create records for each pick
     // Note: ShopMyURL and PercentOff are computed fields in Airtable, don't send them
     const records = picks.map(pick => {
@@ -1572,6 +1589,11 @@ app.post('/admin/picks', async (req, res) => {
         ImageURL: pick.imageUrl,
         SaleID: [saleId] // Link to Sales table
       };
+      
+      // Link to Company if available from the sale
+      if (companyIds.length > 0) {
+        fields.CompanyLink = companyIds; // Link to Companies table
+      }
       
       // Add brand if available
       if (pick.brand) {
@@ -1978,7 +2000,7 @@ app.get('/admin/picks', async (req, res) => {
     
     const fields = [
       'ProductURL', 'ProductName', 'ImageURL', 'OriginalPrice', 'SalePrice', 'PercentOff', 
-      'SaleID', 'Company', 'ShopMyURL', 'AvailabilityStatus', 'LastValidatedAt', 
+      'SaleID', 'Company', 'CompanyLink', 'ShopMyURL', 'AvailabilityStatus', 'LastValidatedAt', 
       'NextCheckDue', 'HiddenUntilFresh'
     ];
     
@@ -2033,7 +2055,8 @@ app.get('/admin/picks', async (req, res) => {
       salePrice: record.fields.SalePrice,
       percentOff: record.fields.PercentOff,
       saleIds: record.fields.SaleID || [],
-      company: record.fields.Company || [],
+      company: record.fields.Company || [], // Company is a lookup field for display
+      companyLink: record.fields.CompanyLink || [], // CompanyLink is the actual link to Companies table
       availabilityStatus: record.fields.AvailabilityStatus || 'Unknown',
       lastValidatedAt: record.fields.LastValidatedAt,
       nextCheckDue: record.fields.NextCheckDue,
@@ -2729,7 +2752,7 @@ app.post('/webhook/airtable-story', async (req, res) => {
       originalPrice: fields.OriginalPrice,
       salePrice: fields.SalePrice,
       shopMyUrl: fields.ShopMyURL || '#',
-      company: fields.Company || 'Unknown',
+      company: fields.Company || 'Unknown', // Company is a lookup field for display
       saleName: fields.SaleName ? fields.SaleName[0] : 'Unknown Sale'
     };
     
