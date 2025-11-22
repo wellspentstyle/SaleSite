@@ -41,6 +41,7 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - **Instagram Story Automation**: Event-driven system generating 1080x1920px Instagram story images triggered by Airtable Automation. Features dynamic text overlays, smart image fetching, auto-uploads to Google Drive, and Telegram delivery.
 - **Gem.app Sync**: Automated scraper for vintage clothing items saved on Gem.app, accessible via the admin panel. Uses CloudMailin for magic link authentication and Playwright for scraping, with incremental sync and robust error handling.
 - **Featured Sales Assets**: Social media asset generator creating 1080x1350 Instagram-ready images with dynamic content and styling from selected sales, auto-uploads to Google Drive.
+- **Freshness Tracking**: Hybrid manual/automated system for tracking product pick availability to prevent showing sold-out items. Picks include freshness metadata (AvailabilityStatus: In Stock/Low/Sold Out/Unknown, LastValidatedAt, NextCheckDue, HiddenUntilFresh). Admin panel provides bulk refresh actions, mark-sold-out workflow, filters by status/freshness/display state, and comprehensive stats dashboard. Frontend automatically filters out sold-out picks and stale items (>14 days since validation with Unknown status). Nightly check endpoint validates picks from active sales only, using existing hybrid scraper to detect availability. Picks link to Company/Brand table for reusability across sales.
 
 ## External Dependencies
 - **Airtable**: Primary data source for sales and product picks.
