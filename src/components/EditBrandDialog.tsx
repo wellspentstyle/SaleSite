@@ -12,6 +12,13 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { X } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 
 interface BrandData {
   name: string;
@@ -46,12 +53,10 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
 
   const [categoryArray, setCategoryArray] = useState<string[]>(parseToArray(brandData.category));
   const [valuesArray, setValuesArray] = useState<string[]>(parseToArray(brandData.values));
-  const [newCategoryItem, setNewCategoryItem] = useState('');
-  const [newValueItem, setNewValueItem] = useState('');
   const [newSizeItem, setNewSizeItem] = useState('');
 
-  // Predefined options for dropdowns
-  const categoryOptions = ['Clothing', 'Shoes', 'Bags', 'Accessories', 'Jewelry', 'Dresses', 'Tops', 'Bottoms', 'Outerwear', 'Swimwear', 'Activewear'];
+  // Predefined options for dropdowns - Categories from Airtable
+  const categoryOptions = ['Clothing', 'Shoes', 'Accessories', 'Bags', 'Jewelry', 'Outerwear', 'Swimwear'];
   const valueOptions = ['Sustainable', 'Women-Owned', 'Independent label', 'Secondhand', 'BIPOC-Owned'];
   const sizeOptions = ['Up to 10', 'Up to 12', 'Up to 14', 'Up to 16', 'Up to 18', 'Up to 20', 'Up to 24', 'Up to 28'];
 
@@ -69,10 +74,10 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
     setCategoryArray(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleAddCategory = () => {
-    if (newCategoryItem.trim()) {
-      setCategoryArray(prev => [...prev, newCategoryItem.trim()]);
-      setNewCategoryItem('');
+  const handleAddCategory = (value: string) => {
+    // Auto-add when selecting from dropdown, avoid duplicates
+    if (value && !categoryArray.includes(value)) {
+      setCategoryArray(prev => [...prev, value]);
     }
   };
 
@@ -80,10 +85,10 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
     setValuesArray(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleAddValue = () => {
-    if (newValueItem.trim()) {
-      setValuesArray(prev => [...prev, newValueItem.trim()]);
-      setNewValueItem('');
+  const handleAddValue = (value: string) => {
+    // Auto-add when selecting from dropdown, avoid duplicates
+    if (value && !valuesArray.includes(value)) {
+      setValuesArray(prev => [...prev, value]);
     }
   };
 
@@ -113,7 +118,7 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
             />
           </div>
 
-          {/* Categories (Array Editor) */}
+          {/* Categories (Dropdown-only picker) */}
           <div className="space-y-2">
             <Label style={{ fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Categories</Label>
             <div className="flex flex-wrap gap-2 mb-2">
@@ -132,31 +137,23 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
-              <Input
-                value={newCategoryItem}
-                onChange={(e) => setNewCategoryItem(e.target.value)}
-                placeholder="Type or select from suggestions"
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
-                list="category-options"
-              />
-              <datalist id="category-options">
-                {categoryOptions.map(opt => (
-                  <option key={opt} value={opt} />
-                ))}
-              </datalist>
-              <Button 
-                onClick={handleAddCategory} 
-                type="button"
-                variant="outline"
-                style={{ fontFamily: 'DM Sans, sans-serif', backgroundColor: '#fff' }}
-              >
-                Add
-              </Button>
-            </div>
+            <Select onValueChange={handleAddCategory}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a category to add" />
+              </SelectTrigger>
+              <SelectContent>
+                {categoryOptions
+                  .filter(opt => !categoryArray.includes(opt))
+                  .map(opt => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Values (Array Editor) */}
+          {/* Values (Multi-select with auto-add) */}
           <div className="space-y-2">
             <Label style={{ fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Values</Label>
             <div className="flex flex-wrap gap-2 mb-2">
@@ -175,28 +172,20 @@ export function EditBrandDialog({ open, onOpenChange, brandData, onSave }: EditB
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
-              <Input
-                value={newValueItem}
-                onChange={(e) => setNewValueItem(e.target.value)}
-                placeholder="Type or select from suggestions"
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddValue())}
-                list="value-options"
-              />
-              <datalist id="value-options">
-                {valueOptions.map(opt => (
-                  <option key={opt} value={opt} />
-                ))}
-              </datalist>
-              <Button 
-                onClick={handleAddValue} 
-                type="button"
-                variant="outline"
-                style={{ fontFamily: 'DM Sans, sans-serif', backgroundColor: '#fff' }}
-              >
-                Add
-              </Button>
-            </div>
+            <Select onValueChange={handleAddValue}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a value to add" />
+              </SelectTrigger>
+              <SelectContent>
+                {valueOptions
+                  .filter(opt => !valuesArray.includes(opt))
+                  .map(opt => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Max Women's Size */}

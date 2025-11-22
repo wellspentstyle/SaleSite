@@ -1202,21 +1202,17 @@ Analyze and return JSON with values.`
       (ownershipText.includes('owned by') || ownershipText.includes('part of') || ownershipText.includes('subsidiary'))
     );
     
-    if (valuesData.values) {
+    if (valuesData.values && hasParentCompany) {
       const valuesArray = valuesData.values.split(',').map(v => v.trim());
-      const isIndependent = valuesArray.includes('Independent label');
       
-      // Remove Women-owned/BIPOC-owned if: (1) brand is explicitly owned by parent company OR (2) not marked as independent
-      if (hasParentCompany || !isIndependent) {
-        const filteredValues = valuesArray.filter(v => 
-          v !== 'Women-owned' && v !== 'BIPOC-owned'
-        );
-        
-        if (filteredValues.length !== valuesArray.length) {
-          const reason = hasParentCompany ? 'owned by parent company' : 'not marked as independent';
-          console.log(`🔒 Removed ownership values (${reason}): ${valuesArray.filter(v => v === 'Women-owned' || v === 'BIPOC-owned').join(', ')}`);
-          valuesData.values = filteredValues.join(', ');
-        }
+      // Only remove Women-owned/BIPOC-owned if we have explicit evidence of parent company ownership
+      const filteredValues = valuesArray.filter(v => 
+        v !== 'Women-owned' && v !== 'BIPOC-owned'
+      );
+      
+      if (filteredValues.length !== valuesArray.length) {
+        console.log(`🔒 Removed ownership values (owned by parent company): ${valuesArray.filter(v => v === 'Women-owned' || v === 'BIPOC-owned').join(', ')}`);
+        valuesData.values = filteredValues.join(', ');
       }
     }
     
