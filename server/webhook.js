@@ -540,7 +540,7 @@ app.get('/companies', async (req, res) => {
       
       return {
         id: record.id,
-        name: record.fields.Company || '',
+        name: record.fields.Name || '',
         type: record.fields.Type || '',
         priceRange: record.fields.PriceRange || '',
         category: record.fields.Category || '',
