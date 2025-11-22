@@ -22,7 +22,7 @@ export function HomePage() {
     maxWomensSize: [],
     values: [],
   });
-  const [sortOption, setSortOption] = useState<SortOption>('featured');
+  const [sortOption, setSortOption] = useState<SortOption>('date-new-old');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export function HomePage() {
     setDialogOpen(true);
   };
 
-  const { featuredSales, regularSales } = useMemo(() => {
+  const { featuredSales, regularSales, allSales } = useMemo(() => {
     const filtered = sales.filter((sale) => {
       if (filters.type.length > 0) {
         let typeMatches = false;
@@ -169,10 +169,14 @@ export function HomePage() {
       }
     };
 
-    const featured = sortSales(filtered.filter(sale => sale.featured));
-    const regular = sortSales(filtered.filter(sale => !sale.featured));
-
-    return { featuredSales: featured, regularSales: regular };
+    if (sortOption === 'featured') {
+      const featured = sortSales(filtered.filter(sale => sale.featured));
+      const regular = sortSales(filtered.filter(sale => !sale.featured));
+      return { featuredSales: featured, regularSales: regular, allSales: null };
+    } else {
+      const allSorted = sortSales(filtered);
+      return { featuredSales: [], regularSales: [], allSales: allSorted };
+    }
   }, [sales, filters, sortOption]);
 
   return (
@@ -224,11 +228,25 @@ export function HomePage() {
                   Loading sales...
                 </p>
               </div>
-            ) : featuredSales.length === 0 && regularSales.length === 0 ? (
+            ) : (allSales !== null && allSales.length === 0) || (allSales === null && featuredSales.length === 0 && regularSales.length === 0) ? (
               <div className="text-center py-20">
                 <p className="text-muted-foreground" style={{ fontFamily: 'Crimson Pro, serif' }}>
                   {sales.length === 0 ? 'No active sales at the moment.' : 'No sales match your current filters.'}
                 </p>
+              </div>
+            ) : allSales ? (
+              <div>
+                <section>
+                  <div className={`grid grid-cols-1 gap-8 transition-all duration-300 ${isFilterOpen ? 'md:grid-cols-1 lg:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
+                    {allSales.map((sale) => (
+                      <SaleCard
+                        key={sale.id}
+                        sale={sale}
+                        onViewPicks={handleViewPicks}
+                      />
+                    ))}
+                  </div>
+                </section>
               </div>
             ) : (
               <div>
