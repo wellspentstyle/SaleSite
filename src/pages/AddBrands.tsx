@@ -429,10 +429,12 @@ export function AddBrands() {
                       <td className="px-4 py-3">{result.category}</td>
                       <td className="px-4 py-3">{result.values}</td>
                       <td className="px-4 py-3">{result.maxWomensSize}</td>
-                      <td className="px-4 py-3 max-w-md">
+                      <td className="px-4 py-3" style={{ maxWidth: '300px' }}>
                         {result.description ? (
-                          <span className="text-sm text-muted-foreground line-clamp-3">
-                            {result.description}
+                          <span className="text-sm text-muted-foreground" title={result.description}>
+                            {result.description.length > 100 
+                              ? result.description.substring(0, 100) + '...' 
+                              : result.description}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
