@@ -20,6 +20,7 @@ interface BrandResult {
   category: string;
   values: string;
   maxWomensSize: string;
+  description: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
   evidence?: {
@@ -60,6 +61,7 @@ export function AddBrands() {
       category: '',
       values: '',
       maxWomensSize: '',
+      description: '',
       status: 'pending'
     }));
 
@@ -110,6 +112,7 @@ export function AddBrands() {
               category: data.brand.category || '',
               values: data.brand.values || '',
               maxWomensSize: data.brand.maxWomensSize || '',
+              description: data.brand.description || '',
               evidence: data.brand.evidence,
               status: 'completed'
             } : r
@@ -176,6 +179,7 @@ export function AddBrands() {
             category: data.brand.category || '',
             values: data.brand.values || '',
             maxWomensSize: data.brand.maxWomensSize || '',
+            description: data.brand.description || '',
             evidence: data.brand.evidence,
             status: 'completed'
           } : r
@@ -228,6 +232,7 @@ export function AddBrands() {
           r.category, 
           r.values, 
           r.maxWomensSize,
+          r.description,
           medianPrice,
           productSamples
         ].join('\t');
@@ -399,6 +404,7 @@ export function AddBrands() {
                     <th className="px-4 py-3 text-left font-medium">Category</th>
                     <th className="px-4 py-3 text-left font-medium">Values</th>
                     <th className="px-4 py-3 text-left font-medium">Max Size</th>
+                    <th className="px-4 py-3 text-left font-medium">Description</th>
                     <th className="px-4 py-3 text-left font-medium">Status</th>
                   </tr>
                 </thead>
@@ -423,6 +429,15 @@ export function AddBrands() {
                       <td className="px-4 py-3">{result.category}</td>
                       <td className="px-4 py-3">{result.values}</td>
                       <td className="px-4 py-3">{result.maxWomensSize}</td>
+                      <td className="px-4 py-3 max-w-md">
+                        {result.description ? (
+                          <span className="text-sm text-muted-foreground line-clamp-3">
+                            {result.description}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         {result.status === 'pending' && (
                           <span className="text-muted-foreground">Pending</span>

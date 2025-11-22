@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { execSync } from 'child_process';
 import { scrapeProduct } from './scrapers/index.js';
 import crypto from 'crypto';
@@ -22,6 +23,12 @@ const upload = multer();
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
+
+// Initialize Anthropic with Replit AI Integrations
+const anthropic = new Anthropic({
+  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
 });
 
 // Airtable configuration
@@ -1018,6 +1025,46 @@ Analyze and return JSON with values.`
     const finalCategory = fetchedCategories.length > 0 ? fetchedCategories.join(', ') : '';
     const finalMaxSize = fetchedMaxSize || '';
     
+    // Step 10: Generate brand description using Claude
+    console.log(`🤖 Phase 8: Generating brand description...`);
+    
+    let brandDescription = '';
+    try {
+      const descriptionPrompt = `Write a 2-sentence brand description for ${brandName}. The audience is a smart, savvy shopper who actively seeks out new brands and likely already shops at similar labels—they're discerning, know quality when they see it, and are turned off by generic marketing speak or jargon. The description should: (1) position the brand in relation to other brands this shopper would know, highlighting what makes it different or fill a gap, (2) communicate the brand's design philosophy or point of view in specific, concrete terms rather than vague aspirational language, (3) acknowledge what makes the shopper themselves discerning (e.g., "if you notice when a seam is placed just right" or "if you've moved past logo worship"), and (4) feel like insider knowledge from a trusted friend who actually knows fashion, not a brand's marketing copy. Avoid words like "elevated," "timeless," "effortless," "curated," or "elevated basics" unless using them ironically. Be specific about fabrics, cuts, details, or the actual experience of wearing/owning the clothes. Keep it concise—each sentence should make one clear point, and don't over-explain or add unnecessary clauses at the end.
+
+Context about ${brandName}:
+- Type: ${isShop ? 'Shop' : 'Brand'}
+- Categories: ${finalCategory || 'Not specified'}
+- Price Range: ${priceRange}
+- Values: ${valuesData.values || 'None'}
+- Products: ${products.slice(0, 5).map(p => p.name).join(', ')}
+
+Examples:
+Tibi: If you've ever wished The Row had a personality or that Lemaire came in colors, Tibi is probably already in your cart. Amy Smilovic designs clothes that respect your intelligence—pieces with enough edge to feel special but enough restraint to work with everything you already own.
+Toteme: If you're drawn to Scandinavian minimalism but find COS too mall-adjacent and The Row too expensive, Toteme is the answer you didn't know you needed. Elin Kling and Karl Lindman design clothes where every proportion feels considered—the kind of pieces that look deceptively simple until you try them on and realize the cut is doing all the work.
+Khaite: For when you want clothes that feel like fashion without the performance anxiety of actually wearing "fashion." Catherine Holstein takes classic American sportswear codes—the cashmere sweater, the perfect jean, the white shirt—and tweaks them just enough that you look like you have a secret.
+Rachel Comey: If you love the idea of artsy Brooklyn but want clothes that actually work in your life, Rachel Comey has been doing this longer and better than anyone else. She's a master of the unexpected detail—a twisted seam, an asymmetric hem, a print that somehow reads as neutral—so you get to feel interesting without looking like you're trying.
+
+Write ONLY the 2-sentence description for ${brandName}, no preamble or explanation.`;
+
+      const descriptionResponse = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 300,
+        messages: [
+          {
+            role: 'user',
+            content: descriptionPrompt
+          }
+        ]
+      });
+      
+      brandDescription = descriptionResponse.content[0]?.text?.trim() || '';
+      console.log(`✅ Generated description: ${brandDescription.substring(0, 100)}...`);
+    } catch (error) {
+      console.error(`❌ Failed to generate description:`, error.message);
+      brandDescription = '';
+    }
+    
     console.log(`✅ Successfully researched ${brandName}`);
     
     // Step 4: Return structured data with evidence
@@ -1029,6 +1076,7 @@ Analyze and return JSON with values.`
         category: finalCategory,
         values: valuesData.values || '',
         maxWomensSize: finalMaxSize,
+        description: brandDescription,
         // Include evidence for audit trail
         evidence: {
           products: products.slice(0, 5).map(p => ({
