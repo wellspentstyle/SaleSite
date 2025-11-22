@@ -6,6 +6,7 @@ import { FinalizePicks } from './pages/FinalizePicks';
 import { AddBrands } from './pages/AddBrands';
 import { SyncGem } from './pages/SyncGem';
 import { GenerateAssets } from './pages/GenerateAssets';
+import { Freshness } from './pages/Freshness';
 import { Toaster } from './components/ui/sonner';
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="picks/finalize" element={<FinalizePicks />} />
           <Route path="brands" element={<AddBrands />} />
           <Route path="assets" element={<GenerateAssets />} />
+          <Route path="freshness" element={<Freshness />} />
           <Route path="sync" element={<SyncGem />} />
         </Route>
       </Routes>
