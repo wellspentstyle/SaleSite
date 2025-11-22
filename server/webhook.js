@@ -490,7 +490,9 @@ app.get('/sales', async (req, res) => {
           originalPrice: record.fields.OriginalPrice || 0,
           salePrice: record.fields.SalePrice || 0,
           percentOff: record.fields.PercentOff || 0,
-          shopMyUrl: record.fields.ShopMyURL || '#'
+          shopMyUrl: record.fields.ShopMyURL || '#',
+          company: record.fields.Company || [], // Company lookup for display
+          companyLink: record.fields.CompanyLink || [] // Linked record IDs for relationships
         });
       });
     });
