@@ -26,6 +26,7 @@ The application is built with React 18 and TypeScript, using Vite for a fast dev
 - Sort and Filter controls are aligned to the right.
 - Filter sidebar slides in from the right, pushing content over with smooth transitions and synchronized margin transitions.
 - Default sort is "newest first" (DATE, NEW TO OLD) to showcase latest sales immediately.
+- **Mobile Optimizations**: Responsive design with breakpoint-specific improvements: Sort/Filter buttons stack vertically on mobile with full-width layout and 48px min-height for optimal touch targets; reduced spacing on mobile (py-8→py-16→py-20, card padding p-5→p-8, grid gaps gap-5→gap-8) for less cramped layouts; SortDropdown expands full-width on mobile (w-full md:w-auto). FilterSidebar maintains 280px right-sliding behavior across all breakpoints.
 
 **Technical Implementations:**
 - **Filtering**: Right-sliding sidebar with checkbox-based filtering for TYPE (BRAND, SHOP, HAS PICKS), PRICE RANGE, DISCOUNT, MAX SIZE (WOMEN), and VALUES (SUSTAINABLE, WOMEN-OWNED, INDEPENDENT LABEL, SECONDHAND, BIPOC-OWNED). Filters use OR logic within categories and AND logic across categories.

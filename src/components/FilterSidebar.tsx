@@ -120,75 +120,73 @@ export function FilterSidebar({ filters, onFilterChange, isOpen, onClose }: Filt
       </div>
 
       <div style={{ minWidth: '256px' }}>
-          <FilterSection
-            title="TYPE"
-            filterKey="type"
-            options={['Brand', 'Shop']}
-          />
-          
-          {/* Has Faves - Standalone section with header styling */}
-          <div className="flex items-center justify-between py-3 px-0">
-            <label
-              htmlFor="has-picks"
-              className="text-sm cursor-pointer leading-none tracking-widest uppercase"
-              style={{ 
-                fontFamily: 'DM Sans, sans-serif',
-                fontWeight: 500
-              }}
-            >
-              HAS FAVES
-            </label>
-            <Checkbox
-              id="has-picks"
-              checked={filters.type.includes('Has picks')}
-              onCheckedChange={(checked: boolean) =>
-                handleCheckboxChange('type', 'Has picks', checked)
-              }
-              className="w-4 h-4 flex-shrink-0"
-            />
-          </div>
-          
-          <FilterSection
-            title="PRICE RANGE"
-            filterKey="priceRange"
-            options={['$', '$$', '$$$', '$$$$']}
-          />
-          
-          <FilterSection
-            title="DISCOUNT"
-            filterKey="discount"
-            options={[
-              'Up to 25% off',
-              '25-35% off',
-              '35-50% off',
-              '50%+ off'
-            ]}
-          />
-          
-          <FilterSection
-            title="MAX SIZE (WOMEN)"
-            filterKey="maxWomensSize"
-            options={[
-              'Up to 10',
-              'Up to 12',
-              'Up to 14',
-              'Up to 16',
-              'Up to 18+'
-            ]}
-          />
-          
-          <FilterSection
-            title="VALUES"
-            filterKey="values"
-            options={[
-              'Sustainable',
-              'Women-owned',
-              'Independent label',
-              'Secondhand',
-              'BIPOC-owned'
-            ]}
+        <FilterSection
+          title="TYPE"
+          filterKey="type"
+          options={['Brand', 'Shop']}
+        />
+        
+        <div className="flex items-center justify-between py-3 px-0">
+          <label
+            htmlFor="has-picks"
+            className="text-sm cursor-pointer leading-none tracking-widest uppercase"
+            style={{ 
+              fontFamily: 'DM Sans, sans-serif',
+              fontWeight: 500
+            }}
+          >
+            HAS FAVES
+          </label>
+          <Checkbox
+            id="has-picks"
+            checked={filters.type.includes('Has picks')}
+            onCheckedChange={(checked: boolean) =>
+              handleCheckboxChange('type', 'Has picks', checked)
+            }
+            className="w-4 h-4 flex-shrink-0"
           />
         </div>
+        
+        <FilterSection
+          title="PRICE RANGE"
+          filterKey="priceRange"
+          options={['$', '$$', '$$$', '$$$$']}
+        />
+        
+        <FilterSection
+          title="DISCOUNT"
+          filterKey="discount"
+          options={[
+            'Up to 25% off',
+            '25-35% off',
+            '35-50% off',
+            '50%+ off'
+          ]}
+        />
+        
+        <FilterSection
+          title="MAX SIZE (WOMEN)"
+          filterKey="maxWomensSize"
+          options={[
+            'Up to 10',
+            'Up to 12',
+            'Up to 14',
+            'Up to 16',
+            'Up to 18+'
+          ]}
+        />
+        
+        <FilterSection
+          title="VALUES"
+          filterKey="values"
+          options={[
+            'Sustainable',
+            'Women-owned',
+            'Independent label',
+            'Secondhand',
+            'BIPOC-owned'
+          ]}
+        />
       </div>
     </div>
   );
