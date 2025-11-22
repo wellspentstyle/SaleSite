@@ -109,15 +109,14 @@ export function FilterSidebar({ filters, onFilterChange, isOpen, onClose }: Filt
       }}
     >
       <div className="mb-8 flex items-center justify-between" style={{ minWidth: '256px' }}>
+        <h2 className="text-sm tracking-widest uppercase font-medium">FILTERS</h2>
         <button
           onClick={onClose}
           className="p-1 hover:opacity-70 transition-opacity"
           aria-label="Close filters"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
-        <h2 className="text-sm tracking-widest uppercase font-medium">FILTERS</h2>
-        <div className="w-5" />
       </div>
 
       <div style={{ minWidth: '256px' }}>
@@ -127,7 +126,7 @@ export function FilterSidebar({ filters, onFilterChange, isOpen, onClose }: Filt
           options={['Brand', 'Shop']}
         />
         
-        {/* Has Picks - Standalone section with header styling */}
+        {/* Has Faves - Standalone section with header styling */}
         <div className="flex items-center justify-between py-3 px-0">
           <label
             htmlFor="has-picks"
@@ -137,7 +136,7 @@ export function FilterSidebar({ filters, onFilterChange, isOpen, onClose }: Filt
               fontWeight: 500
             }}
           >
-            HAS PICKS
+            HAS FAVES
           </label>
           <Checkbox
             id="has-picks"
