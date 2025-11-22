@@ -184,7 +184,7 @@
 
     button {
       font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
+      font-weight: 700;
       line-height: 1.5;
       font-family: 'DM Sans', sans-serif;
     }
