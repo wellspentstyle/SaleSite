@@ -604,7 +604,8 @@ app.get('/companies', async (req, res) => {
         maxWomensSize: record.fields.MaxWomensSize || '',
         values: values,
         description: record.fields.Description || '',
-        url: record.fields.URL || ''
+        url: record.fields.URL || '', // Keep for backward compatibility
+        shopmyUrl: record.fields.ShopmyURL || '' // Primary affiliate link
       };
     });
     

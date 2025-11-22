@@ -13,7 +13,8 @@ interface Company {
   maxWomensSize: string;
   values: string[];
   description: string;
-  url: string;
+  url: string; // Brand's official website (backward compatibility)
+  shopmyUrl: string; // ShopMy affiliate link (primary for clicks)
 }
 
 export function BrandsPage() {
@@ -368,6 +369,9 @@ export function BrandsPage() {
 }
 
 function CompanyCard({ company }: { company: Company }) {
+  // Prefer ShopMy affiliate link, fallback to official website
+  const clickUrl = company.shopmyUrl || company.url;
+  
   return (
     <div style={{
       border: '1px solid var(--border)',
@@ -375,11 +379,11 @@ function CompanyCard({ company }: { company: Company }) {
       padding: '24px',
       backgroundColor: '#fff',
       transition: 'box-shadow 0.2s',
-      cursor: company.url ? 'pointer' : 'default'
+      cursor: clickUrl ? 'pointer' : 'default'
     }}
-    onClick={() => company.url && window.open(company.url, '_blank')}
+    onClick={() => clickUrl && window.open(clickUrl, '_blank')}
     onMouseEnter={(e) => {
-      if (company.url) {
+      if (clickUrl) {
         e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
       }
     }}
