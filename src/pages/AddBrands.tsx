@@ -539,7 +539,6 @@ export function AddBrands() {
               </table>
             </div>
           </div>
-        </div>
         )}
 
         {/* Edit Brand Dialog */}
