@@ -284,7 +284,7 @@ export async function scrapeWithPlaywright(url, options = {}) {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--disable-blink-features=AutomationControlled',
+        '--disable-blink-features=AutomationControlled', // CRITICAL: Hide automation
         '--disable-features=IsolateOrigins,site-per-process',
         '--disable-web-security',
         '--disable-features=VizDisplayCompositor'
@@ -304,7 +304,7 @@ export async function scrapeWithPlaywright(url, options = {}) {
       viewport: { width: 1920, height: 1080 },
       locale: 'en-US',
       timezoneId: 'America/New_York',
-      geolocation: { latitude: 40.7128, longitude: -74.0060 },
+      geolocation: { latitude: 40.7128, longitude: -74.0060 }, // NYC
       permissions: ['geolocation'],
       deviceScaleFactor: 1,
       isMobile: false,
@@ -554,7 +554,7 @@ export async function scrapeWithPlaywright(url, options = {}) {
         '[class*="was-price"]',
         '[class*="compare-at-price"]',
         '[class*="Price--original"]',
-        's [class*="price"]',
+        's [class*="price"]', // Strikethrough prices
         'del [class*="price"]',
         '[itemprop="highPrice"]'
       ];
