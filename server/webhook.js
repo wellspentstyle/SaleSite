@@ -622,6 +622,50 @@ app.get('/admin/sales', async (req, res) => {
   }
 });
 
+// Update a sale (PATCH)
+app.patch('/admin/sales/:saleId', async (req, res) => {
+  const { auth } = req.headers;
+  const { saleId } = req.params;
+  const { percentOff } = req.body;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  if (!percentOff || isNaN(percentOff)) {
+    return res.status(400).json({ success: false, message: 'Valid percentOff is required' });
+  }
+  
+  try {
+    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          PercentOff: parseInt(percentOff)
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('❌ Airtable PATCH error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to update sale in Airtable' });
+    }
+    
+    const data = await response.json();
+    console.log(`✅ Updated sale ${saleId} with ${percentOff}% off`);
+    
+    res.json({ success: true, sale: data });
+  } catch (error) {
+    console.error('Error updating sale:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Brand research endpoint - uses Serper web search + AI to research fashion brands with REAL pricing data
 app.post('/admin/brand-research', async (req, res) => {
   const { auth } = req.headers;

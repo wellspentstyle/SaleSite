@@ -1,9 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, ExternalLink, Edit2 } from 'lucide-react';
 import { ManualEntryForm, ManualProductData } from '../components/ManualEntryForm';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 
 interface Product {
   url: string;
@@ -44,6 +54,9 @@ export function FinalizePicks() {
   const [salePercentOff, setSalePercentOff] = useState<number>(0);
   const [customPercentOff, setCustomPercentOff] = useState<string>('');
   const [individualCustomPercent, setIndividualCustomPercent] = useState<Map<number, string>>(new Map());
+  const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
+  const [isEditingSale, setIsEditingSale] = useState(false);
+  const [editedPercentOff, setEditedPercentOff] = useState<string>('');
 
   useEffect(() => {
     if (!state?.scrapedProducts || !state?.selectedSaleId) {
@@ -59,6 +72,7 @@ export function FinalizePicks() {
 
   const handleDelete = (index: number) => {
     setPicks(picks.filter((_, i) => i !== index));
+    setDeleteConfirmIndex(null);
   };
 
   const handleBrandChange = (index: number, newBrand: string) => {
@@ -218,6 +232,42 @@ export function FinalizePicks() {
     setIndividualCustomPercent(newMap);
   };
 
+  const handleUpdateSale = async () => {
+    const percentOff = parseFloat(editedPercentOff);
+    if (isNaN(percentOff) || percentOff < 0 || percentOff > 100) {
+      alert('Please enter a valid percent off between 0 and 100');
+      return;
+    }
+
+    const auth = sessionStorage.getItem('adminAuth');
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/sales/${selectedSaleId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'auth': auth || ''
+        },
+        body: JSON.stringify({
+          percentOff: percentOff
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSalePercentOff(percentOff);
+        setIsEditingSale(false);
+        setEditedPercentOff('');
+      } else {
+        alert(`Failed to update sale: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Update error:', error);
+      alert('An error occurred while updating the sale');
+    }
+  };
+
   const handleLaunch = async () => {
     const manualPicks = Array.from(manualEntries.values()).map(data => ({
       url: data.url,
@@ -301,16 +351,100 @@ export function FinalizePicks() {
           >
             Review and edit your curated picks before launching.
           </p>
-          <p 
-            style={{ 
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: '14px',
-              fontStyle: 'italic',
-              color: '#999'
-            }}
-          >
-            {picks.length} auto-scraped, {failedUrls.length} manual {failedUrls.length === 1 ? 'entry' : 'entries'}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px' }}>
+            <p 
+              style={{ 
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '14px',
+                fontStyle: 'italic',
+                color: '#999'
+              }}
+            >
+              {picks.length} auto-scraped, {failedUrls.length} manual {failedUrls.length === 1 ? 'entry' : 'entries'}
+            </p>
+            {!isEditingSale ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: '#666' }}>
+                  Sale: {salePercentOff}% Off
+                </span>
+                <button
+                  onClick={() => {
+                    setIsEditingSale(true);
+                    setEditedPercentOff(salePercentOff.toString());
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    fontFamily: 'DM Sans, sans-serif',
+                    backgroundColor: '#fff',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = '#000'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = '#ddd'}
+                >
+                  <Edit2 style={{ width: '12px', height: '12px' }} />
+                  Edit
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={editedPercentOff}
+                  onChange={(e) => setEditedPercentOff(e.target.value)}
+                  placeholder="% Off"
+                  style={{
+                    width: '80px',
+                    height: '32px',
+                    fontSize: '13px',
+                    fontFamily: 'DM Sans, sans-serif'
+                  }}
+                />
+                <button
+                  onClick={handleUpdateSale}
+                  style={{
+                    padding: '4px 12px',
+                    height: '32px',
+                    fontSize: '12px',
+                    fontFamily: 'DM Sans, sans-serif',
+                    backgroundColor: '#000',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setIsEditingSale(false);
+                    setEditedPercentOff('');
+                  }}
+                  style={{
+                    padding: '4px 12px',
+                    height: '32px',
+                    fontSize: '12px',
+                    fontFamily: 'DM Sans, sans-serif',
+                    backgroundColor: '#fff',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Manual Entry Forms (for failed scrapes) */}
@@ -500,32 +634,63 @@ export function FinalizePicks() {
                     backgroundColor: '#fff'
                   }}
                 >
-                  {/* Delete Button */}
-                  <button
-                    onClick={() => handleDelete(index)}
-                    style={{
-                      position: 'absolute',
-                      top: '24px',
-                      right: '24px',
-                      zIndex: 10,
-                      padding: '8px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                      border: '1px solid #e5e5e5',
-                      cursor: 'pointer',
-                      borderRadius: '4px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fee';
-                      e.currentTarget.style.borderColor = '#f55';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                      e.currentTarget.style.borderColor = '#e5e5e5';
-                    }}
-                    aria-label="Delete pick"
-                  >
-                    <Trash2 style={{ width: '16px', height: '16px', color: '#666' }} />
-                  </button>
+                  {/* Action buttons - External Link and Delete */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '24px',
+                    right: '24px',
+                    zIndex: 10,
+                    display: 'flex',
+                    gap: '8px'
+                  }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(pick.url, '_blank');
+                      }}
+                      style={{
+                        padding: '8px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        border: '1px solid #e5e5e5',
+                        cursor: 'pointer',
+                        borderRadius: '4px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f0f9ff';
+                        e.currentTarget.style.borderColor = '#0284c7';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                        e.currentTarget.style.borderColor = '#e5e5e5';
+                      }}
+                      aria-label="Open product page"
+                      title="View product"
+                    >
+                      <ExternalLink style={{ width: '16px', height: '16px', color: '#666' }} />
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirmIndex(index)}
+                      style={{
+                        padding: '8px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        border: '1px solid #e5e5e5',
+                        cursor: 'pointer',
+                        borderRadius: '4px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#fee';
+                        e.currentTarget.style.borderColor = '#f55';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                        e.currentTarget.style.borderColor = '#e5e5e5';
+                      }}
+                      aria-label="Delete pick"
+                      title="Delete pick"
+                    >
+                      <Trash2 style={{ width: '16px', height: '16px', color: '#666' }} />
+                    </button>
+                  </div>
 
                   {/* Product Image */}
                   <div 
@@ -642,7 +807,6 @@ export function FinalizePicks() {
                             step="0.01"
                             value={pick.originalPrice ?? ''}
                             onChange={(e) => handlePriceChange(index, 'originalPrice', e.target.value)}
-                            placeholder="Optional"
                             style={{
                               height: '32px',
                               fontSize: '13px',
@@ -846,6 +1010,24 @@ export function FinalizePicks() {
             </div>
           </>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteConfirmIndex !== null} onOpenChange={() => setDeleteConfirmIndex(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Pick?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this pick? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => deleteConfirmIndex !== null && handleDelete(deleteConfirmIndex)}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }
