@@ -2938,7 +2938,17 @@ ${emailContent.substring(0, 4000)}`
       
       // Check for fuzzy duplicates
       const isDuplicate = recentSalesData.records.some(record => {
-        const recordCompany = (record.fields.Company || '')
+        // Handle Company field which could be a string or array (linked record)
+        let companyValue = record.fields.Company;
+        
+        // If Company is an array (linked record), skip this record for now
+        // We'll rely on Airtable's own duplicate prevention
+        if (Array.isArray(companyValue)) {
+          return false;
+        }
+        
+        // If it's a string, normalize it
+        const recordCompany = (companyValue || '')
           .toLowerCase()
           .replace(/\s+/g, '')
           .replace(/[^a-z0-9]/g, '');
@@ -2953,7 +2963,7 @@ ${emailContent.substring(0, 4000)}`
         const percentSimilar = Math.abs(recordPercent - saleData.percentOff) <= 5;
         
         if (companySimilar && percentSimilar) {
-          console.log(`⏭️  Duplicate found: ${record.fields.Company} ${recordPercent}%`);
+          console.log(`⏭️  Duplicate found: ${companyValue} ${recordPercent}%`);
           return true;
         }
         
@@ -2992,7 +3002,8 @@ ${emailContent.substring(0, 4000)}`
     const isLive = saleData.startDate <= today ? 'YES' : 'NO';
     
     const fields = {
-      Company: saleData.company,
+      // Note: Company field is a linked record in Airtable and cannot be set directly here
+      // Store company name in Description for now - it should be linked manually in admin panel
       PercentOff: saleData.percentOff,
       SaleURL: saleData.saleUrl,
       CleanURL: cleanUrl !== saleData.saleUrl ? cleanUrl : saleData.saleUrl,
@@ -3001,7 +3012,9 @@ ${emailContent.substring(0, 4000)}`
       Live: isLive,
       Description: JSON.stringify({
         source: 'email',
+        companyName: saleData.company, // Store company name here since Company field is linked
         aiReasoning: saleData.reasoning,
+        confidence: saleData.confidence,
         originalEmail: {
           from: from,
           subject: subject,
