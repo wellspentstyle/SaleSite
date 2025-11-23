@@ -146,32 +146,15 @@ export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryForm
             >
               Image URL
             </Label>
-            <div className="flex gap-2">
-              <Input
-                id={`image-${url}`}
-                type="url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://..."
-                className="h-10 font-mono text-sm flex-1"
-                required
-              />
-              <button
-                type="button"
-                onClick={handleFindImage}
-                disabled={loadingImage}
-                className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
-                style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px' }}
-              >
-                <ImageIcon className="h-4 w-4" />
-                {loadingImage ? 'Finding...' : 'Find Image'}
-              </button>
-            </div>
-            {imageError && (
-              <p className="text-xs text-red-600 mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                {imageError}
-              </p>
-            )}
+            <Input
+              id={`image-${url}`}
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://..."
+              className="h-10 font-mono text-sm"
+              required
+            />
           </div>
 
           <div className="space-y-2">

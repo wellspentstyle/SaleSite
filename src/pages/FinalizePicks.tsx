@@ -1058,7 +1058,7 @@ export function FinalizePicks() {
                     Saving...
                   </>
                 ) : (
-                  'Launch'
+                  'Save'
                 )}
               </button>
             </div>
