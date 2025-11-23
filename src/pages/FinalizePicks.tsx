@@ -58,6 +58,8 @@ export function FinalizePicks() {
   const [manualEntries, setManualEntries] = useState<Map<string, ManualProductData>>(new Map());
   const [failedUrls, setFailedUrls] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
   const [selectedSaleId, setSelectedSaleId] = useState<string>('');
   const [salePercentOff, setSalePercentOff] = useState<number>(0);
   const [customPercentOff, setCustomPercentOff] = useState<string>('');
@@ -82,6 +84,37 @@ export function FinalizePicks() {
     setSelectedSaleId(state.selectedSaleId);
     setSalePercentOff(state.salePercentOff || 0);
     setFailedUrls((state.failures || []).map(f => f.url));
+    
+    // Try to load existing draft
+    const loadDraft = async () => {
+      const auth = sessionStorage.getItem('adminAuth');
+      try {
+        const response = await fetch(`${API_BASE}/admin/finalize-drafts`, {
+          headers: { 'auth': auth || '' }
+        });
+        const data = await response.json();
+        if (data.success && data.drafts.length > 0) {
+          const existingDraft = data.drafts.find((d: any) => d.saleId === state.selectedSaleId);
+          if (existingDraft) {
+            // Resume from draft
+            setDraftId(existingDraft.id);
+            setPicks(existingDraft.picks || []);
+            setManualEntries(new Map(existingDraft.manualEntries?.map((e: any) => [e.url, e]) || []));
+            setFailedUrls(existingDraft.failedUrls || []);
+            setCustomPercentOff(existingDraft.customPercentOff || '');
+            setSalePercentOff(existingDraft.salePercentOff || 0);
+            // Convert keys to numbers when rehydrating individualCustomPercent
+            setIndividualCustomPercent(new Map(
+              Object.entries(existingDraft.individualCustomPercent || {}).map(([k, v]) => [Number(k), v as string])
+            ));
+            toast.success('Resumed from saved draft');
+          }
+        }
+      } catch (error) {
+        // Silently fail - draft load is optional
+      }
+    };
+    loadDraft();
   }, [state, navigate]);
 
   const handleDelete = (index: number) => {
@@ -296,6 +329,44 @@ export function FinalizePicks() {
     }
   };
 
+  const handleSaveDraft = async () => {
+    setIsSavingDraft(true);
+    const auth = sessionStorage.getItem('adminAuth');
+    
+    try {
+      const response = await fetch(`${API_BASE}/admin/finalize-drafts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'auth': auth || ''
+        },
+        body: JSON.stringify({
+          id: draftId, // Include existing draft ID to update instead of create
+          saleId: selectedSaleId,
+          saleName: state?.scrapedProducts?.[0]?.name || 'Sale',
+          salePercentOff,
+          picks,
+          manualEntries: Array.from(manualEntries.values()),
+          failedUrls,
+          customPercentOff,
+          individualCustomPercent: Object.fromEntries(individualCustomPercent)
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setDraftId(data.draft.id); // Save the draft ID for future updates
+        toast.success('Draft saved successfully!');
+      } else {
+        toast.error('Failed to save draft');
+      }
+    } catch (error) {
+      toast.error('An error occurred while saving draft');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
   const handleLaunch = async () => {
     const manualPicks = Array.from(manualEntries.values()).map(data => ({
       url: data.url,
@@ -340,6 +411,17 @@ export function FinalizePicks() {
       const data = await response.json();
 
       if (data.success) {
+        // Delete the draft after successful publish
+        if (draftId) {
+          try {
+            await fetch(`${API_BASE}/admin/finalize-drafts/${draftId}`, {
+              method: 'DELETE',
+              headers: { 'auth': auth || '' }
+            });
+          } catch (error) {
+            // Silently fail - draft deletion is not critical
+          }
+        }
         toast.success(`Successfully saved ${allPicks.length} picks!`);
         navigate('/admin/picks');
       } else {
@@ -529,6 +611,7 @@ export function FinalizePicks() {
               <ManualEntryForm
                 key={url}
                 url={url}
+                initialData={manualEntries.get(url)}
                 onDataChange={(data) => handleManualDataChange(url, data)}
                 onRemove={() => handleRemoveManualEntry(url)}
               />
@@ -1016,25 +1099,54 @@ export function FinalizePicks() {
             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
               <button
                 onClick={() => navigate('/admin/picks')}
-                disabled={isSaving}
+                disabled={isSaving || isSavingDraft}
                 style={{
                   backgroundColor: '#fff',
                   border: '1px solid #ddd',
                   padding: '12px 48px',
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: '14px',
-                  cursor: isSaving ? 'not-allowed' : 'pointer',
-                  opacity: isSaving ? 0.5 : 1,
+                  cursor: (isSaving || isSavingDraft) ? 'not-allowed' : 'pointer',
+                  opacity: (isSaving || isSavingDraft) ? 0.5 : 1,
                   transition: 'border-color 0.2s'
                 }}
-                onMouseEnter={(e) => !isSaving && (e.currentTarget.style.borderColor = '#000')}
-                onMouseLeave={(e) => !isSaving && (e.currentTarget.style.borderColor = '#ddd')}
+                onMouseEnter={(e) => !(isSaving || isSavingDraft) && (e.currentTarget.style.borderColor = '#000')}
+                onMouseLeave={(e) => !(isSaving || isSavingDraft) && (e.currentTarget.style.borderColor = '#ddd')}
               >
                 Back
               </button>
               <button
+                onClick={handleSaveDraft}
+                disabled={isSaving || isSavingDraft}
+                style={{
+                  backgroundColor: '#fff',
+                  color: '#000',
+                  border: '1px solid #ddd',
+                  padding: '12px 48px',
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: '14px',
+                  cursor: (isSaving || isSavingDraft) ? 'not-allowed' : 'pointer',
+                  opacity: (isSaving || isSavingDraft) ? 0.5 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => !(isSaving || isSavingDraft) && (e.currentTarget.style.borderColor = '#000')}
+                onMouseLeave={(e) => !(isSaving || isSavingDraft) && (e.currentTarget.style.borderColor = '#ddd')}
+              >
+                {isSavingDraft ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving Draft...
+                  </>
+                ) : (
+                  'Save Draft'
+                )}
+              </button>
+              <button
                 onClick={handleLaunch}
-                disabled={isSaving}
+                disabled={isSaving || isSavingDraft}
                 style={{
                   backgroundColor: '#000',
                   color: '#fff',
@@ -1042,23 +1154,23 @@ export function FinalizePicks() {
                   padding: '12px 48px',
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: '14px',
-                  cursor: isSaving ? 'not-allowed' : 'pointer',
-                  opacity: isSaving ? 0.5 : 1,
+                  cursor: (isSaving || isSavingDraft) ? 'not-allowed' : 'pointer',
+                  opacity: (isSaving || isSavingDraft) ? 0.5 : 1,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
                   transition: 'background-color 0.2s'
                 }}
-                onMouseEnter={(e) => !isSaving && (e.currentTarget.style.backgroundColor = '#333')}
-                onMouseLeave={(e) => !isSaving && (e.currentTarget.style.backgroundColor = '#000')}
+                onMouseEnter={(e) => !(isSaving || isSavingDraft) && (e.currentTarget.style.backgroundColor = '#333')}
+                onMouseLeave={(e) => !(isSaving || isSavingDraft) && (e.currentTarget.style.backgroundColor = '#000')}
               >
                 {isSaving ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving...
+                    Publishing...
                   </>
                 ) : (
-                  'Save'
+                  'Publish to Airtable'
                 )}
               </button>
             </div>

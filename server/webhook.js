@@ -25,6 +25,12 @@ import {
   saveDraft,
   deleteDraft
 } from './manual-pick-drafts.js';
+import {
+  getAllDrafts as getAllFinalizeDrafts,
+  getDraftById as getFinalizeDraftById,
+  saveDraft as saveFinalizeDraft,
+  deleteDraft as deleteFinalizeDraft
+} from './finalize-drafts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2011,7 +2017,7 @@ app.post('/admin/picks', async (req, res) => {
       
       // Link to Company if available from the sale
       if (companyIds.length > 0) {
-        fields.CompanyLink = companyIds; // Link to Companies table
+        fields.Company = companyIds; // Link to Companies table
       }
       
       // Add brand if available
@@ -2134,7 +2140,7 @@ app.post('/admin/manual-picks', async (req, res) => {
       
       // Link to Company if available from the sale
       if (companyIds.length > 0) {
-        fields.CompanyLink = companyIds;
+        fields.Company = companyIds;
       }
       
       // Add brand if provided
@@ -4018,6 +4024,58 @@ app.delete('/admin/manual-picks/drafts/:id', async (req, res) => {
     
   } catch (error) {
     console.error('Error deleting draft:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// FINALIZE DRAFTS ENDPOINTS
+// ============================================
+
+// Get all finalize drafts
+app.get('/admin/finalize-drafts', async (req, res) => {
+  const { auth } = req.headers;
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  try {
+    const drafts = await getAllFinalizeDrafts();
+    res.json({ success: true, drafts });
+  } catch (error) {
+    console.error('Error getting finalize drafts:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Save finalize draft
+app.post('/admin/finalize-drafts', async (req, res) => {
+  const { auth } = req.headers;
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  try {
+    const draft = await saveFinalizeDraft(req.body);
+    res.json({ success: true, draft });
+  } catch (error) {
+    console.error('Error saving finalize draft:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete finalize draft
+app.delete('/admin/finalize-drafts/:id', async (req, res) => {
+  const { auth } = req.headers;
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  try {
+    const deleted = await deleteFinalizeDraft(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'Draft not found' });
+    }
+    res.json({ success: true, message: 'Draft deleted' });
+  } catch (error) {
+    console.error('Error deleting finalize draft:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

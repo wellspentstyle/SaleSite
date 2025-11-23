@@ -7,6 +7,7 @@ interface ManualEntryFormProps {
   url: string;
   onDataChange: (data: ManualProductData) => void;
   onRemove: () => void;
+  initialData?: ManualProductData;
 }
 
 export interface ManualProductData {
@@ -19,15 +20,27 @@ export interface ManualProductData {
   percentOff: number;
 }
 
-export function ManualEntryForm({ url, onDataChange, onRemove }: ManualEntryFormProps) {
-  const [name, setName] = useState('');
-  const [brand, setBrand] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [originalPrice, setOriginalPrice] = useState('');
-  const [salePrice, setSalePrice] = useState('');
-  const [percentOff, setPercentOff] = useState(0);
+export function ManualEntryForm({ url, onDataChange, onRemove, initialData }: ManualEntryFormProps) {
+  const [name, setName] = useState(initialData?.name || '');
+  const [brand, setBrand] = useState(initialData?.brand || '');
+  const [imageUrl, setImageUrl] = useState(initialData?.imageUrl || '');
+  const [originalPrice, setOriginalPrice] = useState(initialData?.originalPrice?.toString() || '');
+  const [salePrice, setSalePrice] = useState(initialData?.salePrice?.toString() || '');
+  const [percentOff, setPercentOff] = useState(initialData?.percentOff || 0);
   const [loadingImage, setLoadingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+
+  // Hydrate state from initialData when it becomes available
+  useEffect(() => {
+    if (initialData) {
+      setName(initialData.name || '');
+      setBrand(initialData.brand || '');
+      setImageUrl(initialData.imageUrl || '');
+      setOriginalPrice(initialData.originalPrice?.toString() || '');
+      setSalePrice(initialData.salePrice?.toString() || '');
+      setPercentOff(initialData.percentOff || 0);
+    }
+  }, [initialData]);
 
   useEffect(() => {
     const orig = parseFloat(originalPrice) || 0;
