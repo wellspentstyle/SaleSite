@@ -154,8 +154,9 @@ export function SalesApprovals() {
       <h1 className="text-2xl mb-6" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700 }}>
         Sales Approvals
       </h1>
-        {/* Settings Card */}
-        <Card className="mb-6">
+      
+      {/* Settings Card */}
+      <Card className="mb-6">
           <CardHeader>
             <CardTitle>Approval Settings</CardTitle>
           </CardHeader>
@@ -179,8 +180,8 @@ export function SalesApprovals() {
           </CardContent>
         </Card>
 
-        {/* Pending Sales */}
-        <div className="space-y-4">
+      {/* Pending Sales */}
+      <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-normal">
               Pending Sales ({pendingSales.length})
@@ -321,7 +322,6 @@ export function SalesApprovals() {
               ))}
             </div>
           )}
-        </div>
       </div>
     </div>
   );
