@@ -166,7 +166,7 @@ export function BrandsPage() {
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.6'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             >
-              Our Brands
+              Brand Watchlist
             </Link>
           </nav>
         </div>
@@ -186,7 +186,7 @@ export function BrandsPage() {
             marginBottom: '16px',
             letterSpacing: '-0.02em'
           }}>
-            Our Brands
+            The Brands We're Watching
           </h1>
           <p style={{ 
             fontSize: '16px',
@@ -194,7 +194,7 @@ export function BrandsPage() {
             maxWidth: '600px',
             lineHeight: 1.6
           }}>
-            Discover {companies.length} carefully curated brands and shops. Filter by price range, values, and more to find your next favorite designer.
+            From long-time favorites to your next discovery, these are the labels we actually track.
           </p>
         </div>
       </div>
@@ -259,6 +259,33 @@ export function BrandsPage() {
             >
               Shops ({shops.length})
             </button>
+            
+            {/* Filter Button */}
+            <button
+              onClick={() => setFilterOpen(!filterOpen)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                backgroundColor: filterOpen ? '#000' : '#fff',
+                color: filterOpen ? '#fff' : '#000',
+                border: '1px solid #000',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                fontFamily: 'DM Sans, sans-serif',
+                marginTop: '16px'
+              }}
+            >
+              <Filter className="w-4 h-4" />
+              Filter
+            </button>
           </nav>
         </div>
 
@@ -270,37 +297,6 @@ export function BrandsPage() {
           marginRight: filterOpen ? '0' : 'auto',
           transition: 'margin-right 0.3s ease-in-out'
         }}>
-          {/* Filter Button */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'flex-end', 
-            marginBottom: '32px'
-          }}>
-            <button
-              onClick={() => setFilterOpen(!filterOpen)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 20px',
-                fontSize: '13px',
-                fontWeight: 500,
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                backgroundColor: filterOpen ? '#000' : '#fff',
-                color: filterOpen ? '#fff' : '#000',
-                border: '1px solid #000',
-                borderRadius: '3px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                fontFamily: 'DM Sans, sans-serif'
-              }}
-            >
-              <Filter className="w-4 h-4" />
-              Filter
-            </button>
-          </div>
-
           {/* Brands Section */}
           <section id="brands" style={{ marginBottom: '80px' }}>
             <h2 style={{

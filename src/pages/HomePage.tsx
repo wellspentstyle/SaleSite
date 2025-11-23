@@ -197,7 +197,7 @@ export function HomePage() {
                 className="text-sm tracking-widest uppercase font-medium hover:opacity-60 transition-opacity"
                 style={{ fontFamily: 'DM Sans, sans-serif' }}
               >
-                Our Brands
+                Brand Watchlist
               </Link>
             </nav>
           </div>
