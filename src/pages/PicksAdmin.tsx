@@ -366,11 +366,14 @@ export function PicksAdmin() {
       while (true) {
         const { done, value } = await reader.read();
         
+        console.log('[Stream] Read chunk, done:', done, 'value length:', value?.length);
+        
         if (done || cancelScrapingRef.current) {
           if (cancelScrapingRef.current) {
             reader.cancel();
             toast.info('Scraping cancelled');
           }
+          console.log('[Stream] Exiting loop, done:', done, 'cancelled:', cancelScrapingRef.current);
           break;
         }
 
@@ -384,9 +387,11 @@ export function PicksAdmin() {
         for (const line of lines) {
           if (line.startsWith('event: ')) {
             currentEvent = line.substring(7).trim();
+            console.log('[Stream] Event:', currentEvent);
           } else if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.substring(6));
+              console.log('[Stream] Data for event', currentEvent, ':', data);
 
               if (currentEvent === 'start') {
                 toast.info(`Scraping ${data.total} products...`);
@@ -415,7 +420,7 @@ export function PicksAdmin() {
               
               currentEvent = '';
             } catch (e) {
-              // Ignore parse errors
+              console.error('[Stream] Parse error:', e, 'Line:', line);
             }
           }
         }
