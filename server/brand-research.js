@@ -5,7 +5,7 @@ function convertSizeToUS(sizeString) {
   if (!sizeString || sizeString === '""' || sizeString.trim() === '') {
     return '';
   }
-  
+
   // Letter size mapping (S/M/L/XL)
   const letterSizeMap = {
     'S': 6,
@@ -17,14 +17,14 @@ function convertSizeToUS(sizeString) {
     '2X': 18,
     '3X': 22
   };
-  
+
   // European to US size conversion (women's)
   const euToUSMap = {
     32: 0, 34: 0, 36: 2, 38: 4, 40: 6, 
     42: 8, 44: 10, 46: 12, 48: 14, 50: 16, 
     52: 18, 54: 20
   };
-  
+
   // Try to extract European numeric size (e.g., "44", "Up to 44", "EU 44")
   const euMatch = sizeString.match(/(\d{2})/);
   if (euMatch) {
@@ -33,7 +33,7 @@ function convertSizeToUS(sizeString) {
       return `Up to ${euToUSMap[euSize]}`;
     }
   }
-  
+
   // Try to extract letter size (e.g., "L", "Up to L", "XL")
   const letterMatch = sizeString.match(/(XXL|XL|L|M|S|1X|2X|3X)/i);
   if (letterMatch) {
@@ -42,42 +42,88 @@ function convertSizeToUS(sizeString) {
       return `Up to ${letterSizeMap[size]}`;
     }
   }
-  
+
   // If already in US numeric format (e.g., "10", "14"), ensure "Up to" prefix
   const usMatch = sizeString.match(/^(?:Up to )?(\d{1,2})$/i);
   if (usMatch) {
     return `Up to ${usMatch[1]}`;
   }
-  
+
   // If no match found, return empty string
   return '';
+}
+
+// Helper to parse size strings from product data
+function parseSizeValue(sizeStr) {
+  if (!sizeStr) return null;
+
+  const cleaned = String(sizeStr).trim().toUpperCase();
+
+  // Numeric sizes (0-40)
+  const numMatch = cleaned.match(/^(\d{1,2})W?$/);
+  if (numMatch) {
+    const num = parseInt(numMatch[1]);
+    if (num >= 0 && num <= 40) return { type: 'numeric', value: num };
+  }
+
+  // Letter sizes
+  const letterSizes = {
+    'XXS': 0, 'XS': 2, 'S': 6, 'M': 8, 'L': 10, 
+    'XL': 14, 'XXL': 18, 'XXXL': 22, '4XL': 26, '5XL': 30
+  };
+  if (letterSizes[cleaned]) {
+    return { type: 'letter', value: letterSizes[cleaned] };
+  }
+
+  // Plus sizes (1X-6X)
+  const plusMatch = cleaned.match(/^(\d)X$/);
+  if (plusMatch) {
+    const multiplier = parseInt(plusMatch[1]);
+    return { type: 'plus', value: 14 + (multiplier - 1) * 4 };
+  }
+
+  return null;
+}
+
+// Helper to find max size from array of size objects
+function findMaxSize(sizes) {
+  if (!sizes || sizes.length === 0) return null;
+
+  const parsed = sizes
+    .map(s => parseSizeValue(s))
+    .filter(s => s !== null);
+
+  if (parsed.length === 0) return null;
+
+  const maxSize = Math.max(...parsed.map(s => s.value));
+  return maxSize;
 }
 
 // Create brand research router
 function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApiKey }) {
   const router = express.Router();
 
-  // Brand research endpoint - uses Serper web search + AI with strict validation
+  // Brand research endpoint - uses Google Shopping API + web search
   router.post('/', async (req, res) => {
     const { auth } = req.headers;
     const { brandName } = req.body;
-    
+
     if (auth !== adminPassword) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
-    
+
     if (!brandName || typeof brandName !== 'string') {
       return res.status(400).json({ success: false, error: 'Brand name is required' });
     }
-    
+
     try {
       console.log(`\n🔍 Researching brand: ${brandName}`);
-      
+
       // ============================================
-      // PHASE 1: FIND OFFICIAL DOMAIN
+      // PHASE 1: FIND OFFICIAL DOMAIN (UNCHANGED)
       // ============================================
       console.log(`🌐 Phase 1: Finding official domain...`);
-      
+
       const domainSearchQuery = `${brandName} official website fashion brand`;
       const domainResponse = await fetch('https://google.serper.dev/search', {
         method: 'POST',
@@ -90,7 +136,7 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
           num: 10
         })
       });
-      
+
       if (!domainResponse.ok) {
         const errorText = await domainResponse.text();
         console.error(`❌ Serper API error (${domainResponse.status}):`, errorText);
@@ -103,17 +149,17 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
             : `Search API error: ${domainResponse.status}`
         });
       }
-      
+
       const domainSearchData = await domainResponse.json();
       console.log(`📦 Domain search returned ${domainSearchData.organic?.length || 0} results`);
-      
+
       if (!domainSearchData.organic || domainSearchData.organic.length === 0) {
         return res.json({
           success: false,
           error: 'No search results found for this brand'
         });
       }
-      
+
       // Expanded resale/marketplace domains to block
       const resaleDomains = [
         'therealreal.com', 'vestiairecollective.com', 'poshmark.com', 'ebay.com',
@@ -127,21 +173,21 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
         'shopstyle.com', 'modesens.com', 'intermixonline.com', 'amazon.com',
         'walmart.com', 'target.com', 'shopual.com'
       ];
-      
+
       // Find official brand domain
       const brandNameLower = brandName.toLowerCase().replace(/[^a-z0-9]/g, '');
       let officialDomain = null;
-      
+
       for (const result of domainSearchData.organic.slice(0, 10)) {
         if (!result.link) continue;
-        
+
         const hostname = new URL(result.link).hostname.replace('www.', '').toLowerCase();
-        
+
         // Skip resale/marketplace domains
         if (resaleDomains.some(resale => hostname.includes(resale))) {
           continue;
         }
-        
+
         // Check if domain contains brand name
         const domainParts = hostname.split('.')[0].replace(/[-_]/g, '');
         if (domainParts.includes(brandNameLower) || brandNameLower.includes(domainParts)) {
@@ -149,7 +195,7 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
           break;
         }
       }
-      
+
       if (!officialDomain) {
         console.warn(`⚠️  Could not identify official domain for ${brandName}`);
         return res.json({
@@ -157,189 +203,130 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
           error: 'Could not identify official brand website'
         });
       }
-      
+
       console.log(`🏢 Official domain: ${officialDomain}`);
-      
+
       // ============================================
-      // PHASE 2: MULTI-STRATEGY PRODUCT SEARCH (IMPROVED)
+      // PHASE 2: GOOGLE SHOPPING API (NEW!)
       // ============================================
-      console.log(`🌐 Phase 2: Searching for products (multi-strategy)...`);
-      
-      let allProductResults = [];
-      
-      // Strategy 1: Price-focused search
-      const priceSearchQuery = `site:${officialDomain} price $ shop buy`;
-      const priceResponse = await fetch('https://google.serper.dev/search', {
+      console.log(`🛍️  Phase 2: Fetching products from Google Shopping...`);
+
+      const shoppingResponse = await fetch('https://google.serper.dev/shopping', {
         method: 'POST',
         headers: {
           'X-API-KEY': serperApiKey,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ q: priceSearchQuery, num: 10 })
+        body: JSON.stringify({
+          q: `${brandName} women`,
+          num: 40, // Get more results for better data
+          location: 'United States'
+        })
       });
-      
-      if (priceResponse.ok) {
-        const priceData = await priceResponse.json();
-        const results = priceData.organic || [];
-        allProductResults.push(...results);
-        console.log(`  Strategy 1 (price): ${results.length} results`);
+
+      if (!shoppingResponse.ok) {
+        console.error(`❌ Shopping API error: ${shoppingResponse.status}`);
+        return res.json({
+          success: false,
+          error: `Shopping API error: ${shoppingResponse.status}`
+        });
       }
-      
-      // Strategy 2: Collection/category pages (NEW)
-      const collectionSearchQuery = `site:${officialDomain} collection shop new arrivals`;
-      const collectionResponse = await fetch('https://google.serper.dev/search', {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': serperApiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ q: collectionSearchQuery, num: 8 })
+
+      const shoppingData = await shoppingResponse.json();
+      const shoppingResults = shoppingData.shopping || [];
+      console.log(`🛍️  Shopping API returned ${shoppingResults.length} products`);
+
+      // Filter to official domain only
+      const officialProducts = shoppingResults.filter(product => {
+        if (!product.link) return false;
+
+        try {
+          const productDomain = new URL(product.link).hostname.replace('www.', '').toLowerCase();
+          // Accept exact match OR subdomains
+          return productDomain === officialDomain || productDomain.endsWith('.' + officialDomain);
+        } catch (e) {
+          return false;
+        }
       });
-      
-      if (collectionResponse.ok) {
-        const collectionData = await collectionResponse.json();
-        const results = collectionData.organic || [];
-        allProductResults.push(...results);
-        console.log(`  Strategy 2 (collections): ${results.length} results`);
-      }
-      
-      // Deduplicate results
-      const uniqueResults = Array.from(
-        new Map(allProductResults.map(r => [r.link, r])).values()
-      );
-      
-      console.log(`📦 Total unique product results: ${uniqueResults.length}`);
-      
+
+      console.log(`✅ Filtered to ${officialProducts.length} products from official domain`);
+
       // ============================================
-      // PHASE 3: RELAXED PRODUCT EXTRACTION (IMPROVED)
+      // PHASE 3: EXTRACT STRUCTURED DATA
       // ============================================
-      console.log(`🤖 Phase 3: Extracting products with relaxed validation...`);
-      
-      const searchResults = uniqueResults.slice(0, 15).map(r => ({
-        title: r.title,
-        snippet: r.snippet,
-        link: r.link
-      }));
-      
-      const extractionCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: `Extract product information from search results. Be LESS strict than before about prices.
+      console.log(`📊 Phase 3: Extracting structured product data...`);
 
-RELAXED PRICE EXTRACTION RULES:
-- Extract prices you can SEE in title/snippet
-- Valid: "$450", "Price: $200", "$89.99", "Was $400 Now $200", "$200-$400"
-- ALSO ACCEPT: "from $X", ranges, approximate prices
-- If you see "Was $400 Now $200" - use $400 (ORIGINAL price)
-- If price range like "$200-$400" - use the higher value ($400)
-- For "from $X" - use that value as minimum
-- Estimate from context if product type suggests price tier
+      const products = [];
+      const allSizes = [];
+      const productTypes = [];
 
-Return valid JSON:
-{
-  "products": [
-    {"name": "Product Name", "price": 450, "url": "https://...", "priceConfidence": "high|medium|low"}
-  ]
-}
-
-Requirements:
-- Extract 3-7 products if possible
-- URLs must be from ${officialDomain}
-- Price must be numeric (use ORIGINAL/higher price if range)
-- Add priceConfidence field: "high" (exact), "medium" (range/from), "low" (estimated)
-- It's OK to include products with "medium" or "low" confidence
-- Prefer higher-priced items to get accurate price range`
-          },
-          {
-            role: 'user',
-            content: `Extract products with prices from "${brandName}":\n\n${JSON.stringify(searchResults, null, 2)}`
+      for (const item of officialProducts) {
+        // Extract price
+        let price = null;
+        if (item.price) {
+          // Handle various price formats: "$450", "450.00", "US$450"
+          const priceMatch = String(item.price).match(/[\d,]+\.?\d*/);
+          if (priceMatch) {
+            price = parseFloat(priceMatch[0].replace(/,/g, ''));
           }
-        ],
-        temperature: 0.2
-      });
-      
-      const extractionResponse = extractionCompletion.choices[0]?.message?.content;
-      
-      if (!extractionResponse) {
-        throw new Error('No response from product extraction');
-      }
-      
-      console.log(`📦 Extraction response: ${extractionResponse.substring(0, 200)}...`);
-      
-      // Parse product data
-      let productData;
-      try {
-        const jsonMatch = extractionResponse.match(/\{[\s\S]*\}/);
-        productData = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(extractionResponse);
-      } catch (parseError) {
-        console.error('Failed to parse product data:', parseError);
-        productData = { products: [] };
-      }
-      
-      let products = productData.products || [];
-      
-      // ============================================
-      // PHASE 4: VALIDATE PRODUCTS (RELAXED)
-      // ============================================
-      console.log(`✅ Phase 4: Validating ${products.length} products (relaxed rules)...`);
-      
-      const validatedProducts = [];
-      for (const product of products) {
-        // RELAXED price sanity check ($5 - $15,000 instead of $10-$10,000)
-        if (product.price < 5 || product.price > 15000) {
-          console.log(`⚠️  Suspicious price for "${product.name}": $${product.price} - skipping`);
+        }
+
+        // Validate price (must be reasonable)
+        if (!price || price < 5 || price > 15000) {
           continue;
         }
-        
-        // URL validation - must be from official domain or subdomain
-        try {
-          const urlObj = new URL(product.url);
-          const urlDomain = urlObj.hostname.replace('www.', '');
-          // Accept exact match OR subdomains (e.g., uk.stinegoya.com for stinegoya.com)
-          if (urlDomain === officialDomain || urlDomain.endsWith('.' + officialDomain)) {
-            validatedProducts.push(product);
-            console.log(`✅ ${product.priceConfidence || 'unknown'} confidence: "${product.name}" - $${product.price}`);
-          } else {
-            console.log(`⚠️  Wrong domain for "${product.name}": ${urlDomain}`);
-          }
-        } catch (e) {
-          console.log(`⚠️  Invalid URL: ${product.url}`);
+
+        // Extract sizes if available
+        if (item.sizes && Array.isArray(item.sizes)) {
+          allSizes.push(...item.sizes);
+        } else if (item.size) {
+          allSizes.push(item.size);
         }
+
+        // Extract product type from title
+        const title = item.title || '';
+        productTypes.push(title);
+
+        products.push({
+          name: title,
+          price: price,
+          url: item.link,
+          priceConfidence: 'high', // Shopping API has structured prices
+          size: item.size || item.sizes,
+          category: item.category
+        });
       }
-      
-      products = validatedProducts;
-      console.log(`✅ Validated ${products.length} products`);
-      
+
+      console.log(`✅ Extracted ${products.length} valid products`);
+      console.log(`   Sizes found: ${allSizes.length}`);
+      console.log(`   Product types: ${productTypes.length}`);
+
       // ============================================
-      // PHASE 5: SMART PRICE RANGE CALCULATION (NEW)
+      // PHASE 4: CALCULATE PRICE RANGE
       // ============================================
-      console.log(`💰 Phase 5: Calculating price range (with fallbacks)...`);
-      
+      console.log(`💰 Phase 4: Calculating price range...`);
+
       let priceRange = '';
       let medianPrice = 0;
       let priceRangeMethod = 'none';
-      
+
       if (products.length >= 3) {
-        // Method 1: Calculate from actual products
         const prices = products.map(p => p.price).sort((a, b) => a - b);
         medianPrice = prices.length % 2 === 0 
           ? (prices[prices.length/2 - 1] + prices[prices.length/2]) / 2 
           : prices[Math.floor(prices.length/2)];
-        
-        priceRangeMethod = 'products';
-        console.log(`  Method: Actual products (${products.length} items)`);
+
+        priceRangeMethod = 'shopping-api';
+        console.log(`  Method: Shopping API (${products.length} products)`);
       } else if (products.length > 0) {
-        // Method 2: Use available products but flag as less confident
         const prices = products.map(p => p.price);
         medianPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-        priceRangeMethod = 'limited-products';
-        console.log(`  Method: Limited products (${products.length} items - less confident)`);
+        priceRangeMethod = 'shopping-api-limited';
+        console.log(`  Method: Shopping API limited (${products.length} products)`);
       } else {
-        // Method 3: ESTIMATE from brand context (NEW FALLBACK)
-        console.log(`  Method: Estimating from brand context...`);
-        
+        // Fallback: estimate from brand context
+        console.log(`  Method: Estimating (no products found)...`);
+
         const estimateCompletion = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [
@@ -357,45 +344,43 @@ If you can't estimate, return 250 (default contemporary price).`
             },
             {
               role: 'user',
-              content: `Brand: ${brandName}\nDomain: ${officialDomain}\nSearch results suggest: ${searchResults.slice(0, 3).map(r => r.title).join(', ')}`
+              content: `Brand: ${brandName}\nDomain: ${officialDomain}`
             }
           ],
           temperature: 0.1
         });
-        
+
         const estimateText = estimateCompletion.choices[0]?.message?.content?.trim() || '250';
         medianPrice = parseInt(estimateText.replace(/[^0-9]/g, '')) || 250;
         priceRangeMethod = 'estimated';
         console.log(`  Estimated price: $${medianPrice}`);
       }
-      
+
       // Calculate tier
       if (medianPrice < 100) priceRange = '$';
       else if (medianPrice < 300) priceRange = '$$';
       else if (medianPrice < 800) priceRange = '$$$';
       else priceRange = '$$$$';
-      
+
       console.log(`💰 Price: $${Math.round(medianPrice)} → ${priceRange} (method: ${priceRangeMethod})`);
-      
+
       // ============================================
-      // PHASE 6: DETERMINE CATEGORIES (IMPROVED)
+      // PHASE 5: DETERMINE CATEGORIES
       // ============================================
-      console.log(`🤖 Phase 6: Determining categories...`);
-      
+      console.log(`🏷️  Phase 5: Determining categories from products...`);
+
       let categories = [];
-      
-      // Combine product names AND search result titles for better context
-      const contextText = [
-        ...products.map(p => p.name),
-        ...searchResults.slice(0, 5).map(r => r.title + ' ' + r.snippet)
-      ].join(' ');
-      
-      const categoryCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: `Analyze text and determine which categories apply.
+
+      if (products.length > 0) {
+        // Use actual product data to determine categories
+        const productContext = products.slice(0, 20).map(p => p.name).join('\n');
+
+        const categoryCompletion = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: `Analyze product titles and determine which categories apply.
 
 Return ONLY categories from this list:
 - Clothing
@@ -408,192 +393,260 @@ Return ONLY categories from this list:
 
 Rules:
 - Return as comma-separated list (e.g., "Clothing, Shoes, Bags")
-- Include a category if you see MULTIPLE mentions or clear evidence
-- Be liberal - when in doubt, include it
-- Clothing is the most common, include unless clearly not a clothing brand`
+- Include a category if you see MULTIPLE products in that category
+- Base decision on ACTUAL products shown, not assumptions
+- Be specific but not overly broad
+
+Examples:
+"Silk Dress, Cotton Shirt, Wool Sweater" → "Clothing"
+"Dress, Heels, Sandals, Clutch" → "Clothing, Shoes, Bags"
+"Ring, Necklace, Earrings" → "Jewelry"`
+            },
+            {
+              role: 'user',
+              content: `Brand: ${brandName}\n\nProduct titles:\n${productContext}`
+            }
+          ],
+          temperature: 0.1
+        });
+
+        const categoryResponse = categoryCompletion.choices[0]?.message?.content?.trim() || '';
+        categories = categoryResponse.split(',').map(c => c.trim()).filter(c => c);
+
+      } else {
+        // Fallback: search-based category detection
+        console.log(`  No products found, using search fallback...`);
+
+        const categorySearchQuery = `site:${officialDomain} shop collection`;
+        const categoryResponse = await fetch('https://google.serper.dev/search', {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': serperApiKey,
+            'Content-Type': 'application/json'
           },
-          {
-            role: 'user',
-            content: `Brand: ${brandName}\n\nContext: ${contextText.substring(0, 2000)}`
-          }
-        ],
-        temperature: 0.1
-      });
-      
-      const categoryResponse = categoryCompletion.choices[0]?.message?.content?.trim() || '';
-      categories = categoryResponse.split(',').map(c => c.trim()).filter(c => c);
-      
-      // Fallback: If no categories found, default to "Clothing" for fashion brands
+          body: JSON.stringify({ q: categorySearchQuery, num: 5 })
+        });
+
+        if (categoryResponse.ok) {
+          const categoryData = await categoryResponse.json();
+          const searchResults = categoryData.organic || [];
+          const contextText = searchResults.map(r => `${r.title} ${r.snippet}`).join(' ');
+
+          const categoryCompletion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: `Analyze text and determine which categories apply.
+
+Return ONLY categories from this list:
+- Clothing
+- Shoes
+- Bags
+- Accessories
+- Jewelry
+- Swimwear
+- Homewares
+
+Return as comma-separated list. Default to "Clothing" if unclear.`
+              },
+              {
+                role: 'user',
+                content: `Brand: ${brandName}\n\nContext: ${contextText.substring(0, 2000)}`
+              }
+            ],
+            temperature: 0.1
+          });
+
+          const categoryResponse = categoryCompletion.choices[0]?.message?.content?.trim() || '';
+          categories = categoryResponse.split(',').map(c => c.trim()).filter(c => c);
+        }
+      }
+
+      // Fallback: If no categories found, default to "Clothing"
       if (categories.length === 0) {
         categories = ['Clothing'];
         console.log(`⚠️  No categories detected, defaulting to: Clothing`);
       } else {
         console.log(`✅ Categories: ${categories.join(', ')}`);
       }
-      
+
       const finalCategory = categories.join(', ');
-      
+
       // ============================================
-      // PHASE 7: ALWAYS ATTEMPT SIZE FETCH (IMPROVED)
+      // PHASE 6: SIZE EXTRACTION (IMPROVED!)
       // ============================================
-      console.log(`📏 Phase 7: Fetching size information...`);
-      
+      console.log(`📏 Phase 6: Extracting size information...`);
+
       let finalMaxSize = '';
       let sizeMethod = 'none';
-      
-      // CHANGED: Always attempt if brand has Clothing or Swimwear, OR if no categories
+
       const shouldCheckSizes = categories.includes('Clothing') || 
                                categories.includes('Swimwear') || 
-                               categories.length === 0; // Try even if categories unclear
-      
+                               categories.length === 0;
+
       if (shouldCheckSizes) {
-        console.log(`  Attempting size fetch...`);
-        
-        try {
-          // Search for size chart
-          const sizeSearchQuery = `site:${officialDomain} "size chart" OR "size guide" women`;
-          const sizeResponse = await fetch('https://google.serper.dev/search', {
-            method: 'POST',
-            headers: {
-              'X-API-KEY': serperApiKey,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ q: sizeSearchQuery, num: 5 })
-          });
-          
-          if (sizeResponse.ok) {
-            const sizeData = await sizeResponse.json();
-            const sizeResults = sizeData.organic?.slice(0, 3) || [];
-            
-            if (sizeResults.length > 0) {
-              console.log(`  Found ${sizeResults.length} size chart pages`);
-              
-              // Try to fetch full page content
-              let sizeText = '';
-              
-              try {
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 15000);
-                
-                const pageResponse = await fetch(sizeResults[0].link, {
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                  },
-                  signal: controller.signal
-                });
-                
-                clearTimeout(timeout);
-                
-                if (pageResponse.ok) {
-                  const html = await pageResponse.text();
-                  
-                  // Extract text content
-                  const textContent = html
-                    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-                    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-                    .replace(/<[^>]+>/g, ' ')
-                    .replace(/&nbsp;/g, ' ')
-                    .replace(/&amp;/g, '&')
-                    .replace(/\s+/g, ' ')
-                    .trim();
-                  
-                  // Find size-related content
-                  const sizeKeywords = ['size chart', 'size guide', 'sizing', 'measurements', 'fit guide'];
-                  const lines = textContent.split(/[.\n]/);
-                  const relevantLines = lines.filter(line => {
-                    const lower = line.toLowerCase();
-                    return sizeKeywords.some(kw => lower.includes(kw)) ||
-                           /\b(XS|S|M|L|XL|XXL|XXXL|0X|1X|2X|3X|4X|5X|\d{1,2})\b/.test(line);
+        // Strategy 1: Get sizes from Shopping API products
+        if (allSizes.length > 0) {
+          console.log(`  Strategy 1: Analyzing ${allSizes.length} sizes from products...`);
+
+          const maxSize = findMaxSize(allSizes);
+          if (maxSize && maxSize >= 0) {
+            finalMaxSize = `Up to ${maxSize}`;
+            sizeMethod = 'shopping-products';
+            console.log(`  ✅ Max size from products: ${finalMaxSize}`);
+          }
+        }
+
+        // Strategy 2: Fallback to size chart scraping if needed
+        // Only do this if we didn't find sizes OR found small range (< size 14)
+        const maxSizeNum = finalMaxSize ? parseInt(finalMaxSize.match(/\d+/)?.[0]) : 0;
+
+        if (!finalMaxSize || maxSizeNum < 14) {
+          console.log(`  Strategy 2: Searching for size chart (fallback)...`);
+
+          try {
+            const sizeSearchQuery = `site:${officialDomain} "size chart" OR "size guide" women`;
+            const sizeResponse = await fetch('https://google.serper.dev/search', {
+              method: 'POST',
+              headers: {
+                'X-API-KEY': serperApiKey,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ q: sizeSearchQuery, num: 5 })
+            });
+
+            if (sizeResponse.ok) {
+              const sizeData = await sizeResponse.json();
+              const sizeResults = sizeData.organic?.slice(0, 3) || [];
+
+              if (sizeResults.length > 0) {
+                console.log(`  Found ${sizeResults.length} size chart pages`);
+
+                // Try to fetch full page content
+                let sizeText = '';
+
+                try {
+                  const controller = new AbortController();
+                  const timeout = setTimeout(() => controller.abort(), 15000);
+
+                  const pageResponse = await fetch(sizeResults[0].link, {
+                    headers: {
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    },
+                    signal: controller.signal
                   });
-                  
-                  if (relevantLines.length > 0) {
-                    sizeText = relevantLines.slice(0, 150).join('\n'); // Increased from 100
-                    sizeMethod = 'full-page';
-                    console.log(`  ✅ Extracted ${relevantLines.length} relevant lines from page`);
+
+                  clearTimeout(timeout);
+
+                  if (pageResponse.ok) {
+                    const html = await pageResponse.text();
+
+                    // Extract text content
+                    const textContent = html
+                      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                      .replace(/<[^>]+>/g, ' ')
+                      .replace(/&nbsp;/g, ' ')
+                      .replace(/&amp;/g, '&')
+                      .replace(/\s+/g, ' ')
+                      .trim();
+
+                    // Find size-related content
+                    const sizeKeywords = ['size chart', 'size guide', 'sizing', 'measurements', 'fit guide'];
+                    const lines = textContent.split(/[.\n]/);
+                    const relevantLines = lines.filter(line => {
+                      const lower = line.toLowerCase();
+                      return sizeKeywords.some(kw => lower.includes(kw)) ||
+                             /\b(XS|S|M|L|XL|XXL|XXXL|0X|1X|2X|3X|4X|5X|\d{1,2})\b/.test(line);
+                    });
+
+                    if (relevantLines.length > 0) {
+                      sizeText = relevantLines.slice(0, 150).join('\n');
+                      console.log(`  ✅ Extracted ${relevantLines.length} relevant lines from page`);
+                    }
                   }
+                } catch (fetchError) {
+                  console.log(`  ⚠️  Page fetch failed: ${fetchError.message}`);
                 }
-              } catch (fetchError) {
-                console.log(`  ⚠️  Page fetch failed: ${fetchError.message}`);
-              }
-              
-              // Fallback to snippets if page fetch failed
-              if (!sizeText) {
-                sizeText = sizeResults.map(r => `${r.title} ${r.snippet}`).join('\n');
-                sizeMethod = 'snippets';
-                console.log(`  Using search snippets`);
-              }
-              
-              if (sizeText) {
-                // IMPROVED AI prompt for size extraction
-                const sizeCompletion = await openai.chat.completions.create({
-                  model: 'gpt-4o',
-                  messages: [
-                    {
-                      role: 'system',
-                      content: `Find the LARGEST women's size available. Be thorough and check carefully.
+
+                // Fallback to snippets if page fetch failed
+                if (!sizeText) {
+                  sizeText = sizeResults.map(r => `${r.title} ${r.snippet}`).join('\n');
+                  console.log(`  Using search snippets`);
+                }
+
+                if (sizeText) {
+                  const sizeCompletion = await openai.chat.completions.create({
+                    model: 'gpt-4o',
+                    messages: [
+                      {
+                        role: 'system',
+                        content: `Find the LARGEST women's size available. Look for NUMBERED sizes (0-40).
 
 Look for:
 - US numeric: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32
 - Letter sizes: XS, S, M, L, XL, XXL, XXXL, 4XL, 5XL
 - Plus sizes: 0X, 1X, 2X, 3X, 4X, 5X, 6X
 - European: 32-54
-- UK: 4-28
-
-Common patterns:
-- "Sizes 0-16" → return "16"
-- "XS to XL" → return "XL"  
-- "Regular (0-14) Plus (16-24)" → return "24"
-- "Up to 3X" → return "3X"
-- "Size 0-32" → return "32"
 
 Instructions:
-1. Look for the HIGHEST number or largest letter size mentioned
+1. Look for the HIGHEST number mentioned
 2. Check for both regular AND plus size ranges
-3. If you see "extended sizes", "plus sizes", or "inclusive sizing" - look harder for max
-4. Return ONLY the maximum size value
-5. If truly not found, return empty string
+3. If you see "extended sizes", "plus sizes" - look harder
+4. PREFER numeric sizes over letters
+5. Return ONLY the maximum size value (just the number or letter)
+6. If not found, return empty string
 
 Examples:
-- Input: "Available in sizes XS-XL" → Output: "XL"
-- Input: "Sizes 0-18" → Output: "18"
-- Input: "Size range: 00-16, Plus sizes 14W-24W" → Output: "24W"
+- "Sizes 0-18" → "18"
+- "Regular 0-14, Plus 16-24" → "24"
+- "XS-XL" → "XL" (only if no numbers found)
 
-Return ONLY the size, nothing else.`
-                    },
-                    {
-                      role: 'user',
-                      content: `${brandName} size information:\n\n${sizeText.substring(0, 10000)}`
+Return ONLY the size value.`
+                      },
+                      {
+                        role: 'user',
+                        content: `${brandName} size information:\n\n${sizeText.substring(0, 10000)}`
+                      }
+                    ],
+                    temperature: 0.05
+                  });
+
+                  const chartMaxSize = sizeCompletion.choices[0]?.message?.content?.trim() || '';
+
+                  if (chartMaxSize && chartMaxSize.length > 0 && chartMaxSize.length < 20) {
+                    const chartConverted = convertSizeToUS(chartMaxSize);
+
+                    // Use chart size if it's larger than what we found in products
+                    const chartNum = parseInt(chartConverted.match(/\d+/)?.[0]) || 0;
+                    if (chartNum > maxSizeNum) {
+                      finalMaxSize = chartConverted;
+                      sizeMethod = 'size-chart';
+                      console.log(`  ✅ Max size from chart: ${chartMaxSize} → ${finalMaxSize}`);
+                    } else {
+                      console.log(`  ℹ️  Chart size (${chartNum}) not larger than product sizes (${maxSizeNum})`);
                     }
-                  ],
-                  temperature: 0.05 // Very low temperature for precision
-                });
-                
-                const maxSize = sizeCompletion.choices[0]?.message?.content?.trim() || '';
-                
-                if (maxSize && maxSize.length > 0 && maxSize.length < 20) {
-                  finalMaxSize = convertSizeToUS(maxSize);
-                  console.log(`  ✅ Max size: ${maxSize} → ${finalMaxSize} (method: ${sizeMethod})`);
-                } else {
-                  console.log(`  ⚠️  Could not extract valid size: "${maxSize}"`);
+                  }
                 }
               }
-            } else {
-              console.log(`  ⚠️  No size chart pages found`);
             }
+          } catch (error) {
+            console.error(`  ❌ Size chart fetch error: ${error.message}`);
           }
-        } catch (error) {
-          console.error(`  ❌ Size fetch error: ${error.message}`);
+        } else {
+          console.log(`  ✅ Sufficient size data from products (${maxSizeNum}), skipping chart`);
         }
       } else {
-        console.log(`  ⏭️  Skipping size fetch (no clothing detected)`);
+        console.log(`  ⏭️  Skipping size fetch (no clothing/swimwear detected)`);
         sizeMethod = 'skipped';
       }
-      
+
       // ============================================
-      // PHASE 8: OWNERSHIP & VALUES RESEARCH
+      // PHASE 7: OWNERSHIP & VALUES RESEARCH
       // ============================================
-      console.log(`🌐 Phase 8: Researching ownership and values...`);
-      
+      console.log(`🌐 Phase 7: Researching ownership and values...`);
+
       // Ownership check
       const ownershipQuery = `${brandName} owned by parent company conglomerate`;
       const ownershipResponse = await fetch('https://google.serper.dev/search', {
@@ -604,10 +657,10 @@ Return ONLY the size, nothing else.`
         },
         body: JSON.stringify({ q: ownershipQuery, num: 6 })
       });
-      
+
       const ownershipData = ownershipResponse.ok ? await ownershipResponse.json() : {};
       const ownershipResults = ownershipData.organic?.slice(0, 5) || [];
-      
+
       // Sustainability check
       const sustainabilityQuery = `${brandName} sustainable B Corp Fair Trade GOTS certified organic`;
       const sustainabilityResponse = await fetch('https://google.serper.dev/search', {
@@ -618,10 +671,10 @@ Return ONLY the size, nothing else.`
         },
         body: JSON.stringify({ q: sustainabilityQuery, num: 6 })
       });
-      
+
       const sustainabilityData = sustainabilityResponse.ok ? await sustainabilityResponse.json() : {};
       const sustainabilityResults = sustainabilityData.organic?.slice(0, 5) || [];
-      
+
       // Diversity check
       const diversityQuery = `${brandName} women-owned female-founded BIPOC-owned founder`;
       const diversityResponse = await fetch('https://google.serper.dev/search', {
@@ -632,13 +685,13 @@ Return ONLY the size, nothing else.`
         },
         body: JSON.stringify({ q: diversityQuery, num: 6 })
       });
-      
+
       const diversityData = diversityResponse.ok ? await diversityResponse.json() : {};
       const diversityResults = diversityData.organic?.slice(0, 5) || [];
-      
+
       // AI analysis of values
-      console.log(`🤖 Phase 9: Analyzing values with AI...`);
-      
+      console.log(`🤖 Phase 8: Analyzing values with AI...`);
+
       const valuesCompletion = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
@@ -676,9 +729,9 @@ ${JSON.stringify(diversityResults, null, 2)}`
         ],
         temperature: 0.1
       });
-      
+
       const valuesResponse = valuesCompletion.choices[0]?.message?.content;
-      
+
       let valuesData = { values: '' };
       try {
         const jsonMatch = valuesResponse.match(/\{[\s\S]*\}/);
@@ -686,16 +739,21 @@ ${JSON.stringify(diversityResults, null, 2)}`
       } catch (parseError) {
         console.error('Failed to parse values:', parseError);
       }
-      
+
       console.log(`✅ Values: ${valuesData.values || 'none'}`);
-      
+
       // ============================================
-      // PHASE 10: GENERATE BRAND DESCRIPTION
+      // PHASE 9: GENERATE BRAND DESCRIPTION
       // ============================================
-      console.log(`🤖 Phase 10: Generating brand description...`);
-      
+      console.log(`🤖 Phase 9: Generating brand description...`);
+
       let brandDescription = '';
       try {
+        // Use product names to inform description
+        const productContext = products.length > 0 
+          ? products.slice(0, 10).map(p => p.name).join(', ')
+          : 'Not available';
+
         const descriptionResponse = await anthropic.messages.create({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 180,
@@ -708,46 +766,46 @@ Context:
 - Categories: ${finalCategory || 'Fashion'}
 - Price Range: ${priceRange || 'Not available'}
 - Values: ${valuesData.values || 'None'}
-- Products: ${products.length > 0 ? products.slice(0, 5).map(p => p.name).join(', ') : 'Not available'}
+- Sample Products: ${productContext}
 
 Write ONLY the description, no preamble.`
           }]
         });
-        
+
         brandDescription = descriptionResponse.content[0]?.text?.trim() || '';
         console.log(`✅ Generated description`);
       } catch (error) {
         console.error(`❌ Description generation failed: ${error.message}`);
       }
-      
+
       // ============================================
       // FINAL RESPONSE WITH CONFIDENCE SCORES
       // ============================================
       const brandUrl = `https://${officialDomain}`;
-      
+
       // Calculate overall data quality score
       const qualityScore = {
-        priceRange: priceRangeMethod === 'products' ? 100 : 
-                    priceRangeMethod === 'limited-products' ? 70 : 50,
-        categories: categories.length > 0 ? 90 : 50,
-        sizes: finalMaxSize ? (sizeMethod === 'full-page' ? 90 : 70) : 0,
-        products: products.length >= 3 ? 100 : 
-                  products.length > 0 ? 60 : 0,
-        values: valuesData.values ? 100 : 100, // Values are optional, so 100 if present or if not needed
+        priceRange: priceRangeMethod === 'shopping-api' ? 100 : 
+                    priceRangeMethod === 'shopping-api-limited' ? 75 : 50,
+        categories: products.length > 0 ? 95 : 70,
+        sizes: finalMaxSize ? (sizeMethod === 'shopping-products' ? 90 : 75) : 0,
+        products: products.length >= 5 ? 100 : 
+                  products.length > 0 ? 70 : 0,
+        values: valuesData.values ? 100 : 100,
         description: brandDescription ? 100 : 0
       };
-      
+
       const avgQuality = Object.values(qualityScore).reduce((a, b) => a + b, 0) / Object.keys(qualityScore).length;
-      
+
       console.log(`\n📊 Data Quality Score: ${Math.round(avgQuality)}%`);
       console.log(`   Price Range: ${qualityScore.priceRange}% (${priceRangeMethod})`);
       console.log(`   Categories: ${qualityScore.categories}%`);
       console.log(`   Sizes: ${qualityScore.sizes}% (${sizeMethod})`);
       console.log(`   Products: ${qualityScore.products}% (${products.length} found)`);
       console.log(`   Description: ${qualityScore.description}%`);
-      
+
       console.log(`\n✅ Research complete for ${brandName}`);
-      
+
       res.json({
         success: true,
         qualityScore: Math.round(avgQuality),
@@ -768,23 +826,26 @@ Write ONLY the description, no preamble.`
           description: brandDescription,
           url: brandUrl,
           evidence: {
-            products: products.slice(0, 5).map(p => ({
+            products: products.slice(0, 10).map(p => ({
               name: p.name,
               price: p.price,
               url: p.url,
-              priceConfidence: p.priceConfidence || 'unknown'
+              size: p.size,
+              priceConfidence: p.priceConfidence
             })),
-            medianPrice: products.length > 0 ? Math.round(medianPrice) : Math.round(medianPrice),
+            medianPrice: Math.round(medianPrice),
             productsFound: products.length,
+            sizesFound: allSizes.length,
             officialDomain: officialDomain,
             extractionMethods: {
               price: priceRangeMethod,
-              size: sizeMethod
+              size: sizeMethod,
+              category: products.length > 0 ? 'shopping-products' : 'search-fallback'
             }
           }
         }
       });
-      
+
     } catch (error) {
       console.error(`❌ Error researching brand ${brandName}:`, error);
       res.json({
