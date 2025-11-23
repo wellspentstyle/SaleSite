@@ -1,0 +1,227 @@
+#!/usr/bin/env node
+
+/**
+ * Email Processing Monitor
+ * 
+ * Real-time monitoring tool for webhook email processing.
+ * Shows live stats, recent emails, and helps debug issues.
+ * 
+ * Run with: node email-monitor.js
+ * 
+ * Environment variables needed:
+ * - ADMIN_PASSWORD: Your admin password
+ * - API_URL: Your API URL (default: http://localhost:3001)
+ */
+
+import fetch from 'node-fetch';
+import readline from 'readline';
+
+const API_URL = process.env.API_URL || 'http://localhost:3001';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_PASSWORD) {
+  console.error('❌ ADMIN_PASSWORD environment variable is required');
+  process.exit(1);
+}
+
+// ANSI color codes
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  dim: '\x1b[2m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m',
+  gray: '\x1b[90m'
+};
+
+// Store monitoring state
+const state = {
+  sales: [],
+  lastCheck: null,
+  stats: {
+    total: 0,
+    live: 0,
+    pending: 0,
+    avgConfidence: 0,
+    recentAdds: []
+  }
+};
+
+// Fetch sales data
+async function fetchSales() {
+  try {
+    const response = await fetch(`${API_URL}/admin/sales`, {
+      headers: {
+        'auth': ADMIN_PASSWORD
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.sales || [];
+  } catch (error) {
+    console.error(`${colors.red}Error fetching sales:${colors.reset}`, error.message);
+    return null;
+  }
+}
+
+// Calculate stats
+function calculateStats(sales) {
+  const now = new Date();
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
+  const live = sales.filter(s => s.live === 'YES').length;
+  const pending = sales.filter(s => s.live === 'NO').length;
+  
+  // Recent additions (created in last hour)
+  const recentAdds = sales.filter(s => {
+    // Assuming you have a createdTime field
+    return true; // Placeholder - adjust based on your data
+  });
+  
+  // Calculate average confidence (if available)
+  const confidenceScores = sales
+    .map(s => {
+      try {
+        const desc = JSON.parse(s.Description || '{}');
+        return desc.confidence;
+      } catch {
+        return null;
+      }
+    })
+    .filter(c => c != null);
+  
+  const avgConfidence = confidenceScores.length > 0
+    ? Math.round(confidenceScores.reduce((a, b) => a + b, 0) / confidenceScores.length)
+    : 0;
+  
+  return {
+    total: sales.length,
+    live,
+    pending,
+    avgConfidence,
+    recentAdds: sales.slice(0, 5) // Most recent 5
+  };
+}
+
+// Clear screen
+function clearScreen() {
+  console.clear();
+  // Alternative: process.stdout.write('\x1Bc');
+}
+
+// Display dashboard
+function displayDashboard() {
+  clearScreen();
+  
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString();
+  
+  console.log(`${colors.bright}${colors.cyan}╔════════════════════════════════════════════════════════╗${colors.reset}`);
+  console.log(`${colors.bright}${colors.cyan}║       📧 Email Processing Monitor Dashboard           ║${colors.reset}`);
+  console.log(`${colors.bright}${colors.cyan}╚════════════════════════════════════════════════════════╝${colors.reset}`);
+  console.log(`${colors.dim}Last updated: ${timeStr}${colors.reset}\n`);
+  
+  // Stats overview
+  console.log(`${colors.bright}📊 Overview${colors.reset}`);
+  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  console.log(`Total Sales: ${colors.bright}${state.stats.total}${colors.reset}`);
+  console.log(`Live Sales: ${colors.green}${state.stats.live}${colors.reset}`);
+  console.log(`Pending: ${colors.yellow}${state.stats.pending}${colors.reset}`);
+  console.log(`Avg Confidence: ${state.stats.avgConfidence}%\n`);
+  
+  // Recent sales
+  console.log(`${colors.bright}🆕 Recent Sales (Last 5)${colors.reset}`);
+  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  
+  if (state.stats.recentAdds.length === 0) {
+    console.log(`${colors.dim}No recent sales${colors.reset}`);
+  } else {
+    state.stats.recentAdds.forEach((sale, i) => {
+      const statusColor = sale.live === 'YES' ? colors.green : colors.yellow;
+      const statusIcon = sale.live === 'YES' ? '🟢' : '🟡';
+      
+      console.log(`${i + 1}. ${statusIcon} ${colors.bright}${sale.company}${colors.reset}`);
+      console.log(`   ${sale.percentOff}% off | ${sale.startDate || 'No date'}`);
+      
+      // Parse confidence if available
+      try {
+        const desc = JSON.parse(sale.Description || '{}');
+        if (desc.confidence) {
+          const confColor = desc.confidence >= 80 ? colors.green : 
+                           desc.confidence >= 60 ? colors.yellow : colors.red;
+          console.log(`   ${colors.dim}Confidence: ${confColor}${desc.confidence}%${colors.reset}`);
+        }
+      } catch {}
+      
+      console.log('');
+    });
+  }
+  
+  // Instructions
+  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  console.log(`${colors.dim}Press ${colors.bright}R${colors.reset}${colors.dim} to refresh | ${colors.bright}Q${colors.reset}${colors.dim} to quit | Auto-refresh: 30s${colors.reset}`);
+}
+
+// Update data and display
+async function refresh() {
+  const sales = await fetchSales();
+  
+  if (sales) {
+    state.sales = sales;
+    state.stats = calculateStats(sales);
+    state.lastCheck = new Date();
+  }
+  
+  displayDashboard();
+}
+
+// Handle keyboard input
+function setupKeyboardListener() {
+  readline.emitKeypressEvents(process.stdin);
+  
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+  }
+  
+  process.stdin.on('keypress', async (str, key) => {
+    if (key.name === 'q' || (key.ctrl && key.name === 'c')) {
+      console.log('\n\n👋 Goodbye!');
+      process.exit(0);
+    }
+    
+    if (key.name === 'r') {
+      console.log('🔄 Refreshing...');
+      await refresh();
+    }
+  });
+}
+
+// Main
+async function main() {
+  console.log(`${colors.cyan}🚀 Starting Email Processing Monitor...${colors.reset}\n`);
+  
+  // Initial load
+  await refresh();
+  
+  // Setup keyboard listener
+  setupKeyboardListener();
+  
+  // Auto-refresh every 30 seconds
+  setInterval(async () => {
+    await refresh();
+  }, 30000);
+}
+
+// Run
+main().catch(error => {
+  console.error(`${colors.red}Fatal error:${colors.reset}`, error);
+  process.exit(1);
+});

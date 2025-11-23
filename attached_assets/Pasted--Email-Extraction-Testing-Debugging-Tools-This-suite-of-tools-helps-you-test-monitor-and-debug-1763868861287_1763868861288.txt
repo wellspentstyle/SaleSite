@@ -1,0 +1,366 @@
+# Email Extraction Testing & Debugging Tools
+
+This suite of tools helps you test, monitor, and debug the email extraction webhook for sale automation.
+
+## 📦 Files Included
+
+1. **improved-webhook-handler.js** - Enhanced webhook handler with better reliability
+2. **test-email-extraction.js** - Automated test suite with various email scenarios
+3. **email-monitor.js** - Real-time monitoring dashboard
+4. **analyze-rejection.js** - Debug tool for understanding why emails are rejected
+
+## 🚀 Setup
+
+### 1. Install Dependencies (if not already installed)
+
+```bash
+npm install node-fetch
+```
+
+### 2. Set Environment Variables
+
+```bash
+# Required for testing
+export ADMIN_PASSWORD="your-admin-password"
+export CLOUDMAIL_SECRET="your-cloudmail-secret"
+
+# Required for AI analysis
+export AI_INTEGRATIONS_OPENAI_API_KEY="your-openai-key"
+export AI_INTEGRATIONS_OPENAI_BASE_URL="your-base-url"
+
+# Optional - defaults to localhost
+export TEST_WEBHOOK_URL="http://localhost:3001/webhook/agentmail"
+export API_URL="http://localhost:3001"
+```
+
+## 🧪 Running the Test Suite
+
+The test suite simulates 10 different email scenarios to verify the webhook works correctly.
+
+```bash
+node test-email-extraction.js
+```
+
+**Expected Output:**
+```
+🧪 Email Extraction Test Suite
+================================
+
+Webhook URL: http://localhost:3001/webhook/agentmail
+Auth: Enabled
+
+⏳ Running: Valid Flash Sale - Clear Details...
+
+✅ Valid Flash Sale - Clear Details
+   Expected: PASS | Actual: PASS ✓
+   Company: J.Crew
+   Discount: 40%
+   Confidence: 95%
+   Reasoning: Clear flash sale with explicit dates and terms
+
+...
+
+📊 Test Summary
+================
+Total Tests: 10
+✅ Passed: 9
+❌ Failed: 1
+Success Rate: 90.0%
+```
+
+### Understanding Test Results
+
+- **✅ Green checkmark** = Test passed as expected
+- **❌ Red X** = Test failed (either false positive or false negative)
+- **Expected vs Actual** = Shows if the email should have been accepted/rejected
+- **Match (✓/✗)** = Whether the actual result matched expectations
+
+### Test Cases Included
+
+1. **Valid Flash Sale** - Clear 48-hour sale with code
+2. **Valid Seasonal Sale** - Holiday sale with end date
+3. **Valid HTML Email** - Tests HTML parsing when no plain text
+4. **Invalid Welcome Email** - First order discount (should reject)
+5. **Invalid Newsletter** - Generic newsletter (should reject)
+6. **Invalid Account Verification** - Signup email (should reject)
+7. **Valid Clearance Sale** - Range discount (up to 60%)
+8. **Borderline Referral** - Referral program (should reject)
+9. **Valid Black Friday** - Event sale with early access
+10. **Edge Case Forwarded** - Forwarded sale email (should accept)
+
+## 📊 Real-Time Monitoring
+
+Monitor email processing in real-time with the dashboard:
+
+```bash
+node email-monitor.js
+```
+
+**Dashboard Features:**
+- Total sales count
+- Live vs pending sales
+- Average confidence scores
+- Last 5 added sales
+- Auto-refresh every 30 seconds
+- Manual refresh with `R` key
+- Quit with `Q` key
+
+**Example Output:**
+```
+╔════════════════════════════════════════════════════════╗
+║       📧 Email Processing Monitor Dashboard           ║
+╚════════════════════════════════════════════════════════╝
+Last updated: 2:45:30 PM
+
+📊 Overview
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total Sales: 47
+Live Sales: 23
+Pending: 24
+Avg Confidence: 82%
+
+🆕 Recent Sales (Last 5)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 🟢 J.Crew
+   40% off | 2025-11-22
+   Confidence: 95%
+
+2. 🟢 Everlane
+   30% off | 2025-11-22
+   Confidence: 88%
+
+...
+```
+
+## 🔍 Analyzing Individual Emails
+
+When you have a specific email that was rejected and you want to understand why:
+
+### Option 1: From a File
+
+```bash
+node analyze-rejection.js email-sample.txt
+```
+
+### Option 2: From Clipboard/stdin
+
+```bash
+cat email.txt | node analyze-rejection.js
+```
+
+### Email File Format
+
+Create a text file with optional headers:
+
+```
+From: sales@brand.com
+Subject: Weekend Sale - 30% Off
+
+Email body content goes here...
+```
+
+Or just paste the email body without headers.
+
+**Example Output:**
+```
+╔════════════════════════════════════════════════════════╗
+║           Email Rejection Analysis Report              ║
+╚════════════════════════════════════════════════════════╝
+
+📧 Email Metadata
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: welcome@brand.com
+Subject: Welcome to Brand! Get 15% Off
+Body Length: 245 characters
+
+📄 Email Body Preview
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Welcome to the Brand family!
+
+As a thank you for signing up, enjoy 15% off your first order...
+
+🤖 AI Analysis
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+❌ REJECTED
+Reason: Not a promotional sale email
+
+Reasoning:
+This is a welcome email offering a first-order discount to new subscribers,
+not a time-limited promotional sale.
+
+💡 Recommendations
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This email was correctly rejected.
+It appears to be a not a promotional sale email.
+```
+
+## 🔧 Applying the Improved Webhook Handler
+
+To use the improved webhook handler in your main server:
+
+1. **Backup your current code:**
+```bash
+cp server/index.js server/index.js.backup
+```
+
+2. **Replace the webhook handler:**
+   - Open `server/index.js`
+   - Find the `app.post('/webhook/agentmail', ...)` route
+   - Replace it with the code from `improved-webhook-handler.js`
+
+3. **Restart your server:**
+```bash
+npm run dev
+```
+
+## 🐛 Common Issues & Solutions
+
+### Issue: Tests fail with "Unauthorized"
+
+**Solution:** Check that `CLOUDMAIL_SECRET` matches your CloudMailin configuration:
+```bash
+echo $CLOUDMAIL_SECRET
+# Should match the secret in your CloudMailin settings
+```
+
+### Issue: Tests fail with "Connection refused"
+
+**Solution:** Make sure your server is running:
+```bash
+npm run dev
+# In another terminal:
+node test-email-extraction.js
+```
+
+### Issue: AI returns low confidence for valid sales
+
+**Solution:** Check the email content:
+1. Does it have clear dates? ("Valid until Nov 25")
+2. Is the discount explicit? ("30% off" not "up to 30% off")
+3. Does it have sale-specific URLs? (links to /sale pages)
+4. Avoid welcome/signup language
+
+### Issue: All tests fail with parsing errors
+
+**Solution:** Check your OpenAI API key and base URL:
+```bash
+# Test the API directly
+curl -X POST "$AI_INTEGRATIONS_OPENAI_BASE_URL/chat/completions" \
+  -H "Authorization: Bearer $AI_INTEGRATIONS_OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"test"}]}'
+```
+
+## 📈 Monitoring Metrics
+
+Key metrics to watch in the dashboard:
+
+- **Total Sales:** Should steadily increase as emails arrive
+- **Live Sales:** Should match current active promotions
+- **Avg Confidence:** Aim for 75%+ average
+  - 90-100%: Excellent extraction
+  - 75-89%: Good extraction
+  - 60-74%: Acceptable but review manually
+  - <60%: Likely rejected
+
+## 🎯 Improving Extraction Accuracy
+
+### For Brands Sending You Emails
+
+If certain brands' emails are consistently rejected:
+
+1. Run `analyze-rejection.js` on a sample
+2. Check what fields are missing
+3. Look for welcome/signup language that triggers rejection
+4. Verify the email has a clear time-limited offer
+
+### Adjusting the Confidence Threshold
+
+In `improved-webhook-handler.js`, you can adjust:
+
+```javascript
+const confidenceThreshold = 60; // Lower = more permissive
+```
+
+**Recommendations:**
+- Start at 60% for testing
+- Increase to 70% once stable
+- Never go below 50% (too many false positives)
+
+### Adding Custom Logic
+
+You can add custom rules before the AI step:
+
+```javascript
+// Example: Always accept emails from specific senders
+const trustedSenders = ['sales@jcrew.com', 'promo@everlane.com'];
+if (trustedSenders.some(sender => from.includes(sender))) {
+  // Skip AI, process immediately
+}
+```
+
+## 📝 Sample Emails for Testing
+
+Create test files with these examples:
+
+**valid-flash-sale.txt:**
+```
+From: sales@brand.com
+Subject: 48-Hour Flash Sale - 40% Off
+
+Don't miss our biggest sale!
+40% off everything with code FLASH40
+Valid through Sunday only!
+
+Shop now: https://brand.com/sale
+```
+
+**invalid-welcome.txt:**
+```
+From: welcome@brand.com
+Subject: Welcome! Here's 15% Off
+
+Thanks for signing up!
+Enjoy 15% off your first order.
+Code: WELCOME15
+
+Start shopping: https://brand.com
+```
+
+Then test:
+```bash
+node analyze-rejection.js valid-flash-sale.txt
+node analyze-rejection.js invalid-welcome.txt
+```
+
+## 🚨 Debugging Production Issues
+
+If emails aren't being processed in production:
+
+1. **Check CloudMailin logs** - Are emails being delivered?
+2. **Check server logs** - Are webhooks being received?
+3. **Run test suite** - Verify the handler works locally
+4. **Use analyze-rejection.js** - Test the exact email content
+5. **Check Airtable** - Verify connection and field names
+
+## 📞 Support
+
+If you're still having issues:
+
+1. Run the test suite and save output: `node test-email-extraction.js > test-results.txt`
+2. Run the analyzer on a failing email: `node analyze-rejection.js email.txt > analysis.txt`
+3. Check server logs for error messages
+4. Review the AI reasoning in the analysis output
+
+## 🔄 Continuous Improvement
+
+After deploying the improved webhook handler:
+
+1. **Week 1:** Run `email-monitor.js` daily to check for issues
+2. **Week 2:** Review rejected emails with `analyze-rejection.js`
+3. **Week 3:** Adjust confidence threshold based on false positive/negative rate
+4. **Ongoing:** Run test suite before any code changes
+
+---
+
+**Last Updated:** November 22, 2025
