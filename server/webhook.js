@@ -429,7 +429,8 @@ app.get('/companies', async (req, res) => {
         values: values,
         description: record.fields.Description || '',
         url: record.fields.URL || '', // Keep for backward compatibility
-        shopmyUrl: record.fields.ShopmyURL || '' // Primary affiliate link
+        shopmyUrl: record.fields.ShopmyURL || '', // Primary affiliate link
+        priority: record.fields.Priority || ''
       };
     });
     

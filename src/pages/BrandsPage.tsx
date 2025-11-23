@@ -15,6 +15,7 @@ interface Company {
   description: string;
   url: string; // Brand's official website (backward compatibility)
   shopmyUrl: string; // ShopMy affiliate link (primary for clicks)
+  priority: string;
 }
 
 export function BrandsPage() {
@@ -99,7 +100,7 @@ export function BrandsPage() {
 
   // Separate into brands and shops
   const brands = useMemo(() => 
-    filteredCompanies.filter(c => c.type === 'Brand').sort((a, b) => a.name.localeCompare(b.name)),
+    filteredCompanies.filter(c => c.type === 'Brand' && c.priority === 'High Priority').sort((a, b) => a.name.localeCompare(b.name)),
     [filteredCompanies]
   );
 
