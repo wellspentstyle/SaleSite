@@ -136,10 +136,6 @@ export function PicksAdmin() {
     setSelectedSale(sale);
     setUrls('');
     setCurrentView('url-entry');
-    
-    if (sale.saleUrl) {
-      window.open(sale.saleUrl, '_blank');
-    }
   };
 
   const handleManualEntry = (sale: Sale, e?: React.MouseEvent) => {
@@ -579,7 +575,8 @@ export function PicksAdmin() {
               {filteredSales.map((sale) => (
                 <div
                   key={sale.id}
-                  className="border bg-white transition-all hover:shadow-md"
+                  onClick={() => handleSaleClick(sale)}
+                  className="border bg-white cursor-pointer transition-all hover:shadow-md"
                   style={{ 
                     padding: '20px', 
                     borderRadius: '4px',
