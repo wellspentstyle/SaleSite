@@ -215,13 +215,10 @@ export function SalesApprovals() {
       
         {/* Settings Card */}
         <Card>
-          <CardHeader>
-            <CardTitle>Approval Settings</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label htmlFor="approvals-toggle" className="text-base">
+                <Label htmlFor="approvals-toggle" className="text-base" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                   Require Manual Approval
                 </Label>
                 <p className="text-sm text-muted-foreground">
@@ -241,7 +238,7 @@ export function SalesApprovals() {
       {/* Pending Sales */}
       <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-normal">
+            <h2 className="text-xl font-bold">
               Pending Sales ({pendingSales.length})
             </h2>
             <Button

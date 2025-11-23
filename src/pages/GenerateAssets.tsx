@@ -123,28 +123,42 @@ export function GenerateAssets() {
               <span>Loading sales...</span>
             </div>
           ) : (
-            <div className="space-y-3 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {sales.filter(sale => sale.live === 'YES').length === 0 ? (
-                <p className="text-muted-foreground text-sm">No live sales available</p>
+                <p className="text-muted-foreground text-sm col-span-full">No live sales available</p>
               ) : (
                 sales.filter(sale => sale.live === 'YES').map((sale) => (
-                  <label 
+                  <div
                     key={sale.id}
-                    className="flex items-center gap-3 p-3 border border-border rounded hover:bg-muted cursor-pointer"
-                    style={{ fontFamily: 'DM Sans, sans-serif' }}
+                    onClick={() => handleToggleSaleForAsset(sale.id)}
+                    className="border bg-white cursor-pointer transition-all border-border hover:border-gray-400 hover:shadow-md"
+                    style={{ padding: '20px', borderRadius: '4px' }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedAssetSales.has(sale.id)}
-                      onChange={() => handleToggleSaleForAsset(sale.id)}
-                      className="h-4 w-4"
-                      disabled={isGeneratingAssets}
-                    />
-                    <div className="flex-1">
-                      <div className="font-semibold">{sale.saleName}</div>
-                      <div className="text-sm text-muted-foreground">{sale.percentOff}% off</div>
+                    <div className="flex items-start gap-3 mb-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedAssetSales.has(sale.id)}
+                        onChange={() => handleToggleSaleForAsset(sale.id)}
+                        className="h-4 w-4 mt-1"
+                        disabled={isGeneratingAssets}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="flex-1">
+                        <h3 style={{ 
+                          fontFamily: 'DM Sans, sans-serif', 
+                          fontWeight: 600, 
+                          fontSize: '16px'
+                        }}>
+                          {sale.saleName}
+                        </h3>
+                      </div>
                     </div>
-                  </label>
+                    <div className="ml-7">
+                      <span className="font-semibold text-sm" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                        {sale.percentOff}% Off
+                      </span>
+                    </div>
+                  </div>
                 ))
               )}
             </div>

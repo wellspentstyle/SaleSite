@@ -198,7 +198,7 @@ export function SyncGem() {
           {/* Info Box */}
           {!syncResult && !errorMessage && !isSyncing && (
             <div 
-              className="border border-border bg-muted p-6 rounded-lg"
+              className="border border-border bg-white p-6 rounded-lg"
               style={{ fontFamily: 'DM Sans, sans-serif', marginTop: '24px' }}
             >
               <h3 className="font-semibold mb-2">How it works:</h3>

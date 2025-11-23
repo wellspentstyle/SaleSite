@@ -353,8 +353,18 @@ export function PicksAdmin() {
                 <div
                   key={sale.id}
                   onClick={() => handleSaleClick(sale)}
-                  className="border bg-white cursor-pointer transition-all border-border hover:border-gray-400 hover:shadow-md"
-                  style={{ padding: '20px', borderRadius: '4px' }}
+                  className="border bg-white cursor-pointer transition-all hover:shadow-md"
+                  style={{ 
+                    padding: '20px', 
+                    borderRadius: '4px',
+                    borderColor: '#e5e7eb'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#9ca3af';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                  }}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <h3 
