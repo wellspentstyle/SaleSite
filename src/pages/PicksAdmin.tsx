@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
@@ -84,6 +84,7 @@ export function PicksAdmin() {
   
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const cancelScrapingRef = useRef(false);
   const [editForm, setEditForm] = useState({
     percentOff: '',
     promoCode: '',
@@ -326,11 +327,11 @@ export function PicksAdmin() {
 
   const performScraping = async (urlList: string[]) => {
     setIsLoading(true);
+    cancelScrapingRef.current = false;
     const auth = sessionStorage.getItem('adminAuth');
 
     const scrapedProducts: any[] = [];
     const failures: any[] = [];
-    let isCancelled = false;
 
     try {
       // Use streaming endpoint with POST body
@@ -357,8 +358,8 @@ export function PicksAdmin() {
       while (true) {
         const { done, value } = await reader.read();
         
-        if (done || isCancelled) {
-          if (isCancelled) {
+        if (done || cancelScrapingRef.current) {
+          if (cancelScrapingRef.current) {
             reader.cancel();
             toast.info('Scraping cancelled');
           }
@@ -420,13 +421,18 @@ export function PicksAdmin() {
       });
 
     } catch (error: any) {
-      if (!isCancelled) {
+      if (!cancelScrapingRef.current) {
         console.error('Scraping error:', error);
         toast.error('An error occurred while scraping. Please try again.');
       }
     } finally {
       setIsLoading(false);
+      cancelScrapingRef.current = false;
     }
+  };
+
+  const handleCancelScraping = () => {
+    cancelScrapingRef.current = true;
   };
 
   const handleScrapePicks = async (e: React.FormEvent) => {
@@ -872,6 +878,25 @@ export function PicksAdmin() {
                   'Scrape Picks'
                 )}
               </Button>
+              
+              {isLoading && (
+                <Button 
+                  type="button"
+                  onClick={handleCancelScraping}
+                  variant="outline"
+                  style={{ 
+                    fontFamily: 'DM Sans, sans-serif',
+                    height: '44px',
+                    paddingLeft: '24px',
+                    paddingRight: '24px',
+                    borderColor: '#e5e5e5',
+                    color: '#666'
+                  }}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+              )}
               
               <Button
                 type="button"
