@@ -2895,13 +2895,15 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
     
     console.log('📝 Extracting sale information with AI...');
     
-    // IMPROVED: Better AI prompt with clearer instructions
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a sales email parser. Extract sale information from TIME-LIMITED PROMOTIONAL SALES ONLY.
+    // IMPROVED: Better AI prompt with clearer instructions + Azure content filter handling
+    let aiResponse;
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a sales email parser. Extract sale information from TIME-LIMITED PROMOTIONAL SALES ONLY.
 
 REJECT these types of emails (return {"error": "Not a promotional sale email"}):
 - Welcome emails with first-order discounts (e.g., "Welcome! Get 10% off")
@@ -2946,20 +2948,40 @@ Rules:
 - reasoning: Brief explanation of your decision
 
 Return ONLY valid JSON, no markdown formatting.`
-        },
-        {
-          role: 'user',
-          content: `Email from: ${from}
+          },
+          {
+            role: 'user',
+            content: `Email from: ${from}
 Subject: ${subject}
 
 Content:
 ${emailContent.substring(0, 4000)}`
-        }
-      ],
-      temperature: 0.1,
-    });
+          }
+        ],
+        temperature: 0.1,
+      });
+      
+      aiResponse = completion.choices[0].message.content.trim();
+    } catch (error) {
+      // Handle Azure OpenAI content filter (common false positive)
+      if (error.message && error.message.includes('content management policy')) {
+        console.log('⚠️ Azure content filter triggered - likely a false positive');
+        console.log('📧 Email from:', from);
+        console.log('📧 Subject:', subject);
+        
+        return res.status(200).json({ 
+          success: false, 
+          message: 'Content filter triggered - email skipped',
+          reason: 'azure_content_filter',
+          from: from,
+          subject: subject
+        });
+      }
+      
+      // Re-throw other errors
+      throw error;
+    }
     
-    const aiResponse = completion.choices[0].message.content.trim();
     console.log('🤖 AI Response:', aiResponse);
     
     // Parse AI response with better error handling

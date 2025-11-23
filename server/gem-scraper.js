@@ -1,8 +1,10 @@
+// DIAGNOSTIC GEM SCRAPER
+// This version logs EVERYTHING to help us debug
+
 import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -82,422 +84,338 @@ async function saveItemsToAirtable(items) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Airtable error:', errorText);
-        throw new Error(`Airtable error: ${response.status}`);
+        throw new Error(`Airtable API error: ${response.status} - ${errorText}`);
       }
 
-      const data = await response.json();
-      savedRecords.push(...data.records);
-      console.log(`✅ Saved batch ${Math.floor(i / BATCH_SIZE) + 1}: ${data.records.length} items`);
+      const result = await response.json();
+      savedRecords.push(...result.records);
+      console.log(`✅ Saved batch ${Math.floor(i / BATCH_SIZE) + 1} (${batch.length} items)`);
     }
 
-    console.log(`✅ Total saved to Airtable: ${savedRecords.length} items`);
+    console.log(`✅ Successfully saved ${savedRecords.length} items to Airtable`);
     return { success: true, count: savedRecords.length };
 
   } catch (error) {
-    console.error('❌ Error saving to Airtable:', error.message);
-    return { success: false, error: error.message };
+    console.error('❌ Failed to save items to Airtable:', error.message);
+    return { success: false, error: error.message, count: 0 };
   }
 }
 
 export async function scrapeGemItems(magicLink, options = {}) {
-  const { maxItems = 5, logger = console } = options;
+  const {
+    maxItems = 5,
+    logger = console
+  } = options;
   
-  logger.log('🚀 Starting Gem scraper...');
-  logger.log(`📧 Using magic link authentication`);
-  logger.log(`🔢 Max items to scrape: ${maxItems}`);
-
-  const marker = readMarker();
-  logger.log('📍 Last synced item ID:', marker.lastItemId || 'none (first run)');
-
   let browser;
+  let context;
   let page;
   
   try {
-    // Try to find Chromium executable
-    let chromiumPath = null;
-    try {
-      chromiumPath = execSync('which chromium', { encoding: 'utf-8' }).trim();
-      logger.log(`✅ Found Chromium at: ${chromiumPath}`);
-    } catch (e) {
-      logger.log('⚠️  Could not find chromium with which, trying default path...');
-    }
+    logger.log('💎 Starting Gem scraper (DIAGNOSTIC MODE)...');
+    logger.log(`🔗 Magic link: ${magicLink.substring(0, 60)}...`);
     
-    const launchOptions = {
+    browser = await chromium.launch({
       headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--disable-blink-features=AutomationControlled'
+        '--disable-blink-features=AutomationControlled',
+        '--disable-dev-shm-usage'
       ]
-    };
-    
-    if (chromiumPath) {
-      launchOptions.executablePath = chromiumPath;
-    }
-    
-    logger.log('🚀 Launching browser...');
-    browser = await chromium.launch(launchOptions);
-
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      viewport: { width: 1920, height: 1080 },
-      locale: 'en-US',
-      timezoneId: 'America/New_York'
     });
-
-    page = await context.newPage();
-
-    // IMPROVED: Better magic link authentication with verification
-    logger.log('🔐 Navigating to magic link...');
-    logger.log(`🔗 Magic link: ${magicLink.substring(0, 50)}...`);
     
-    try {
-      const response = await page.goto(magicLink, { 
-        waitUntil: 'networkidle', 
-        timeout: 45000 
+    context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 }
+    });
+    
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    });
+    
+    page = await context.newPage();
+    
+    // STEP 1: Navigate to magic link
+    logger.log('📍 STEP 1: Navigating to magic link...');
+    
+    const response = await page.goto(magicLink, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
+    
+    logger.log(`   Response status: ${response?.status()}`);
+    logger.log(`   URL after navigation: ${page.url()}`);
+    logger.log(`   Page title: ${await page.title()}`);
+    
+    await page.screenshot({ path: '/tmp/gem-1-initial.png', fullPage: true });
+    logger.log('   📸 Screenshot: /tmp/gem-1-initial.png');
+    
+    // STEP 2: Wait and check for elements
+    logger.log('📍 STEP 2: Waiting 3 seconds for page to settle...');
+    await page.waitForTimeout(3000);
+    
+    // DIAGNOSTIC: Check what's on the page
+    const pageAnalysis = await page.evaluate(() => {
+      const analysis = {
+        url: window.location.href,
+        title: document.title,
+        bodyText: document.body.innerText.substring(0, 500),
+        buttons: [],
+        links: [],
+        hasLoggedInText: document.body.innerText.includes('Logged In'),
+        hasContinueText: document.body.innerText.includes('Continue'),
+        hasEmailLogInText: document.body.innerText.includes('Email Log In')
+      };
+      
+      // Find all visible buttons
+      document.querySelectorAll('button').forEach((btn, i) => {
+        const rect = btn.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          analysis.buttons.push({
+            index: i,
+            text: btn.textContent?.trim().substring(0, 50) || '',
+            visible: window.getComputedStyle(btn).display !== 'none'
+          });
+        }
       });
       
-      logger.log(`📊 Response status: ${response.status()}`);
-      logger.log(`📍 Current URL after magic link: ${page.url()}`);
-      
-      // Handle "Logged In - Continue" popup that appears after magic link
-      logger.log('🚫 Checking for "Continue" popup...');
-      await page.waitForTimeout(2000);
-      
-      // Try multiple button texts in case they change it
-      const buttonTexts = ['Continue', 'OK', 'Got It', 'Close', 'Dismiss'];
-      let popupDismissed = false;
-      
-      for (const text of buttonTexts) {
-        try {
-          const btn = page.locator(`button:has-text("${text}")`).first();
-          if (await btn.count() > 0) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              logger.log(`   Found "${text}" button, clicking...`);
-              await btn.click();
-              await page.waitForTimeout(2000);
-              logger.log(`✅ Dismissed popup with "${text}" button`);
-              popupDismissed = true;
-              break;
-            }
+      // Find all visible links
+      document.querySelectorAll('a').forEach((link, i) => {
+        if (i < 5) { // Only first 5
+          const rect = link.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            analysis.links.push({
+              text: link.textContent?.trim().substring(0, 30) || '',
+              href: link.href
+            });
           }
-        } catch (error) {
-          // Button not found or not clickable, try next one
+        }
+      });
+      
+      return analysis;
+    });
+    
+    logger.log('📊 PAGE ANALYSIS:');
+    logger.log(`   URL: ${pageAnalysis.url}`);
+    logger.log(`   Title: ${pageAnalysis.title}`);
+    logger.log(`   Has "Logged In" text: ${pageAnalysis.hasLoggedInText}`);
+    logger.log(`   Has "Continue" text: ${pageAnalysis.hasContinueText}`);
+    logger.log(`   Has "Email Log In" text: ${pageAnalysis.hasEmailLogInText}`);
+    logger.log(`   Buttons found: ${pageAnalysis.buttons.length}`);
+    
+    if (pageAnalysis.buttons.length > 0) {
+      logger.log('   Button details:');
+      pageAnalysis.buttons.forEach((btn, i) => {
+        logger.log(`      ${i + 1}. "${btn.text}" (visible: ${btn.visible})`);
+      });
+    }
+    
+    logger.log(`   Body text preview: ${pageAnalysis.bodyText.substring(0, 200)}`);
+    
+    // STEP 3: Try to handle popup
+    logger.log('📍 STEP 3: Attempting popup handling...');
+    
+    let popupHandled = false;
+    
+    // Strategy 1: Look for Continue button
+    try {
+      logger.log('   Strategy 1: Looking for "Continue" button...');
+      const continueBtn = page.locator('button:has-text("Continue")').first();
+      const count = await continueBtn.count();
+      logger.log(`   Found ${count} "Continue" buttons`);
+      
+      if (count > 0) {
+        const isVisible = await continueBtn.isVisible().catch(() => false);
+        logger.log(`   Button visible: ${isVisible}`);
+        
+        if (isVisible) {
+          logger.log('   ✅ Clicking "Continue" button...');
+          await continueBtn.click();
+          await page.waitForTimeout(3000);
+          popupHandled = true;
+          logger.log('   ✅ Clicked successfully');
         }
       }
-      
-      if (!popupDismissed) {
-        logger.log('   No popup found (this is OK)');
-      }
-      
-      // Take screenshot for debugging
-      await page.screenshot({ path: '/tmp/gem-auth-1-after-link.png', fullPage: true });
-      logger.log('📸 Screenshot saved: /tmp/gem-auth-1-after-link.png');
-      
-    } catch (navError) {
-      logger.error(`❌ Failed to navigate to magic link: ${navError.message}`);
-      throw new Error(`Magic link navigation failed: ${navError.message}`);
+    } catch (error) {
+      logger.log(`   ❌ Strategy 1 failed: ${error.message}`);
     }
-
-    // IMPROVED: Wait for authentication to complete and verify success with polling
-    logger.log('⏳ Waiting for authentication to complete...');
     
-    // Poll for authentication indicators with timeout
-    const maxAuthWaitMs = 15000; // 15 seconds total
-    const pollIntervalMs = 1000; // Check every 1 second
-    const startTime = Date.now();
-    let isAuthenticated = false;
-    let authIndicator = null;
-    
-    while (Date.now() - startTime < maxAuthWaitMs) {
-      const currentUrl = page.url();
-      logger.log(`📍 Polling auth... Current URL: ${currentUrl}`);
-      
-      // Check if we're authenticated by looking for signs of logged-in state
-      const authCheck = await page.evaluate(() => {
-        // Check for common auth indicators
-        const hasUserMenu = document.querySelector('[data-testid="user-menu"]') !== null;
-        const hasProfileLink = document.querySelector('a[href*="/profile"]') !== null;
-        const hasMyGemsLink = document.querySelector('a[href*="/my-gems"]') !== null;
+    // Strategy 2: Look for any button in a dialog/modal
+    if (!popupHandled) {
+      try {
+        logger.log('   Strategy 2: Looking for buttons in dialogs...');
+        const dialogBtn = page.locator('[role="dialog"] button, [role="alertdialog"] button').first();
+        const count = await dialogBtn.count();
+        logger.log(`   Found ${count} dialog buttons`);
         
-        // Check for logout button using standard DOM methods
-        const buttons = Array.from(document.querySelectorAll('button'));
-        const hasLogoutButton = buttons.some(btn => 
-          btn.textContent.toLowerCase().includes('log out') || 
-          btn.textContent.toLowerCase().includes('logout')
-        );
-        
-        // Check if we're NOT on login page
-        const notOnLoginPage = !window.location.href.includes('/login') && 
-                               !window.location.href.includes('/requestEmailLogIn');
-        
-        // Return which indicator we found
-        let indicator = null;
-        if (hasUserMenu) indicator = 'user-menu';
-        else if (hasProfileLink) indicator = 'profile-link';
-        else if (hasMyGemsLink) indicator = 'my-gems-link';
-        else if (hasLogoutButton) indicator = 'logout-button';
-        
-        return {
-          authenticated: (hasUserMenu || hasProfileLink || hasMyGemsLink || hasLogoutButton) && notOnLoginPage,
-          indicator: indicator,
-          notOnLoginPage: notOnLoginPage
-        };
-      });
-      
-      if (authCheck.authenticated) {
-        isAuthenticated = true;
-        authIndicator = authCheck.indicator;
-        logger.log(`✅ Authentication detected via: ${authIndicator}`);
-        break;
+        if (count > 0) {
+          logger.log('   ✅ Clicking dialog button...');
+          await dialogBtn.click();
+          await page.waitForTimeout(3000);
+          popupHandled = true;
+          logger.log('   ✅ Clicked successfully');
+        }
+      } catch (error) {
+        logger.log(`   ❌ Strategy 2 failed: ${error.message}`);
       }
-      
-      // If we're still on login page, keep waiting
-      if (!authCheck.notOnLoginPage) {
-        logger.log('⏳ Still on login page, waiting...');
-      } else {
-        logger.log('⏳ Redirected but no auth indicators yet, waiting...');
-      }
-      
-      await page.waitForTimeout(pollIntervalMs);
     }
+    
+    // Strategy 3: Try pressing Escape
+    if (!popupHandled) {
+      logger.log('   Strategy 3: Trying Escape key...');
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(2000);
+    }
+    
+    await page.screenshot({ path: '/tmp/gem-2-after-popup.png', fullPage: true });
+    logger.log('   📸 Screenshot: /tmp/gem-2-after-popup.png');
+    
+    // STEP 4: Check if we're logged in now
+    logger.log('📍 STEP 4: Checking authentication status...');
     
     const currentUrl = page.url();
-    logger.log(`📍 Final URL after auth wait: ${currentUrl}`);
-    logger.log(`🔐 Authentication check: ${isAuthenticated ? 'SUCCESS' : 'FAILED'}`);
+    const currentTitle = await page.title();
     
-    if (!isAuthenticated) {
-      // Take screenshot of failure state
-      await page.screenshot({ path: '/tmp/gem-auth-2-failed.png', fullPage: true });
-      logger.log('📸 Failed auth screenshot: /tmp/gem-auth-2-failed.png');
+    logger.log(`   Current URL: ${currentUrl}`);
+    logger.log(`   Current title: ${currentTitle}`);
+    
+    const isLoggedIn = !currentUrl.includes('emailLogIn') && 
+                       (currentUrl.includes('/shop') || 
+                        currentUrl.includes('/items') ||
+                        currentUrl.includes('/collection'));
+    
+    logger.log(`   Appears logged in: ${isLoggedIn}`);
+    
+    if (!isLoggedIn) {
+      logger.log('   ⚠️ NOT logged in, trying manual navigation...');
       
-      // Get page title and any error messages
-      const title = await page.title();
-      const errorText = await page.evaluate(() => {
-        const errorEl = document.querySelector('[class*="error"]') || 
-                       document.querySelector('[role="alert"]');
-        return errorEl ? errorEl.textContent : null;
-      });
-      
-      logger.error(`❌ Authentication failed after ${maxAuthWaitMs/1000}s. Page title: "${title}"`);
-      if (errorText) {
-        logger.error(`❌ Error message: ${errorText}`);
+      // Try navigating directly to items page
+      try {
+        await page.goto('https://gem.app/items', {
+          waitUntil: 'domcontentloaded',
+          timeout: 30000
+        });
+        
+        await page.waitForTimeout(3000);
+        
+        const newUrl = page.url();
+        logger.log(`   After manual navigation: ${newUrl}`);
+        
+        if (newUrl.includes('emailLogIn')) {
+          throw new Error('Authentication failed after 15s. Page title: "Email Log In"');
+        }
+        
+        logger.log('   ✅ Manual navigation successful');
+        
+      } catch (navError) {
+        logger.error('   ❌ Manual navigation failed:', navError.message);
+        throw new Error('Magic link authentication failed - not logged in after using link');
       }
-      
-      throw new Error('Magic link authentication failed - not logged in after using link');
     }
     
-    logger.log('✅ Successfully authenticated!');
-    await page.screenshot({ path: '/tmp/gem-auth-3-success.png', fullPage: true });
-    logger.log('📸 Success screenshot: /tmp/gem-auth-3-success.png');
-
-    // IMPROVED: Navigate to saved items with better error handling
-    logger.log('📱 Navigating to my-gems page...');
+    // STEP 5: Extract items
+    logger.log('📍 STEP 5: Attempting to extract items...');
     
-    try {
-      await page.goto('https://gem.app/my-gems', { 
-        waitUntil: 'domcontentloaded', 
-        timeout: 30000 
-      });
-      
-      logger.log(`📍 Current URL: ${page.url()}`);
-      
-      // Wait for items to load
-      logger.log('⏳ Waiting for items to load...');
-      
-      // Try multiple selectors that might indicate items are loaded
-      const itemsLoaded = await Promise.race([
-        page.waitForSelector('[data-testid="gem-card"]', { timeout: 10000 }).then(() => true),
-        page.waitForSelector('.gem-card', { timeout: 10000 }).then(() => true),
-        page.waitForSelector('article', { timeout: 10000 }).then(() => true),
-        page.waitForTimeout(10000).then(() => false)
-      ]);
-      
-      if (!itemsLoaded) {
-        logger.log('⚠️  No item selectors found, but continuing anyway...');
-      } else {
-        logger.log('✅ Items loaded successfully');
-      }
-      
-      await page.screenshot({ path: '/tmp/gem-items-page.png', fullPage: true });
-      logger.log('📸 Items page screenshot: /tmp/gem-items-page.png');
-      
-    } catch (navError) {
-      logger.error(`❌ Failed to navigate to my-gems: ${navError.message}`);
-      await page.screenshot({ path: '/tmp/gem-nav-error.png', fullPage: true });
-      throw new Error(`Navigation to my-gems failed: ${navError.message}`);
-    }
-
-    logger.log('🔍 Extracting saved items...');
-
-    const items = await page.evaluate((lastItemId) => {
+    await page.waitForTimeout(3000);
+    
+    const items = await page.evaluate((maxItems) => {
       const results = [];
       
-      // Try multiple selectors for item cards
       const selectors = [
-        '[data-testid="gem-card"]',
-        '.gem-card',
         'article',
-        '[class*="card"]',
-        '[class*="item"]',
-        '[class*="product"]'
+        '[data-testid*="item"]',
+        'a[href*="/item/"]'
       ];
       
-      let itemCards = [];
+      let elements = [];
       for (const selector of selectors) {
-        itemCards = document.querySelectorAll(selector);
-        if (itemCards.length > 0) {
-          console.log(`Found ${itemCards.length} items with selector: ${selector}`);
+        elements = document.querySelectorAll(selector);
+        if (elements.length > 0) {
+          console.log(`Found ${elements.length} items with: ${selector}`);
           break;
         }
       }
       
-      if (itemCards.length === 0) {
-        console.log('No item cards found on page');
-        return results;
+      if (elements.length === 0) {
+        console.log('No items found. Page HTML length:', document.documentElement.outerHTML.length);
+        return [];
       }
-
-      for (const card of itemCards) {
-        try {
-          // Find link
-          const linkElement = card.querySelector('a[href*="http"]') || card.querySelector('a');
-          if (!linkElement) continue;
-
-          const url = linkElement.href;
-          if (!url || url.includes('gem.app')) continue;
-
-          // Find image
-          const imgElement = card.querySelector('img');
-          const imageUrl = imgElement?.src || '';
-
-          // Get all text content
-          const textContent = card.innerText || '';
-          const lines = textContent.split('\n').map(l => l.trim()).filter(l => l);
-
-          // Extract price
-          const priceMatch = textContent.match(/\$[\d,]+(?:\.\d{2})?/);
-          const price = priceMatch ? parseFloat(priceMatch[0].replace(/[$,]/g, '')) : null;
-
-          // Extract size
-          const sizeMatch = textContent.match(/size[:\s]*([^\n]+)/i);
-          const size = sizeMatch ? sizeMatch[1].trim() : null;
-
-          // Extract name and brand
-          let name = '';
-          let brand = '';
-
-          for (const line of lines) {
-            if (line.startsWith('$') || line.match(/^\d+$/)) continue;
-            if (line.toLowerCase().includes('size')) continue;
-            if (line.toLowerCase().includes('save') || line.toLowerCase().includes('share')) continue;
-
-            if (!brand && line.length < 50) {
-              brand = line;
-            } else if (!name) {
-              name = line;
-              break;
-            }
-          }
-
-          // Extract marketplace
-          const urlObj = new URL(url);
-          const marketplace = urlObj.hostname.replace(/^www\./, '');
-
-          // Create unique item ID
-          const itemId = url + '||' + (name || 'unnamed');
-
-          // Stop if we've reached the last synced item
-          if (itemId === lastItemId) {
-            console.log('Reached last synced item, stopping');
-            return results;
-          }
-
+      
+      for (let i = 0; i < Math.min(elements.length, maxItems); i++) {
+        const element = elements[i];
+        
+        const link = element.querySelector('a') || (element.tagName === 'A' ? element : null);
+        const img = element.querySelector('img');
+        const title = element.querySelector('h1, h2, h3, h4');
+        
+        if (link || img) {
           results.push({
-            id: itemId,
-            name: name || 'Unnamed Item',
-            url: url,
-            brand: brand || null,
-            price: price,
-            size: size,
-            imageUrl: imageUrl,
-            marketplace: marketplace,
-            dateSaved: new Date().toISOString().split('T')[0]
+            url: link?.href || '',
+            imageUrl: img?.src || '',
+            name: title?.textContent?.trim() || 'Unnamed Item',
+            brand: '',
+            price: '',
+            size: '',
+            dateSaved: new Date().toISOString().split('T')[0],
+            marketplace: 'Gem'
           });
-
-        } catch (error) {
-          console.error('Error extracting item:', error);
         }
       }
-
-      return results;
-    }, marker.lastItemId);
-
-    logger.log(`✅ Extracted ${items.length} items from page`);
-
-    if (items.length === 0) {
-      logger.log('⚠️  No items found on page. This could mean:');
-      logger.log('   1. You have no saved items in Gem');
-      logger.log('   2. The page structure changed');
-      logger.log('   3. Items failed to load');
       
-      // Get page HTML for debugging
-      const bodyText = await page.evaluate(() => document.body.innerText);
-      logger.log('📄 Page text preview:', bodyText.substring(0, 500));
+      return results;
+    }, maxItems);
+    
+    logger.log(`✅ Extracted ${items.length} items`);
+    
+    if (items.length > 0) {
+      logger.log('📝 Sample item:', items[0]);
+    } else {
+      logger.log('⚠️ No items extracted - this might be normal if account is empty');
     }
-
+    
+    // Save to Airtable
+    const saveResult = await saveItemsToAirtable(items);
+    
     await browser.close();
-
-    const itemsToSave = items.slice(0, maxItems);
-    logger.log(`📦 Saving ${itemsToSave.length} items (limited to max ${maxItems})`);
-
-    const saveResult = await saveItemsToAirtable(itemsToSave);
-
-    if (saveResult.success && itemsToSave.length > 0) {
-      writeMarker(itemsToSave[0].id);
-    }
-
+    
     return {
       success: true,
+      message: `Successfully scraped ${items.length} items from Gem`,
       itemsScraped: items.length,
       itemsSaved: saveResult.count,
-      items: itemsToSave,
-      message: `Successfully scraped ${items.length} items, saved ${saveResult.count} to Airtable`
+      items: items
     };
-
+    
   } catch (error) {
     logger.error('❌ Gem scraper error:', error.message);
     logger.error('Stack trace:', error.stack);
     
-    // Try to get current page state for debugging
     if (page) {
       try {
         const url = page.url();
         const title = await page.title();
+        
         logger.error(`❌ Error occurred at URL: ${url}`);
         logger.error(`❌ Page title: ${title}`);
+        
         await page.screenshot({ path: '/tmp/gem-error-state.png', fullPage: true });
-        logger.error('📸 Error state screenshot: /tmp/gem-error-state.png');
-      } catch (debugError) {
-        logger.error('⚠️  Could not capture debug info:', debugError.message);
+        logger.log('📸 Error state screenshot: /tmp/gem-error-state.png');
+      } catch (e) {
+        // Ignore
       }
     }
     
     if (browser) {
       await browser.close();
     }
-
+    
     return {
       success: false,
       error: error.message,
       itemsScraped: 0,
-      itemsSaved: 0
+      itemsSaved: 0,
+      items: []
     };
   }
 }
