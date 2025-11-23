@@ -1,60 +1,55 @@
 # Upcoming Sales Webpage
 
 ## Overview
-A modern React + Vite web application designed to showcase upcoming designer sales and deals. Its primary purpose is to provide users with a clean, intuitive interface for discovering discounted luxury fashion items, featuring filtering capabilities, detailed sale information, and a seamless shopping experience through affiliate integrations. The project aims to monetize through affiliate links while offering a curated selection of sales.
+A React + Vite web application showcasing upcoming designer sales and deals. Its core purpose is to offer users an intuitive interface for discovering discounted luxury fashion items, complete with filtering, detailed sale information, and seamless shopping via affiliate integrations. The project aims to generate revenue through affiliate links by providing a curated selection of sales.
 
 ## User Preferences
 I prefer simple language and clear, concise explanations. I want iterative development with frequent, small updates. Ask for my approval before making any major architectural changes or introducing new third-party dependencies. I prefer functional components in React and a modular file structure.
 
 ## System Architecture
-The application is built with React 18 and TypeScript, using Vite for a fast development experience. Styling is managed with Tailwind CSS v3 (configured via tailwind.config.ts with proper content paths scanning .tsx files), complemented by Radix UI primitives for accessible and customizable UI components. State management primarily utilizes React hooks.
+The application uses React 18, TypeScript, and Vite for development. Tailwind CSS v3 handles styling, complemented by Radix UI for accessible components. State management relies on React hooks.
 
 **Deployment Architecture:**
-- **Development**: Vite dev server + Backend server + Vite proxy for API requests.
-- **Production**: Single unified Express server serves both React build and API endpoints.
-- **Routing**: Middleware strips `/api` prefix for dev/prod compatibility, enabling SPA client-side routing.
-- **Configuration**: Autoscale deployment with build step and run command.
-- **Environment Detection**: Automatically detects production vs. development using `REPLIT_DEPLOYMENT` to switch Airtable bases.
+- **Development**: Vite dev server with a backend server and Vite proxy for API requests.
+- **Production**: A single Express server serves both the React build and API endpoints.
+- **Routing**: Middleware manages `/api` prefix for compatibility, enabling SPA client-side routing.
+- **Configuration**: Autoscale deployment with build and run commands.
+- **Environment Detection**: Uses `REPLIT_DEPLOYMENT` to switch Airtable bases between environments.
 
 **UI/UX Decisions:**
-- Clean, minimalist design with a responsive grid layout inspired by kickpleat.com aesthetic.
-- Custom fonts (DM Sans and Crimson Pro) for a modern aesthetic.
-- Streamlined navigation with a logo-only header.
-- Hero section features responsive media: mobile-optimized GIF (841KB) on screens <768px, desktop looping video background (WebM + MP4 fallback) on larger screens, with static poster image fallback for bandwidth/autoplay restrictions.
-- Sale cards display discount percentages, and featured sales include images.
-- Interactive dialogs for detailed product picks with "Shop Now" buttons.
-- Sort and Filter controls are aligned to the right.
-- Filter sidebar slides in from the right, pushing content over with smooth transitions and synchronized margin transitions.
-- Default sort is "newest first" (DATE, NEW TO OLD) to showcase latest sales immediately.
-- **Mobile Optimizations**: Responsive design with breakpoint-specific improvements: Hero section uses mobile-optimized GIF (841KB) instead of desktop video for faster loading on screens <768px; Sort/Filter buttons stack vertically on mobile with full-width layout and 48px min-height for optimal touch targets; reduced spacing on mobile (py-8→py-16→py-20, card padding p-5→p-8, grid gaps gap-5→gap-8) for less cramped layouts; SortDropdown expands full-width on mobile (w-full md:w-auto). FilterSidebar maintains 280px right-sliding behavior across all breakpoints.
+- Minimalist, responsive design inspired by kickpleat.com, using custom fonts (DM Sans, Crimson Pro).
+- Logo-only header and responsive hero section (mobile GIF, desktop video).
+- Sale cards display discounts, with featured sales including images.
+- Interactive dialogs for product picks with "Shop Now" buttons.
+- Filter sidebar slides in from the right, pushing content.
+- Default sort is "newest first."
+- **Mobile Optimizations**: Responsive design with breakpoint-specific adjustments for hero media, button stacking, spacing, and dropdown width.
 
 **Technical Implementations:**
-- **Filtering**: Right-sliding sidebar with checkbox-based filtering for TYPE (BRAND, SHOP, HAS PICKS), PRICE RANGE, DISCOUNT, MAX SIZE (WOMEN), and VALUES (SUSTAINABLE, WOMEN-OWNED, INDEPENDENT LABEL, SECONDHAND, BIPOC-OWNED). Filters use OR logic within categories and AND logic across categories.
-- **Sorting**: Dropdown with 6 options (FEATURED, ALPHABETICALLY A-Z/Z-A, DISCOUNT HIGH TO LOW, DATE OLD/NEW TO OLD). Bifurcated rendering: "FEATURED" sort displays featured sales first (with special styling) then regular sales; all other sorts show a unified grid with uniform card styling sorted by the selected criteria.
-- **Admin Interface**: A password-protected `/admin` panel using React Router for managing product picks, brands, and asset generation. Includes a top-level layout with password gate, a fixed-width left sidebar navigation, and app-wide Sonner toast notifications for all error/success messages (no browser alerts). Pick Manager features streamlined two-view system: sales list view with clickable cards (hover effects) navigating to dedicated URL entry screen, plus "Back to Sales List" button with ArrowLeft icon for returning to selection. Three-button filter toggle separates sales into: Active Without Picks (default), Active With Picks, and Inactive Sales, with visual highlighting of active filter. External link icons on pick cards, in-app AlertDialog for delete confirmations, and inline sale editing capability to update discount percentages. Finalize Picks page includes button-triggered price calculator dialog (calculates original price from sale price + percent off using formula: original = sale / (1 - percent/100)) with validation, state reset on close, and accessibility features to help when retailers only display sale pricing. Add Brands page features separate Cancel (stops processing, keeps results) and Clear (resets everything) buttons with horizontally scrollable results table.
-- **SEO**: Comprehensive meta tags (Title, Description, Keywords, Open Graph, Twitter Card) for improved visibility.
-- **Performance Optimization**: In-memory caching with 5-minute TTL for the `/sales` endpoint and Airtable pagination across all endpoints.
-- **Sales Listing**: Displays current and upcoming sales with discount percentages and dynamically highlights featured sales.
-- **Product Picks**: Detailed product listings within a sale, including brand names, images, prices, and affiliate links.
-- **Hybrid Scraper**: Automatically extracts product data (brand, name, image, price, percent off) from URLs using a multi-phase pipeline (JSON-LD, HTML deterministic extraction with Shopify/microdata support, AI) with Playwright fallback and manual entry UI. Fast Scraper features browser-like headers to avoid bot detection, explicit AI prompts with 🚨 warnings distinguishing sale vs. original price, department store-specific patterns (Nordstrom, Saks, Neiman Marcus), and validation logic that automatically catches and fixes reversed/equal prices. Includes confidence scoring.
-- **Brand Research**: AI-powered brand research tool using Serper.dev API for 6-phase targeted searches to extract product URLs, pricing, categories, sizing, ownership, and diversity information. Features resale domain blocklist (30+ sites), official domain validation, product-aware category detection, clothing-only size scraping, and universal size conversion to US numeric format (EU 44→10, L→10, XL→14) with "Up to X" output. Claude (Anthropic) generates concise 1-2 sentence brand descriptions (~60 words) with insider fashion positioning and specific design philosophy details. AI price extraction prioritizes original/regular prices over sale prices for accurate price range calculation. Fault-tolerant design continues research even when pricing data can't be extracted, returning partial results with `partialData` flag and displaying amber "⚠ Partial" status in UI; edit handler clears flag when user manually adds pricing. Results are editable via in-app dialog (space-y-16 spacing) with dropdown selectors for categories (Clothing, Shoes, Accessories, Bags, Jewelry, Outerwear, Swimwear) and values that auto-add on selection without requiring button clicks, allowing manual correction before saving to Airtable. Two-tier independence constraint prevents Women-owned/BIPOC-owned tags on conglomerate-owned brands through deterministic parent company detection (LVMH, Kering, etc.) and AI-based validation. Enhanced size chart extraction fetches full page HTML for improved accuracy over snippet-based approaches. Type field always defaults to "Brand" and is excluded from edit UI. **Automatic Airtable Integration**: "Send to Airtable" button automatically looks up Company records by name using properly escaped filterByFormula queries (handles apostrophes like "L'Agence"), updates existing records or creates new ones, and preserves multi-select arrays for Category/Values fields. Provides feedback showing counts of created, updated, and failed operations.
-- **Email Automation**: CloudMailin webhook integrates with Gmail to automatically parse incoming sale emails, extract details using AI, and populate Airtable, with duplicate prevention. Enhanced with improved HTML content extraction (strips styles/scripts, handles HTML entities), better AI prompts with reasoning field for transparency, fuzzy duplicate detection (handles company name variations like "Gap" vs "GAP Inc." with 5% discount variance), lower confidence threshold (60% vs 70%) to reduce false negatives, and comprehensive debug logging showing AI reasoning and confidence scores for every decision. **Company Auto-Linking**: Automatically links sales to existing Company records in Airtable using fuzzy matching (Dice coefficient with 90% threshold) that handles name variations by normalizing case, punctuation, and corporate suffixes (Inc., LLC, etc.). Searches Companies table by normalized name, creates new Company records when brand doesn't exist, and populates both OriginalCompanyName (plain text from email) and Company (linked record) fields. Enables frontend display and filtering while eliminating manual linking work.
-- **Instagram Story Automation**: Event-driven system generating 1080x1920px Instagram story images triggered by Airtable Automation. Features dynamic text overlays, smart image fetching, auto-uploads to Google Drive, and Telegram delivery.
-- **Gem.app Sync**: Automated scraper for vintage clothing items saved on Gem.app, accessible via the admin panel. Uses CloudMailin for magic link authentication and Playwright for scraping, with incremental sync and robust error handling. Enhanced authentication verification polls for login indicators (user menu, profile/my-gems links, logout button) every second for up to 15 seconds, eliminating race conditions from slow page loads. Features comprehensive debugging with screenshots at every step (/tmp/gem-auth-*.png), anti-detection browser flags (disables automation signals), Mac user agent for stealth, multiple fallback selectors for item extraction, and instrumented logging that records which auth indicator succeeded and captures full page state on failures. **Background Processing**: Runs in background with in-memory progress tracker (steps: initializing → requesting_login → waiting_for_link → scraping → saving → completed), allowing users to navigate away during long operations. Frontend polls status endpoint every second to display live progress updates showing current step and percentage completion. **Email Detection**: CloudMailin webhook uses flexible subject matching (accepts "Log In Link", "Login", or any subject with "log" + "in") to reliably capture Gem magic link emails from any sender address containing gem.app.
-- **Featured Sales Assets**: Social media asset generator creating 1080x1350 Instagram-ready images with dynamic content and styling from selected sales, auto-uploads to Google Drive.
-- **Freshness Tracking**: Hybrid manual/automated system for tracking product pick availability to prevent showing sold-out items. Picks include freshness metadata (AvailabilityStatus: In Stock/Low/Sold Out/Unknown, LastValidatedAt, NextCheckDue, HiddenUntilFresh). Admin panel provides bulk refresh actions, mark-sold-out workflow, filters by status/freshness/display state, and comprehensive stats dashboard. Frontend automatically filters out sold-out picks and stale items (>14 days since validation with Unknown status). Nightly check endpoint validates picks from active sales only, using existing hybrid scraper to detect availability. Picks link to Company/Brand table for reusability across sales.
-- **Brand Watchlist Directory**: Public-facing `/brands` page titled "The Brands We're Watching" showcasing 137+ curated brands and shops from Airtable Companies table. Hero subtitle reads "From long-time favorites to your next discovery, these are the labels we actually track." Features two sections (Brands/Shops) with left sidebar navigation showing counts and Filter button positioned below the section links. Card-based layout displays company name, description, and tags (price range, size availability, values). Integrates with existing FilterSidebar component for filtering by price range, size, and values (excludes "Has Faves" option). Cards are clickable and prioritize ShopMy affiliate links (ShopmyURL field) with fallback to official brand URLs when affiliate links unavailable. Backend returns both `url` and `shopmyUrl` for backward compatibility. Displays all standard metadata from Companies table including descriptions and max women's sizes, matching homepage aesthetic. Navigation label is "Brand Watchlist" across all pages.
+- **Filtering**: Right-sliding sidebar with checkbox filters for TYPE, PRICE RANGE, DISCOUNT, MAX SIZE, and VALUES, using OR logic within categories and AND across categories.
+- **Sorting**: Dropdown with 6 options. "FEATURED" sort displays featured items first with special styling, others use a unified grid.
+- **Admin Interface**: Password-protected `/admin` panel for managing product picks, brands, and asset generation. Features a two-view pick manager, external link icons, delete confirmations, inline sale editing, and a price calculator dialog. Includes a "Add Brands" page with an editable results table.
+- **SEO**: Comprehensive meta tags for visibility.
+- **Performance Optimization**: In-memory caching (5-minute TTL) for `/sales` and Airtable pagination.
+- **Hybrid Scraper**: Extracts product data from URLs using a multi-phase pipeline (JSON-LD, HTML, AI, Playwright fallback) with validation and confidence scoring.
+- **Brand Research**: AI-powered tool (Serper.dev) for 6-phase targeted searches to extract brand details, including product URLs, pricing, categories, sizing, ownership, and diversity. Generates 1-2 sentence brand descriptions using Claude. Features automatic Airtable integration to update or create records, handling multi-select fields and providing feedback.
+- **Email Automation**: CloudMailin webhook parses incoming sale emails, extracts details using AI, and populates Airtable, with fuzzy duplicate detection and company auto-linking.
+- **Instagram Story Automation**: Event-driven system creating 1080x1920px Instagram images from Airtable data, uploading to Google Drive, and delivering via Telegram.
+- **Gem.app Sync**: Automated scraper for vintage clothing items, accessible via admin panel. Uses CloudMailin for magic link authentication and Playwright for scraping, with enhanced authentication, popup handling, and background processing with live progress updates.
+- **Featured Sales Assets**: Generates 1080x1350 Instagram images from selected sales, auto-uploads to Google Drive.
+- **Freshness Tracking**: Hybrid manual/automated system to track product pick availability. Admin panel provides bulk refresh actions, mark-sold-out workflow, and filtering. Frontend filters out sold-out/stale items. Nightly checks validate picks.
+- **Brand Watchlist Directory**: Public `/brands` page showcasing curated brands/shops from Airtable. Features two sections (Brands/Shops), a left sidebar with counts, and uses the FilterSidebar component. Cards link to affiliate or official brand URLs.
 
 ## External Dependencies
-- **Airtable**: Primary data source for sales and product picks.
-- **ShopMy**: Affiliate marketing platform for monetizing product links.
-- **OpenAI**: AI-powered data extraction for scraping and email automation.
-- **Serper.dev**: Real-time Google search API for brand research.
-- **CloudMailin**: Inbound email parsing service for sale emails and Gem.app authentication.
-- **Telegram Bot API**: Delivers generated Instagram stories to iPhone.
-- **Google Drive API**: Cloud storage for generated Instagram story images.
-- **Radix UI**: Unstyled, accessible component primitives.
+- **Airtable**: Primary data source.
+- **ShopMy**: Affiliate marketing platform.
+- **OpenAI**: AI for data extraction.
+- **Serper.dev**: Google search API for brand research.
+- **CloudMailin**: Inbound email parsing.
+- **Telegram Bot API**: Delivers Instagram stories.
+- **Google Drive API**: Stores Instagram story images.
+- **Radix UI**: Unstyled component primitives.
 - **Lucide React**: Icon library.
 - **Recharts**: Charting library.
 - **Sonner**: Toast notification library.
-- **Vaul**: Drawer component for React.
+- **Vaul**: Drawer component.

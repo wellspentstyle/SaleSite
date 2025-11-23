@@ -153,6 +153,80 @@ export async function scrapeGemItems(magicLink, options = {}) {
 
     page = await context.newPage();
 
+    // Function to dismiss common popups/modals
+    async function dismissPopups() {
+      logger.log('🚫 Checking for popups/modals...');
+      
+      // Common popup close selectors
+      const popupSelectors = [
+        // Close buttons
+        'button[aria-label*="close" i]',
+        'button[aria-label*="dismiss" i]',
+        'button:has-text("Close")',
+        'button:has-text("×")',
+        'button:has-text("✕")',
+        '[class*="close" i][role="button"]',
+        '[class*="dismiss" i]',
+        
+        // Accept/OK buttons for cookie consent
+        'button:has-text("Accept")',
+        'button:has-text("OK")',
+        'button:has-text("I Accept")',
+        'button:has-text("Accept All")',
+        'button:has-text("Allow")',
+        '[id*="accept" i][role="button"]',
+        
+        // "Not now" / "Later" for notifications/app prompts
+        'button:has-text("Not Now")',
+        'button:has-text("No Thanks")',
+        'button:has-text("Later")',
+        'button:has-text("Maybe Later")',
+        'button:has-text("Continue in Browser")',
+        'button:has-text("Stay in Browser")',
+        
+        // Modal overlays
+        '[class*="modal" i] button',
+        '[class*="overlay" i] button',
+        '[role="dialog"] button',
+        '[role="alertdialog"] button',
+        
+        // Specific Gem.app patterns
+        '[data-testid*="close"]',
+        '[data-testid*="dismiss"]'
+      ];
+      
+      let popupsClosed = 0;
+      
+      for (const selector of popupSelectors) {
+        try {
+          const popup = page.locator(selector).first();
+          const count = await popup.count();
+          
+          if (count > 0) {
+            const isVisible = await popup.isVisible().catch(() => false);
+            
+            if (isVisible) {
+              logger.log(`   Found popup: ${selector}`);
+              await popup.click({ timeout: 2000 });
+              await page.waitForTimeout(1000); // Wait for animation
+              popupsClosed++;
+              logger.log(`   ✅ Closed popup`);
+            }
+          }
+        } catch (error) {
+          // Ignore - popup might not exist or already be closed
+        }
+      }
+      
+      if (popupsClosed > 0) {
+        logger.log(`✅ Dismissed ${popupsClosed} popup(s)`);
+      } else {
+        logger.log('   No popups found');
+      }
+      
+      return popupsClosed;
+    }
+
     // IMPROVED: Better magic link authentication with verification
     logger.log('🔐 Navigating to magic link...');
     logger.log(`🔗 Magic link: ${magicLink.substring(0, 50)}...`);
@@ -165,6 +239,12 @@ export async function scrapeGemItems(magicLink, options = {}) {
       
       logger.log(`📊 Response status: ${response.status()}`);
       logger.log(`📍 Current URL after magic link: ${page.url()}`);
+      
+      // Wait for page to settle before checking for popups
+      await page.waitForTimeout(2000);
+      
+      // Dismiss any popups that appeared
+      await dismissPopups();
       
       // Take screenshot for debugging
       await page.screenshot({ path: '/tmp/gem-auth-1-after-link.png', fullPage: true });
@@ -264,6 +344,11 @@ export async function scrapeGemItems(magicLink, options = {}) {
     }
     
     logger.log('✅ Successfully authenticated!');
+    
+    // Dismiss any post-login popups
+    await page.waitForTimeout(1000);
+    await dismissPopups();
+    
     await page.screenshot({ path: '/tmp/gem-auth-3-success.png', fullPage: true });
     logger.log('📸 Success screenshot: /tmp/gem-auth-3-success.png');
 
@@ -277,6 +362,10 @@ export async function scrapeGemItems(magicLink, options = {}) {
       });
       
       logger.log(`📍 Current URL: ${page.url()}`);
+      
+      // Dismiss any popups on items page
+      await page.waitForTimeout(1000);
+      await dismissPopups();
       
       // Wait for items to load
       logger.log('⏳ Waiting for items to load...');

@@ -1,13 +1,17 @@
-# Email Extraction Testing & Debugging Tools
+# Testing & Debugging Tools
 
-This suite of tools helps you test, monitor, and debug the email extraction webhook for sale automation.
+This suite of tools helps you test, monitor, and debug email extraction and Gem scraping automation.
 
 ## 📦 Files Included
 
+### Email Automation Tools
 1. **test-email-extraction.js** - Automated test suite with 10 email scenarios
 2. **email-monitor.js** - Real-time monitoring dashboard
 3. **analyze-rejection.js** - Debug tool for understanding why emails are rejected
 4. **diagnostics.js** - System health checker
+
+### Gem Scraping Tools
+5. **debug-gem-popup.js** - Interactive popup debugger for Gem.app authentication
 
 ## 🚀 Quick Start
 
@@ -147,6 +151,66 @@ node tools/email-monitor.js
 **Controls:**
 - Press `R` to refresh manually
 - Press `Q` to quit
+
+---
+
+### Gem Popup Debugger
+
+**Purpose:** Debug popup/modal issues blocking Gem.app authentication
+
+```bash
+node tools/debug-gem-popup.js <magic-link-url>
+```
+
+**Features:**
+- Opens **visible** browser window for 60 seconds
+- Highlights ALL buttons in RED with numbered labels
+- Lists every modal, overlay, and interactive element
+- Shows exactly what popups are blocking authentication
+- Provides detailed analysis and recommendations
+
+**Output:**
+```
+🔍 Gem Popup Debugger
+
+📊 PAGE ANALYSIS RESULTS
+════════════════════════════════════
+
+🔘 BUTTONS (5 visible):
+
+   1. "Accept All Cookies"
+      aria-label: Accept cookies
+      classes: cookie-consent-btn
+      position: (720, 450)
+      type: button
+
+   2. "×"
+      aria-label: Close modal
+      classes: modal-close
+      position: (1000, 100)
+      type: button
+
+🎯 LIKELY POPUP BUTTONS FOUND:
+   - "Accept All Cookies" at (720, 450)
+   - "×" at (1000, 100)
+```
+
+**How to Use:**
+1. Run the debugger with your magic link
+2. Watch the visible browser window
+3. Manually click popups to dismiss them
+4. Tell me which button worked
+5. I'll update the scraper to auto-click it
+
+**Example:**
+```bash
+# Get a magic link first, then debug it
+node tools/debug-gem-popup.js "https://gem.app/emailLogIn?token=abc123..."
+
+# Browser opens and highlights all buttons in red
+# Click the popup button manually
+# Tell me: "Button #3 'Continue' worked!"
+```
 
 ## 📊 Understanding Results
 
