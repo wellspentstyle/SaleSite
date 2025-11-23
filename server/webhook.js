@@ -2634,6 +2634,126 @@ app.post('/admin/picks/nightly-check', async (req, res) => {
   }
 });
 
+// ========================================
+// COMPANY AUTO-LINKING HELPERS
+// ========================================
+
+/**
+ * Normalize company name for fuzzy matching
+ * Handles variations like "Gap" vs "GAP Inc." vs "The Gap"
+ */
+function normalizeCompanyName(name) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/^the\s+/i, '') // Remove leading "The"
+    .replace(/\s+(inc|llc|ltd|co|corp|company)\.?$/i, '') // Remove corporate suffixes
+    .replace(/[^\w\s]/g, '') // Remove punctuation
+    .replace(/\s+/g, ' '); // Normalize whitespace
+}
+
+/**
+ * Calculate simple string similarity (0-1)
+ * Using Dice coefficient for fuzzy matching
+ */
+function calculateSimilarity(str1, str2) {
+  const bigrams1 = new Set();
+  const bigrams2 = new Set();
+  
+  for (let i = 0; i < str1.length - 1; i++) {
+    bigrams1.add(str1.substring(i, i + 2));
+  }
+  for (let i = 0; i < str2.length - 1; i++) {
+    bigrams2.add(str2.substring(i, i + 2));
+  }
+  
+  const intersection = new Set([...bigrams1].filter(x => bigrams2.has(x)));
+  return (2.0 * intersection.size) / (bigrams1.size + bigrams2.size);
+}
+
+/**
+ * Find existing Company record in Airtable or create a new one
+ * Returns the Company record ID to use for linking
+ */
+async function findOrCreateCompany(companyName) {
+  const normalized = normalizeCompanyName(companyName);
+  console.log(`🔍 Searching for company: "${companyName}" (normalized: "${normalized}")`);
+  
+  try {
+    // Query Companies table - use Name field with case-insensitive search
+    const searchUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Companies?filterByFormula=FIND(LOWER("${normalized.replace(/"/g, '\\"')}"), LOWER({Name}))`;
+    
+    const searchResponse = await fetch(searchUrl, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`
+      }
+    });
+    
+    if (!searchResponse.ok) {
+      console.error('❌ Company search failed:', await searchResponse.text());
+      return null;
+    }
+    
+    const searchData = await searchResponse.json();
+    
+    // If exact or close match found, use it
+    if (searchData.records && searchData.records.length > 0) {
+      // Find best match using fuzzy matching
+      let bestMatch = null;
+      let bestSimilarity = 0;
+      
+      for (const record of searchData.records) {
+        const recordName = normalizeCompanyName(record.fields.Name || '');
+        const similarity = calculateSimilarity(normalized, recordName);
+        
+        console.log(`   Candidate: "${record.fields.Name}" (similarity: ${(similarity * 100).toFixed(1)}%)`);
+        
+        if (similarity > bestSimilarity) {
+          bestSimilarity = similarity;
+          bestMatch = record;
+        }
+      }
+      
+      // Use match if similarity >= 90%
+      if (bestMatch && bestSimilarity >= 0.9) {
+        console.log(`✅ Matched existing company: "${bestMatch.fields.Name}" (${(bestSimilarity * 100).toFixed(1)}% match)`);
+        return bestMatch.id;
+      }
+    }
+    
+    // No match found - create new Company record
+    console.log(`➕ Creating new company record: "${companyName}"`);
+    
+    const createUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Companies`;
+    const createResponse = await fetch(createUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          Name: companyName,
+          Type: 'Brand' // Default type
+        }
+      })
+    });
+    
+    if (!createResponse.ok) {
+      console.error('❌ Company creation failed:', await createResponse.text());
+      return null;
+    }
+    
+    const newCompany = await createResponse.json();
+    console.log(`✅ Created new company: ${newCompany.id}`);
+    return newCompany.id;
+    
+  } catch (error) {
+    console.error('❌ Company lookup/create error:', error);
+    return null;
+  }
+}
+
 // CloudMailin/AgentMail webhook endpoint - IMPROVED VERSION
 app.post('/webhook/agentmail', upload.none(), async (req, res) => {
   console.log('📧 Received email webhook');
@@ -2912,6 +3032,11 @@ ${emailContent.substring(0, 4000)}`
     
     console.log('✅ Parsed sale data:', saleData);
     
+    // Auto-link Company field by looking up existing Company records
+    console.log('🔗 Looking up Company record...');
+    const companyRecordId = await findOrCreateCompany(saleData.company);
+    console.log(`✅ Company record: ${companyRecordId}`);
+    
     // IMPROVED: Smarter duplicate detection with fuzzy matching
     console.log('🔍 Checking for duplicates...');
     const twoWeeksAgo = new Date();
@@ -2925,7 +3050,7 @@ ${emailContent.substring(0, 4000)}`
       .replace(/[^a-z0-9]/g, '');
     
     // Fetch recent sales from same company (within 2 weeks)
-    const recentSalesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?filterByFormula=IS_AFTER({StartDate},'${twoWeeksAgoStr}')&fields[]=Company&fields[]=PercentOff&fields[]=StartDate`;
+    const recentSalesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?filterByFormula=IS_AFTER({StartDate},'${twoWeeksAgoStr}')&fields[]=OriginalCompanyName&fields[]=PercentOff&fields[]=StartDate`;
     
     const recentSalesResponse = await fetch(recentSalesUrl, {
       headers: {
@@ -2938,17 +3063,15 @@ ${emailContent.substring(0, 4000)}`
       
       // Check for fuzzy duplicates
       const isDuplicate = recentSalesData.records.some(record => {
-        // Handle Company field which could be a string or array (linked record)
-        let companyValue = record.fields.Company;
+        // Use OriginalCompanyName field (plain text) instead of linked Company field
+        const companyValue = record.fields.OriginalCompanyName;
         
-        // If Company is an array (linked record), skip this record for now
-        // We'll rely on Airtable's own duplicate prevention
-        if (Array.isArray(companyValue)) {
-          return false;
+        if (!companyValue) {
+          return false; // Skip records without company name
         }
         
-        // If it's a string, normalize it
-        const recordCompany = (companyValue || '')
+        // Normalize company name for comparison
+        const recordCompany = companyValue
           .toLowerCase()
           .replace(/\s+/g, '')
           .replace(/[^a-z0-9]/g, '');
@@ -3002,8 +3125,7 @@ ${emailContent.substring(0, 4000)}`
     const isLive = saleData.startDate <= today ? 'YES' : 'NO';
     
     const fields = {
-      // Note: Company field is a linked record in Airtable and cannot be set directly here
-      // Store company name in Description for now - it should be linked manually in admin panel
+      OriginalCompanyName: saleData.company, // Plain text company name from email
       PercentOff: saleData.percentOff,
       SaleURL: saleData.saleUrl,
       CleanURL: cleanUrl !== saleData.saleUrl ? cleanUrl : saleData.saleUrl,
@@ -3012,7 +3134,6 @@ ${emailContent.substring(0, 4000)}`
       Live: isLive,
       Description: JSON.stringify({
         source: 'email',
-        companyName: saleData.company, // Store company name here since Company field is linked
         aiReasoning: saleData.reasoning,
         confidence: saleData.confidence,
         originalEmail: {
@@ -3022,6 +3143,11 @@ ${emailContent.substring(0, 4000)}`
         }
       })
     };
+    
+    // Link Company field if lookup/create was successful
+    if (companyRecordId) {
+      fields.Company = [companyRecordId]; // Linked records are arrays of record IDs
+    }
     
     if (saleData.discountCode) {
       fields.PromoCode = saleData.discountCode;
