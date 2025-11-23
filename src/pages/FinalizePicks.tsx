@@ -43,6 +43,7 @@ interface Failure {
 interface LocationState {
   scrapedProducts: Product[];
   selectedSaleId: string;
+  saleName?: string;
   salePercentOff?: number;
   failures?: Failure[];
 }
@@ -61,6 +62,7 @@ export function FinalizePicks() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [selectedSaleId, setSelectedSaleId] = useState<string>('');
+  const [saleName, setSaleName] = useState<string>('');
   const [salePercentOff, setSalePercentOff] = useState<number>(0);
   const [customPercentOff, setCustomPercentOff] = useState<string>('');
   const [individualCustomPercent, setIndividualCustomPercent] = useState<Map<number, string>>(new Map());
@@ -82,6 +84,7 @@ export function FinalizePicks() {
     
     setPicks(state.scrapedProducts);
     setSelectedSaleId(state.selectedSaleId);
+    setSaleName(state.saleName || '');
     setSalePercentOff(state.salePercentOff || 0);
     setFailedUrls((state.failures || []).map(f => f.url));
     
@@ -102,6 +105,7 @@ export function FinalizePicks() {
             setManualEntries(new Map(existingDraft.manualEntries?.map((e: any) => [e.url, e]) || []));
             setFailedUrls(existingDraft.failedUrls || []);
             setCustomPercentOff(existingDraft.customPercentOff || '');
+            setSaleName(existingDraft.saleName || '');
             setSalePercentOff(existingDraft.salePercentOff || 0);
             // Convert keys to numbers when rehydrating individualCustomPercent
             setIndividualCustomPercent(new Map(
@@ -343,7 +347,7 @@ export function FinalizePicks() {
         body: JSON.stringify({
           id: draftId, // Include existing draft ID to update instead of create
           saleId: selectedSaleId,
-          saleName: state?.scrapedProducts?.[0]?.name || 'Sale',
+          saleName: saleName || 'Sale',
           salePercentOff,
           picks,
           manualEntries: Array.from(manualEntries.values()),

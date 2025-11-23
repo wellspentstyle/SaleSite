@@ -185,6 +185,7 @@ export function PicksAdmin() {
         state: {
           scrapedProducts: draft.picks || [],
           selectedSaleId: draft.saleId,
+          saleName: draft.saleName,
           salePercentOff: draft.salePercentOff,
           failures: (draft.failedUrls || []).map((url: string) => ({ url, error: 'Previously failed' }))
         }
@@ -353,6 +354,7 @@ export function PicksAdmin() {
           state: {
             scrapedProducts,
             selectedSaleId: selectedSale?.id,
+            saleName: selectedSale?.saleName,
             salePercentOff: selectedSale?.percentOff,
             failures
           }
@@ -883,34 +885,19 @@ export function PicksAdmin() {
                   }}
                 >
                   <div className="mb-3">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <h3 
-                        style={{ 
-                          fontFamily: 'DM Sans, sans-serif', 
-                          fontWeight: 600, 
-                          fontSize: '16px'
-                        }}
-                      >
-                        {draft.saleName}
-                      </h3>
-                      <span
-                        style={{
-                          fontFamily: 'DM Sans, sans-serif',
-                          fontSize: '10px',
-                          fontWeight: 600,
-                          padding: '2px 6px',
-                          borderRadius: '3px',
-                          backgroundColor: draft.type === 'finalize' ? '#dbeafe' : '#fef3c7',
-                          color: draft.type === 'finalize' ? '#1e40af' : '#92400e',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px'
-                        }}
-                      >
-                        {draft.type === 'finalize' ? 'Finalize' : 'Manual'}
-                      </span>
-                    </div>
+                    <h3 
+                      style={{ 
+                        fontFamily: 'DM Sans, sans-serif', 
+                        fontWeight: 600, 
+                        fontSize: '16px',
+                        marginBottom: '4px'
+                      }}
+                    >
+                      {draft.saleName}
+                    </h3>
                     <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                      {draft.salePercentOff}% Off • {draft.picks.length} pick{draft.picks.length !== 1 ? 's' : ''}
+                      {draft.salePercentOff}% Off
+                      {draft.picks.length > 0 && ` • ${draft.picks.length} pick${draft.picks.length !== 1 ? 's' : ''}`}
                       {draft.type === 'finalize' && draft.manualEntries && draft.manualEntries.length > 0 && ` • ${draft.manualEntries.length} manual entr${draft.manualEntries.length !== 1 ? 'ies' : 'y'}`}
                     </p>
                   </div>
