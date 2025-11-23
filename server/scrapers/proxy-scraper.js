@@ -29,15 +29,16 @@ export async function scrapeWithProxy(url, options = {}) {
       url: url,
       render: 'true', // Enable JavaScript rendering
       country_code: 'us', // Use US proxy
-      premium: 'true', // Use premium residential proxies (more reliable for department stores)
+      ultra_premium: 'true', // Use ultra premium mobile proxies for heavily protected sites (was: premium)
+      wait_for: '5000', // Wait 5 seconds after page load for JavaScript to execute
       session_number: Math.floor(Math.random() * 10000) // Random session to avoid rate limits
     });
 
-    logger.log(`🌐 [Proxy Scraper] Fetching through proxy...`);
+    logger.log(`🌐 [Proxy Scraper] Fetching through proxy (ultra_premium + render)...`);
     
     const response = await fetch(proxyUrl, {
       method: 'GET',
-      timeout: 60000 // 60 second timeout (proxies are slower)
+      timeout: 90000 // 90 second timeout (ScraperAPI retries for 70s)
     });
 
     if (!response.ok) {
