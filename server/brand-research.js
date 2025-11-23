@@ -418,7 +418,7 @@ Examples:
         console.log(`  No products found, using search fallback...`);
 
         const categorySearchQuery = `site:${officialDomain} shop collection`;
-        const categoryResponse = await fetch('https://google.serper.dev/search', {
+        const categorySearchResponse = await fetch('https://google.serper.dev/search', {
           method: 'POST',
           headers: {
             'X-API-KEY': serperApiKey,
@@ -427,8 +427,8 @@ Examples:
           body: JSON.stringify({ q: categorySearchQuery, num: 5 })
         });
 
-        if (categoryResponse.ok) {
-          const categoryData = await categoryResponse.json();
+        if (categorySearchResponse.ok) {
+          const categoryData = await categorySearchResponse.json();
           const searchResults = categoryData.organic || [];
           const contextText = searchResults.map(r => `${r.title} ${r.snippet}`).join(' ');
 
@@ -458,8 +458,8 @@ Return as comma-separated list. Default to "Clothing" if unclear.`
             temperature: 0.1
           });
 
-          const categoryResponse = categoryCompletion.choices[0]?.message?.content?.trim() || '';
-          categories = categoryResponse.split(',').map(c => c.trim()).filter(c => c);
+          const categoryResponseText = categoryCompletion.choices[0]?.message?.content?.trim() || '';
+          categories = categoryResponseText.split(',').map(c => c.trim()).filter(c => c);
         }
       }
 
