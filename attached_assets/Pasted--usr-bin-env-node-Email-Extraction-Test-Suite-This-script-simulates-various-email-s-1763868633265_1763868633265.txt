@@ -1,0 +1,380 @@
+#!/usr/bin/env node
+
+/**
+ * Email Extraction Test Suite
+ * 
+ * This script simulates various email scenarios to test the webhook handler.
+ * Run with: node test-email-extraction.js
+ * 
+ * Environment variables needed:
+ * - ADMIN_PASSWORD: Your admin password
+ * - TEST_WEBHOOK_URL: Your webhook URL (default: http://localhost:3001/webhook/agentmail)
+ * - CLOUDMAIL_SECRET: Your CloudMailin secret (optional, for auth testing)
+ */
+
+import fetch from 'node-fetch';
+
+// Configuration
+const WEBHOOK_URL = process.env.TEST_WEBHOOK_URL || 'http://localhost:3001/webhook/agentmail';
+const CLOUDMAIL_SECRET = process.env.CLOUDMAIL_SECRET || 'test-secret';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+// Test email templates
+const testEmails = [
+  {
+    name: 'Valid Flash Sale - Clear Details',
+    shouldPass: true,
+    email: {
+      envelope: { from: 'sales@jcrew.com' },
+      headers: { subject: '48-Hour Flash Sale: 40% Off Everything' },
+      plain: `
+Hi there!
+
+Don't miss our biggest sale of the season!
+
+🎉 40% OFF EVERYTHING 🎉
+Use code: FLASH40
+
+Valid today through Sunday, November 24th only!
+
+Shop now: https://www.jcrew.com/sale
+
+See you there,
+J.Crew Team
+      `.trim()
+    }
+  },
+  
+  {
+    name: 'Valid Seasonal Sale - With End Date',
+    shouldPass: true,
+    email: {
+      envelope: { from: 'marketing@everlane.com' },
+      headers: { subject: 'Holiday Sale: Save 30%' },
+      plain: `
+The Holiday Sale is here!
+
+Save 30% on select styles
+No code needed - discount applied at checkout
+
+Sale ends December 1st
+
+Shop the sale: https://www.everlane.com/collections/sale
+
+Best,
+Everlane
+      `.trim()
+    }
+  },
+  
+  {
+    name: 'Valid Sale - HTML Email (No Plain Text)',
+    shouldPass: true,
+    email: {
+      envelope: { from: 'hello@reformation.com' },
+      headers: { subject: 'Extra 25% Off Sale Styles' },
+      html: `
+<!DOCTYPE html>
+<html>
+<head><style>body { font-family: Arial; }</style></head>
+<body>
+  <div class="header">
+    <h1>Extra 25% Off Sale</h1>
+  </div>
+  <div class="content">
+    <p>Our biggest markdowns of the season.</p>
+    <p><strong>Extra 25% off all sale styles</strong></p>
+    <p>Ends November 25th</p>
+    <p><a href="https://www.thereformation.com/sale">Shop Sale</a></p>
+  </div>
+  <script>console.log('tracking');</script>
+</body>
+</html>
+      `.trim()
+    }
+  },
+  
+  {
+    name: 'Invalid - Welcome Email with First Order Discount',
+    shouldPass: false,
+    email: {
+      envelope: { from: 'welcome@madewell.com' },
+      headers: { subject: 'Welcome to Madewell! Get 15% Off' },
+      plain: `
+Welcome to the Madewell family!
+
+As a thank you for signing up, enjoy 15% off your first order.
+
+Use code: WELCOME15
+
+Shop now: https://www.madewell.com
+
+Happy shopping!
+      `.trim()
+    }
+  },
+  
+  {
+    name: 'Invalid - Newsletter Without Clear Sale',
+    shouldPass: false,
+    email: {
+      envelope: { from: 'news@anthropologie.com' },
+      headers: { subject: 'New Arrivals You\'ll Love' },
+      plain: `
+Check out what's new at Anthropologie!
+
+✨ New dresses
+✨ New tops
+✨ New accessories
+
+See what's trending: https://www.anthropologie.com/new
+
+Plus, enjoy free shipping on orders over $50!
+
+xo, Anthro
+      `.trim()
+    }
+  },
+  
+  {
+    name: 'Invalid - Account Verification',
+    shouldPass: false,
+    email: {
+      envelope: { from: 'noreply@account.nordstrom.com' },
+      headers: { subject: 'Verify your Nordstrom account' },
+      plain: `
+Thanks for signing up!
+
+Please verify your email address to complete your account setup.
+
+Verify now: https://www.nordstrom.com/verify?token=abc123
+
+Questions? Contact customer service.
+      `.trim()
+    }
+  },
+  
+  {
+    name: 'Valid - Clearance Sale with Range Discount',
+    shouldPass: true,
+    email: {
+      envelope: { from: 'sales@gap.com' },
+      headers: { subject: 'End of Season Clearance - Up to 60% Off' },
+      plain: `
+Time to make room for new arrivals!
+
+🔥 END OF SEASON CLEARANCE 🔥
+Up to 60% off select styles
+
+No code needed - prices as marked
+
+Shop clearance: https://www.gap.com/clearance
+
+Hurry - while supplies last!
+      `.trim()
+    }
+  },
+  
+  {
+    name: 'Borderline - Referral Program',
+    shouldPass: false,
+    email: {
+      envelope: { from: 'referrals@aritzia.com' },
+      headers: { subject: 'Give $25, Get $25' },
+      plain: `
+Love Aritzia? Share the love!
+
+Refer a friend and you both get $25 off your next purchase.
+
+Your referral link: https://www.aritzia.com/refer/xyz
+
+Share now and start saving!
+      `.trim()
+    }
+  },
+  
+  {
+    name: 'Valid - Black Friday Sale',
+    shouldPass: true,
+    email: {
+      envelope: { from: 'blackfriday@freepeople.com' },
+      headers: { subject: 'Black Friday Early Access: 30% Off' },
+      plain: `
+VIP Early Access!
+
+Get 30% off your entire purchase
+Code: BFVIP30
+
+Early Access: November 22-23
+Public Sale: November 24-27
+
+Start shopping: https://www.freepeople.com/black-friday
+
+See you there!
+Free People
+      `.trim()
+    }
+  },
+  
+  {
+    name: 'Edge Case - Forwarded Sale Email',
+    shouldPass: true,
+    email: {
+      envelope: { from: 'user@gmail.com' },
+      headers: { subject: 'Fwd: Weekend Sale - 35% Off' },
+      plain: `
+---------- Forwarded message ---------
+From: sales@clubmonaco.com
+Subject: Weekend Sale - 35% Off
+
+WEEKEND ONLY!
+
+35% off new arrivals
+Code: WEEKEND35
+
+Valid Saturday & Sunday only
+
+Shop now: https://www.clubmonaco.com/sale
+
+Cheers,
+Club Monaco
+      `.trim()
+    }
+  }
+];
+
+// Utility functions
+function createAuthHeader(secret) {
+  const credentials = Buffer.from(`:${secret}`).toString('base64');
+  return `Basic ${credentials}`;
+}
+
+function printTestResult(testName, shouldPass, result) {
+  const icon = result.success ? '✅' : '❌';
+  const expectation = shouldPass ? 'PASS' : 'FAIL';
+  const actual = result.success ? 'PASS' : 'FAIL';
+  const match = (shouldPass === result.success) ? '✓' : '✗';
+  
+  console.log(`\n${icon} ${testName}`);
+  console.log(`   Expected: ${expectation} | Actual: ${actual} ${match}`);
+  
+  if (result.data) {
+    if (result.success) {
+      console.log(`   Company: ${result.data.saleData?.company}`);
+      console.log(`   Discount: ${result.data.saleData?.percentOff}%`);
+      console.log(`   Confidence: ${result.data.saleData?.confidence}%`);
+      console.log(`   Reasoning: ${result.data.saleData?.reasoning}`);
+    } else {
+      console.log(`   Reason: ${result.data.message}`);
+      if (result.data.reasoning) {
+        console.log(`   AI Reasoning: ${result.data.reasoning}`);
+      }
+      if (result.data.extractedData) {
+        console.log(`   Confidence: ${result.data.extractedData.confidence}%`);
+      }
+    }
+  }
+  
+  return (shouldPass === result.success);
+}
+
+async function runTest(testCase) {
+  try {
+    const response = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': createAuthHeader(CLOUDMAIL_SECRET)
+      },
+      body: JSON.stringify(testCase.email)
+    });
+    
+    const data = await response.json();
+    
+    return {
+      success: data.success === true,
+      status: response.status,
+      data: data
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+async function runAllTests() {
+  console.log('🧪 Email Extraction Test Suite');
+  console.log('================================\n');
+  console.log(`Webhook URL: ${WEBHOOK_URL}`);
+  console.log(`Auth: ${CLOUDMAIL_SECRET ? 'Enabled' : 'Disabled'}\n`);
+  
+  const results = {
+    total: testEmails.length,
+    passed: 0,
+    failed: 0,
+    details: []
+  };
+  
+  for (const testCase of testEmails) {
+    console.log(`\n⏳ Running: ${testCase.name}...`);
+    
+    const result = await runTest(testCase);
+    const testPassed = printTestResult(testCase.name, testCase.shouldPass, result);
+    
+    if (testPassed) {
+      results.passed++;
+    } else {
+      results.failed++;
+    }
+    
+    results.details.push({
+      name: testCase.name,
+      expected: testCase.shouldPass ? 'PASS' : 'FAIL',
+      actual: result.success ? 'PASS' : 'FAIL',
+      match: testPassed,
+      result: result
+    });
+    
+    // Rate limit: wait 1 second between tests to avoid overwhelming AI API
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  // Print summary
+  console.log('\n\n📊 Test Summary');
+  console.log('================');
+  console.log(`Total Tests: ${results.total}`);
+  console.log(`✅ Passed: ${results.passed}`);
+  console.log(`❌ Failed: ${results.failed}`);
+  console.log(`Success Rate: ${((results.passed / results.total) * 100).toFixed(1)}%`);
+  
+  // Print failures
+  const failures = results.details.filter(d => !d.match);
+  if (failures.length > 0) {
+    console.log('\n\n⚠️  Failed Tests:');
+    failures.forEach(f => {
+      console.log(`\n- ${f.name}`);
+      console.log(`  Expected: ${f.expected}, Got: ${f.actual}`);
+      if (f.result.data?.message) {
+        console.log(`  Message: ${f.result.data.message}`);
+      }
+    });
+  }
+  
+  return results;
+}
+
+// Run tests if this is the main module
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runAllTests()
+    .then(results => {
+      process.exit(results.failed > 0 ? 1 : 0);
+    })
+    .catch(error => {
+      console.error('❌ Test suite error:', error);
+      process.exit(1);
+    });
+}
+
+export { runAllTests, testEmails };
