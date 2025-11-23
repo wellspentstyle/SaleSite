@@ -3,8 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Loader2, ExternalLink, ArrowLeft } from 'lucide-react';
+import { Loader2, ExternalLink, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 
 const API_BASE = '/api';
 
@@ -22,6 +32,14 @@ interface Sale {
 type View = 'sales-list' | 'url-entry';
 type FilterType = 'active-no-picks' | 'active-with-picks' | 'inactive';
 
+interface ProtectionWarning {
+  show: boolean;
+  store: string;
+  successRate: string;
+  recommendation: string;
+  urlsToScrape: string[];
+}
+
 export function PicksAdmin() {
   const navigate = useNavigate();
   const [sales, setSales] = useState<Sale[]>([]);
@@ -31,6 +49,13 @@ export function PicksAdmin() {
   const [loadingSales, setLoadingSales] = useState(true);
   const [filterType, setFilterType] = useState<FilterType>('active-no-picks');
   const [currentView, setCurrentView] = useState<View>('sales-list');
+  const [protectionWarning, setProtectionWarning] = useState<ProtectionWarning>({
+    show: false,
+    store: '',
+    successRate: '',
+    recommendation: '',
+    urlsToScrape: []
+  });
 
   useEffect(() => {
     fetchSales();
@@ -70,23 +95,9 @@ export function PicksAdmin() {
     setUrls('');
   };
 
-  const handleScrapePicks = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedSale) {
-      toast.error('Please select a sale');
-      return;
-    }
-
-    if (!urls.trim()) {
-      toast.error('Please enter at least one URL');
-      return;
-    }
-
+  const performScraping = async (urlList: string[]) => {
     setIsLoading(true);
-
     const auth = sessionStorage.getItem('adminAuth');
-    const urlList = urls.split('\n').filter(url => url.trim() !== '');
 
     try {
       const response = await fetch(`${API_BASE}/admin/scrape-product`, {
@@ -113,8 +124,8 @@ export function PicksAdmin() {
         navigate('/admin/picks/finalize', {
           state: {
             scrapedProducts,
-            selectedSaleId: selectedSale.id,
-            salePercentOff: selectedSale.percentOff,
+            selectedSaleId: selectedSale?.id,
+            salePercentOff: selectedSale?.percentOff,
             failures
           }
         });
@@ -127,6 +138,83 @@ export function PicksAdmin() {
       toast.error('An error occurred while scraping. Please try again.');
       setIsLoading(false);
     }
+  };
+
+  const handleScrapePicks = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedSale) {
+      toast.error('Please select a sale');
+      return;
+    }
+
+    if (!urls.trim()) {
+      toast.error('Please enter at least one URL');
+      return;
+    }
+
+    const auth = sessionStorage.getItem('adminAuth');
+    const urlList = urls.split('\n').filter(url => url.trim() !== '');
+
+    // Check ALL URLs for ultra-high protection stores
+    try {
+      let ultraHighStore = null;
+      
+      // Check each URL for protection level
+      for (const url of urlList) {
+        const checkResponse = await fetch(`${API_BASE}/admin/check-url-protection`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'auth': auth || ''
+          },
+          body: JSON.stringify({ url })
+        });
+
+        const checkData = await checkResponse.json();
+        
+        // If we find ANY ultra-high protection URL, show warning
+        if (checkData.success && checkData.protected && checkData.store.level === 'ultra-high') {
+          ultraHighStore = checkData.store;
+          break; // Stop checking once we find one ultra-high protection URL
+        }
+      }
+
+      // Show warning if any ultra-high protection URL was found
+      if (ultraHighStore) {
+        setProtectionWarning({
+          show: true,
+          store: ultraHighStore.store,
+          successRate: ultraHighStore.successRate,
+          recommendation: ultraHighStore.recommendation,
+          urlsToScrape: urlList
+        });
+        return;
+      }
+
+      // No warning needed, proceed with scraping
+      await performScraping(urlList);
+      
+    } catch (error) {
+      console.error('Error checking URL protection:', error);
+      // If check fails, just proceed with scraping
+      await performScraping(urlList);
+    }
+  };
+
+  const handleProceedWithScraping = async () => {
+    setProtectionWarning(prev => ({ ...prev, show: false }));
+    await performScraping(protectionWarning.urlsToScrape);
+  };
+
+  const handleCancelScraping = () => {
+    setProtectionWarning({
+      show: false,
+      store: '',
+      successRate: '',
+      recommendation: '',
+      urlsToScrape: []
+    });
   };
 
   const filteredSales = sales.filter(sale => {
@@ -391,6 +479,43 @@ export function PicksAdmin() {
           </form>
         </div>
       )}
+
+      {/* Protection Warning Modal */}
+      <AlertDialog open={protectionWarning.show} onOpenChange={(open) => {
+        if (!open) handleCancelScraping();
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'DM Sans, sans-serif' }}>
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Advanced Bot Protection Detected
+            </AlertDialogTitle>
+            <AlertDialogDescription style={{ fontFamily: 'DM Sans, sans-serif', lineHeight: '1.6' }}>
+              <p className="mb-3">
+                <strong>{protectionWarning.store}</strong> uses advanced bot protection.
+              </p>
+              <p className="mb-2">
+                <strong>Success rate:</strong> {protectionWarning.successRate}
+              </p>
+              <p className="mb-4">
+                {protectionWarning.recommendation}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Even with our advanced scraping technology (ScraperAPI ultra-premium + Playwright), 
+                success rates remain very low for this store.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelScraping} style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Manual Entry
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleProceedWithScraping} style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Try Scraping Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

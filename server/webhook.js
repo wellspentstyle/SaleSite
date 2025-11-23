@@ -633,6 +633,106 @@ app.post('/admin/auth', (req, res) => {
   return res.status(401).json({ success: false, message: 'Invalid password' });
 });
 
+// Check URL protection level
+app.post('/admin/check-url-protection', (req, res) => {
+  const { auth } = req.headers;
+  const { url } = req.body;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  if (!url) {
+    return res.status(400).json({ success: false, message: 'URL is required' });
+  }
+  
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    
+    // Department store protection levels based on testing
+    const protectionLevels = {
+      // Ultra-high protection (5-10% success rate)
+      'nordstrom.com': { 
+        level: 'ultra-high', 
+        store: 'Nordstrom', 
+        successRate: '5-10%',
+        recommendation: 'We recommend manual entry for faster, more reliable results.'
+      },
+      'saksfifthavenue.com': { 
+        level: 'ultra-high', 
+        store: 'Saks Fifth Avenue', 
+        successRate: '5-10%',
+        recommendation: 'We recommend manual entry for faster, more reliable results.'
+      },
+      'neimanmarcus.com': { 
+        level: 'ultra-high', 
+        store: 'Neiman Marcus', 
+        successRate: '5-10%',
+        recommendation: 'We recommend manual entry for faster, more reliable results.'
+      },
+      'bergdorfgoodman.com': { 
+        level: 'ultra-high', 
+        store: 'Bergdorf Goodman', 
+        successRate: '5-10%',
+        recommendation: 'We recommend manual entry for faster, more reliable results.'
+      },
+      'bloomingdales.com': { 
+        level: 'ultra-high', 
+        store: 'Bloomingdales', 
+        successRate: '5-10%',
+        recommendation: 'We recommend manual entry for faster, more reliable results.'
+      },
+      
+      // Medium protection (50-60% success rate)
+      'farfetch.com': { 
+        level: 'medium', 
+        store: 'Farfetch', 
+        successRate: '50-60%',
+        recommendation: 'Automated scraping usually works, but data quality may vary.'
+      },
+      
+      // Low protection (85%+ success rate)
+      'shopbop.com': { 
+        level: 'low', 
+        store: 'Shopbop', 
+        successRate: '85%+',
+        recommendation: 'Automated scraping works reliably.'
+      },
+      'ssense.com': { 
+        level: 'low', 
+        store: 'SSENSE', 
+        successRate: '85%+',
+        recommendation: 'Automated scraping works reliably.'
+      }
+    };
+    
+    // Check if URL matches any protected store
+    const protectedStore = Object.keys(protectionLevels).find(domain => 
+      hostname.includes(domain)
+    );
+    
+    if (protectedStore) {
+      const storeInfo = protectionLevels[protectedStore];
+      return res.json({
+        success: true,
+        protected: true,
+        store: storeInfo
+      });
+    }
+    
+    // Not a known protected store
+    return res.json({
+      success: true,
+      protected: false,
+      store: null
+    });
+    
+  } catch (error) {
+    console.error('❌ Error checking URL protection:', error);
+    return res.status(400).json({ success: false, message: 'Invalid URL' });
+  }
+});
+
 // Get all sales for admin
 app.get('/admin/sales', async (req, res) => {
   const { auth } = req.headers;
