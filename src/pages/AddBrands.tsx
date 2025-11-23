@@ -387,8 +387,8 @@ export function AddBrands() {
           </div>
         </div>
 
-          {/* Input Form */}
-          <form onSubmit={handleSubmit}>
+        {/* Input Form */}
+        <form onSubmit={handleSubmit}>
             <div className="space-y-2" style={{ marginBottom: '32px' }}>
               <Label 
                 htmlFor="brand-names"
@@ -486,8 +486,6 @@ export function AddBrands() {
               </div>
             )}
           </form>
-
-        </div>
 
         {/* Progress and Results */}
         {results.length > 0 && (

@@ -242,7 +242,7 @@ export function PicksAdmin() {
                 <p className="text-gray-600 mt-1">Select a sale to add curated product picks</p>
               </div>
             </div>
-            
+
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 onClick={() => setFilterType('active-no-picks')}
@@ -331,7 +331,6 @@ export function PicksAdmin() {
                 Inactive Sales
               </button>
             </div>
-          </div>
 
           {loadingSales ? (
             <div className="flex items-center justify-center gap-2 text-muted-foreground" style={{ padding: '60px' }}>
