@@ -4,6 +4,7 @@ import { BrandsPage } from './pages/BrandsPage';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { AddPicks } from './pages/AddPicks';
 import { FinalizePicks } from './pages/FinalizePicks';
+import { ManualPickEntry } from './pages/ManualPickEntry';
 import { AddBrands } from './pages/AddBrands';
 import { SyncGem } from './pages/SyncGem';
 import { GenerateAssets } from './pages/GenerateAssets';
@@ -22,6 +23,7 @@ export default function App() {
           <Route index element={<Navigate to="/admin/picks" replace />} />
           <Route path="picks" element={<AddPicks />} />
           <Route path="picks/finalize" element={<FinalizePicks />} />
+          <Route path="picks/manual" element={<ManualPickEntry />} />
           <Route path="sales-approvals" element={<SalesApprovals />} />
           <Route path="brands" element={<AddBrands />} />
           <Route path="assets" element={<GenerateAssets />} />

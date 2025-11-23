@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Input } from '../components/ui/input';
-import { Loader2, ExternalLink, ArrowLeft, AlertTriangle, Power, Edit } from 'lucide-react';
+import { Loader2, ExternalLink, ArrowLeft, AlertTriangle, Power, Edit, FileEdit } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -105,6 +105,17 @@ export function PicksAdmin() {
     if (sale.saleUrl) {
       window.open(sale.saleUrl, '_blank');
     }
+  };
+
+  const handleManualEntry = (sale: Sale, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate('/admin/picks/manual', {
+      state: {
+        selectedSaleId: sale.id,
+        saleName: sale.saleName,
+        salePercentOff: sale.percentOff
+      }
+    });
   };
 
   const handleBackToSales = () => {
@@ -525,26 +536,38 @@ export function PicksAdmin() {
                       </p>
                     )}
                     
-                    <div className="flex gap-2 mt-3">
+                    <div className="space-y-2 mt-3">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => handleOpenEditDialog(sale, e)}
+                          className="flex-1"
+                          style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant={sale.live === 'YES' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={(e) => handleToggleActive(sale, e)}
+                          className="flex-1"
+                          style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        >
+                          <Power className="h-3 w-3 mr-1" />
+                          {sale.live === 'YES' ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={(e) => handleOpenEditDialog(sale, e)}
-                        className="flex-1"
+                        onClick={(e) => handleManualEntry(sale, e)}
+                        className="w-full"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                       >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant={sale.live === 'YES' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={(e) => handleToggleActive(sale, e)}
-                        className="flex-1"
-                        style={{ fontFamily: 'DM Sans, sans-serif' }}
-                      >
-                        <Power className="h-3 w-3 mr-1" />
-                        {sale.live === 'YES' ? 'Deactivate' : 'Activate'}
+                        <FileEdit className="h-3 w-3 mr-1" />
+                        Manual Entry
                       </Button>
                     </div>
                   </div>

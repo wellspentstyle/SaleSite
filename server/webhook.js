@@ -2082,6 +2082,124 @@ app.post('/admin/picks', async (req, res) => {
   }
 });
 
+// Save manually entered picks to Airtable
+app.post('/admin/manual-picks', async (req, res) => {
+  const { auth } = req.headers;
+  const { saleId, picks } = req.body;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  if (!saleId || !picks || !Array.isArray(picks)) {
+    return res.status(400).json({ success: false, message: 'saleId and picks array required' });
+  }
+  
+  try {
+    console.log(`✍️ Saving ${picks.length} manual picks for sale ${saleId}`);
+    
+    // Fetch the sale record to get its Company field
+    const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`;
+    const saleResponse = await fetch(saleUrl, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+      },
+    });
+    
+    if (!saleResponse.ok) {
+      throw new Error('Failed to fetch sale record');
+    }
+    
+    const saleData = await saleResponse.json();
+    const companyIds = saleData.fields.Company || [];
+    
+    console.log(`📦 Sale company: ${companyIds.length > 0 ? companyIds[0] : 'None'}`);
+    
+    // Create records for each manual pick
+    const records = picks.map(pick => {
+      const fields = {
+        ProductURL: cleanUrl(pick.url),
+        ProductName: pick.name,
+        ImageURL: pick.imageUrl,
+        SaleID: [saleId],
+        EntryType: 'manual',
+        Confidence: 100 // Manual entries always 100% confidence
+      };
+      
+      // Link to Company if available from the sale
+      if (companyIds.length > 0) {
+        fields.CompanyLink = companyIds;
+      }
+      
+      // Add brand if provided
+      if (pick.brand) {
+        fields.Brand = pick.brand;
+      }
+      
+      // Only add prices if they exist
+      if (pick.originalPrice !== null && pick.originalPrice !== undefined) {
+        fields.OriginalPrice = pick.originalPrice;
+      }
+      if (pick.salePrice !== null && pick.salePrice !== undefined) {
+        fields.SalePrice = pick.salePrice;
+      }
+      
+      // Add custom percentOff if provided
+      if (pick.percentOff !== null && pick.percentOff !== undefined) {
+        fields.PercentOffOverride = pick.percentOff;
+      }
+      
+      return { fields };
+    });
+    
+    // Airtable has a 10-record limit per request, so batch the picks
+    const BATCH_SIZE = 10;
+    const allRecordIds = [];
+    
+    for (let i = 0; i < records.length; i += BATCH_SIZE) {
+      const batch = records.slice(i, i + BATCH_SIZE);
+      
+      const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}`;
+      const airtableResponse = await fetch(airtableUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ records: batch })
+      });
+      
+      if (!airtableResponse.ok) {
+        const errorText = await airtableResponse.text();
+        console.error('❌ Airtable error:', errorText);
+        return res.status(500).json({ 
+          success: false, 
+          message: `Failed to save manual picks (batch ${Math.floor(i / BATCH_SIZE) + 1})` 
+        });
+      }
+      
+      const data = await airtableResponse.json();
+      allRecordIds.push(...data.records.map(r => r.id));
+      console.log(`✅ Saved manual batch ${Math.floor(i / BATCH_SIZE) + 1}: ${data.records.length} picks`);
+    }
+    
+    console.log(`✅ Total manual picks saved: ${allRecordIds.length}`);
+    
+    // Clear sales cache since picks changed
+    clearSalesCache();
+    
+    res.json({ 
+      success: true, 
+      message: `Saved ${allRecordIds.length} manual pick(s)`,
+      recordIds: allRecordIds
+    });
+    
+  } catch (error) {
+    console.error('❌ Save manual picks error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Background function for Gem sync that updates progress
 async function runGemSyncInBackground() {
   let browser;
