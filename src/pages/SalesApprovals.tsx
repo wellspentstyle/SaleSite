@@ -204,12 +204,17 @@ export function SalesApprovals() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl mb-6" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700 }}>
-        Sales Approvals
-      </h1>
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Sales Approvals</h1>
+            <p className="text-gray-600 mt-1">Review and approve incoming sales before they're added to Airtable</p>
+          </div>
+        </div>
       
-      {/* Settings Card */}
-      <Card className="mb-6">
+        {/* Settings Card */}
+        <Card>
           <CardHeader>
             <CardTitle>Approval Settings</CardTitle>
           </CardHeader>
@@ -409,6 +414,7 @@ export function SalesApprovals() {
               ))}
             </div>
           )}
+        </div>
       </div>
     </div>
   );

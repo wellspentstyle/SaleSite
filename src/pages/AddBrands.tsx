@@ -377,21 +377,15 @@ export function AddBrands() {
   const failedCount = results.filter(r => r.status === 'failed').length;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
-      <div style={{ width: '100%', maxWidth: '700px' }}>
-        <div className="border border-border bg-white" style={{ padding: '48px' }}>
-          <h1 
-            className="mb-2 tracking-tight" 
-            style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
-          >
-            Add Brands
-          </h1>
-          <p 
-            className="text-muted-foreground mb-10" 
-            style={{ fontFamily: 'Crimson Pro, serif' }}
-          >
-            Research fashion brands using AI to automatically categorize pricing, values, and size ranges.
-          </p>
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Add Brands</h1>
+            <p className="text-gray-600 mt-1">Research fashion brands using AI to automatically categorize pricing, values, and size ranges</p>
+          </div>
+        </div>
 
           {/* Input Form */}
           <form onSubmit={handleSubmit}>

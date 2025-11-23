@@ -231,22 +231,17 @@ export function PicksAdmin() {
   });
 
   return (
-    <div style={{ padding: '40px 24px', maxWidth: '1400px', margin: '0 auto' }}>
-      {currentView === 'sales-list' ? (
-        <>
-          <div style={{ marginBottom: '40px' }}>
-            <h1 
-              className="mb-2 tracking-tight" 
-              style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
-            >
-              Add Picks to Sales
-            </h1>
-            <p 
-              className="text-muted-foreground mb-6" 
-              style={{ fontFamily: 'Crimson Pro, serif', fontSize: '18px' }}
-            >
-              Select a sale to add curated product picks.
-            </p>
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {currentView === 'sales-list' ? (
+          <>
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold">Add Picks to Sales</h1>
+                <p className="text-gray-600 mt-1">Select a sale to add curated product picks</p>
+              </div>
+            </div>
             
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
@@ -516,6 +511,7 @@ export function PicksAdmin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }

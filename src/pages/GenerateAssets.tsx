@@ -92,21 +92,15 @@ export function GenerateAssets() {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
-      <div style={{ width: '100%', maxWidth: '700px' }}>
-        <div className="border border-border bg-white" style={{ padding: '48px' }}>
-          <h1 
-            className="mb-2 tracking-tight" 
-            style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
-          >
-            Generate Assets
-          </h1>
-          <p 
-            className="text-muted-foreground mb-10" 
-            style={{ fontFamily: 'Crimson Pro, serif' }}
-          >
-            Select sales to generate social media assets (1080x1350). Assets will be saved to Google Drive.
-          </p>
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Generate Assets</h1>
+            <p className="text-gray-600 mt-1">Select sales to generate social media assets (1080x1350) saved to Google Drive</p>
+          </div>
+        </div>
 
           {/* Asset Generation Status Message */}
           {assetMessage && (
@@ -179,7 +173,6 @@ export function GenerateAssets() {
               `Generate ${selectedAssetSales.size > 0 ? `${selectedAssetSales.size} Asset${selectedAssetSales.size > 1 ? 's' : ''}` : 'Assets'}`
             )}
           </Button>
-        </div>
       </div>
     </div>
   );

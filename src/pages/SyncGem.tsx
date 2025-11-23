@@ -104,21 +104,15 @@ export function SyncGem() {
   const syncResult = syncStatus?.result;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
-      <div style={{ width: '100%', maxWidth: '700px' }}>
-        <div className="border border-border bg-white" style={{ padding: '48px' }}>
-          <h1 
-            className="mb-2 tracking-tight" 
-            style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
-          >
-            Sync Gem
-          </h1>
-          <p 
-            className="text-muted-foreground mb-10" 
-            style={{ fontFamily: 'Crimson Pro, serif' }}
-          >
-            Synchronize items from your Gem.app account to the database.
-          </p>
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Sync Gem</h1>
+            <p className="text-gray-600 mt-1">Synchronize items from your Gem.app account to the database</p>
+          </div>
+        </div>
 
           {/* Sync Button */}
           <div style={{ marginTop: '24px', marginBottom: '8px' }}>
@@ -217,7 +211,6 @@ export function SyncGem() {
               </ul>
             </div>
           )}
-        </div>
       </div>
     </div>
   );
