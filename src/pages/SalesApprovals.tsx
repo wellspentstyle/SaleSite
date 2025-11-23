@@ -269,7 +269,7 @@ export function SalesApprovals() {
               {pendingSales.map(sale => (
                 <Card key={sale.id} className="cursor-pointer" onClick={() => handleToggleExpand(sale.id)}>
                   <CardContent className="pt-6">
-                    <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
+                    <div className="space-y-4">
                       {/* Sale Header */}
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
@@ -310,6 +310,7 @@ export function SalesApprovals() {
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             Visit Sale Page
                             <ExternalLink className="h-3 w-3" />
@@ -343,7 +344,7 @@ export function SalesApprovals() {
 
                       {/* Duplicate Warning */}
                       {duplicates[sale.id] && duplicates[sale.id].length > 0 && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3" onClick={(e) => e.stopPropagation()}>
                           <p className="text-sm font-semibold text-yellow-800 mb-2">
                             ⚠️ Potential Duplicates Found ({duplicates[sale.id].length})
                           </p>
@@ -375,7 +376,7 @@ export function SalesApprovals() {
                       )}
 
                       {/* Actions */}
-                      <div className="flex gap-2 pt-2">
+                      <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
                         <Button
                           onClick={() => handleApproveSale(sale.id)}
                           disabled={actionLoading === sale.id}

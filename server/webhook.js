@@ -3346,35 +3346,10 @@ app.post('/webhook/airtable-story', async (req, res) => {
   }
 });
 
-// ============================================
-// SERVE REACT BUILD IN PRODUCTION
-// ============================================
-
-// Serve static files from the React build directory
-const buildPath = path.join(__dirname, '..', 'build');
-app.use(express.static(buildPath));
-
-// Handle client-side routing - serve index.html for all non-API/webhook routes
-// This must be the LAST route to avoid intercepting API calls
-app.use((req, res) => {
-  // Only serve index.html for GET requests
-  if (req.method !== 'GET') {
-    return res.status(404).json({ error: 'Not found' });
-  }
-  
-  // Don't serve index.html for /api or /webhook paths that didn't match earlier routes
-  if (req.path.startsWith('/api') || req.path.startsWith('/webhook')) {
-    return res.status(404).json({ error: 'Not found' });
-  }
-  
-  // Everything else (/, /admin, etc.) is a SPA route and should get index.html
-  res.sendFile(path.join(buildPath, 'index.html'));
-});
-
 // ==================== PENDING SALES APPROVAL API ====================
 
 // Get all pending sales
-app.get('/api/pending-sales', (req, res) => {
+app.get('/pending-sales', (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3391,7 +3366,7 @@ app.get('/api/pending-sales', (req, res) => {
 });
 
 // Check for duplicate sales in Airtable
-app.post('/api/check-duplicates/:id', async (req, res) => {
+app.post('/check-duplicates/:id', async (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3456,7 +3431,7 @@ app.post('/api/check-duplicates/:id', async (req, res) => {
 });
 
 // Approve a pending sale (move to Airtable)
-app.post('/api/approve-sale/:id', async (req, res) => {
+app.post('/approve-sale/:id', async (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3570,7 +3545,7 @@ app.post('/api/approve-sale/:id', async (req, res) => {
 });
 
 // Reject a pending sale (delete it)
-app.post('/api/reject-sale/:id', (req, res) => {
+app.post('/reject-sale/:id', (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3600,7 +3575,7 @@ app.post('/api/reject-sale/:id', (req, res) => {
 });
 
 // Get approval settings
-app.get('/api/approval-settings', (req, res) => {
+app.get('/approval-settings', (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3617,7 +3592,7 @@ app.get('/api/approval-settings', (req, res) => {
 });
 
 // Update approval settings
-app.post('/api/approval-settings', (req, res) => {
+app.post('/approval-settings', (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3647,6 +3622,31 @@ app.post('/api/approval-settings', (req, res) => {
     console.error('Error updating approval settings:', error);
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// ============================================
+// SERVE REACT BUILD IN PRODUCTION
+// ============================================
+
+// Serve static files from the React build directory
+const buildPath = path.join(__dirname, '..', 'build');
+app.use(express.static(buildPath));
+
+// Handle client-side routing - serve index.html for all non-API/webhook routes
+// This must be the LAST route to avoid intercepting API calls
+app.use((req, res) => {
+  // Only serve index.html for GET requests
+  if (req.method !== 'GET') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  
+  // Don't serve index.html for /api or /webhook paths that didn't match earlier routes
+  if (req.path.startsWith('/api') || req.path.startsWith('/webhook')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  
+  // Everything else (/, /admin, etc.) is a SPA route and should get index.html
+  res.sendFile(path.join(buildPath, 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
