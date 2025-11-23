@@ -473,6 +473,24 @@ export function AddBrands() {
                 </Button>
               )}
             </div>
+
+            {/* Live Progress Indicator */}
+            {isProcessing && currentIndex >= 0 && results[currentIndex] && (
+              <div style={{ 
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '14px',
+                color: '#666',
+                marginTop: '12px',
+                paddingTop: '8px'
+              }}>
+                Researching: {results[currentIndex].name}
+                {results[currentIndex].status === 'processing' && (
+                  <span style={{ marginLeft: '8px', color: '#999' }}>
+                    (gathering brand information...)
+                  </span>
+                )}
+              </div>
+            )}
           </form>
 
         </div>

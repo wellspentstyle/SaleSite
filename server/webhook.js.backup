@@ -2174,6 +2174,286 @@ app.get('/admin/gem-sync-status', (req, res) => {
   });
 });
 
+// OLD SYNC-GEM CODE REPLACED - keeping this comment for reference
+// The original synchronous endpoint was replaced with background processing above
+app.post('/admin/sync-gem-old-removed', async (req, res) => {
+  // This endpoint was removed and replaced with background processing
+  res.status(410).json({ success: false, message: 'This endpoint has been replaced' });
+});
+
+app.post('/admin/sync-gem-legacy', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  if (!GEM_EMAIL) {
+    return res.status(500).json({ 
+      success: false, 
+      message: 'GEM_EMAIL not configured. Please set GEM_EMAIL environment variable.' 
+    });
+  }
+  
+  let browser;
+  try {
+    console.log('💎 Starting Gem sync process...');
+    console.log('📧 Requesting login email from Gem using browser automation...');
+    
+    // Use Playwright to trigger login email (gem.app blocks direct API calls)
+    const { chromium } = await import('playwright');
+    
+    // Try to find Chromium executable (different paths in dev vs production)
+    let chromiumPath = null;
+    try {
+      chromiumPath = execSync('which chromium', { encoding: 'utf-8' }).trim();
+      console.log(`✅ Found Chromium at: ${chromiumPath}`);
+    } catch (e) {
+      console.log('⚠️  Could not find chromium with which, trying default path...');
+    }
+    
+    const launchOptions = {
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
+    };
+    
+    if (chromiumPath) {
+      launchOptions.executablePath = chromiumPath;
+    }
+    
+    console.log('🚀 Launching browser with options:', JSON.stringify(launchOptions, null, 2));
+    browser = await chromium.launch(launchOptions);
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    });
+    const page = await context.newPage();
+    
+    try {
+      // Navigate to login page
+      console.log('🌐 Navigating to gem.app/requestEmailLogIn...');
+      await page.goto('https://gem.app/requestEmailLogIn', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      
+      // Take screenshot for debugging
+      await page.screenshot({ path: '/tmp/gem-login-1-loaded.png' });
+      console.log('📸 Screenshot saved: /tmp/gem-login-1-loaded.png');
+      
+      // Wait for page to fully load
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+        console.log('⚠️ Network not idle, continuing anyway...');
+      });
+      
+      // Log page title and URL for debugging
+      const title = await page.title();
+      const url = page.url();
+      console.log(`📄 Page loaded: "${title}" at ${url}`);
+      
+      // Try to find email input with multiple selectors
+      const emailSelectors = [
+        'input[type="email"]',
+        'input[name="email"]',
+        'input[placeholder*="email" i]',
+        'input[autocomplete="email"]',
+        '#email',
+        'input'
+      ];
+      
+      let emailInput = null;
+      for (const selector of emailSelectors) {
+        emailInput = await page.$(selector);
+        if (emailInput) {
+          console.log(`✅ Found email input with selector: ${selector}`);
+          break;
+        }
+      }
+      
+      if (!emailInput) {
+        // Log all inputs on the page
+        const inputs = await page.$$eval('input', els => els.map(el => ({
+          type: el.type,
+          name: el.name,
+          id: el.id,
+          placeholder: el.placeholder,
+          className: el.className
+        })));
+        console.log('🔍 All inputs found on page:', JSON.stringify(inputs, null, 2));
+        throw new Error('Could not find email input field');
+      }
+      
+      // Fill in email
+      console.log('✏️ Filling email field...');
+      await page.fill('input[type="email"]', GEM_EMAIL);
+      await page.screenshot({ path: '/tmp/gem-login-2-filled.png' });
+      console.log('📸 Screenshot saved: /tmp/gem-login-2-filled.png');
+      
+      // Try to find submit button with multiple selectors
+      const submitSelectors = [
+        'button[type="submit"]',
+        'button:has-text("Continue")',
+        'button:has-text("Log in")',
+        'button:has-text("Sign in")',
+        'input[type="submit"]',
+        'button'
+      ];
+      
+      let submitButton = null;
+      for (const selector of submitSelectors) {
+        submitButton = await page.$(selector);
+        if (submitButton) {
+          console.log(`✅ Found submit button with selector: ${selector}`);
+          break;
+        }
+      }
+      
+      if (!submitButton) {
+        // Log all buttons on the page
+        const buttons = await page.$$eval('button', els => els.map(el => ({
+          type: el.type,
+          textContent: el.textContent,
+          className: el.className,
+          id: el.id
+        })));
+        console.log('🔍 All buttons found on page:', JSON.stringify(buttons, null, 2));
+        
+        // Also check for divs that might be styled as buttons
+        const divButtons = await page.$$eval('div[role="button"], div[onclick], a[role="button"]', els => els.map(el => ({
+          tagName: el.tagName,
+          textContent: el.textContent.trim(),
+          className: el.className,
+          role: el.getAttribute('role')
+        })));
+        console.log('🔍 Div/link elements that might be buttons:', JSON.stringify(divButtons, null, 2));
+        
+        // Try pressing Enter in the email field as alternative
+        console.log('⚠️ No button found, trying to press Enter in email field instead...');
+        await page.focus('input[type="email"]');
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(3000);
+        console.log('✅ Pressed Enter in email field');
+        await page.screenshot({ path: '/tmp/gem-login-3-submitted.png' });
+        console.log('📸 Screenshot saved: /tmp/gem-login-3-submitted.png');
+      } else {
+        // Click submit
+        console.log('🖱️ Clicking submit button...');
+        await page.click('button[type="submit"]');
+        
+        // Wait for submission to complete
+        await page.waitForTimeout(3000);
+        await page.screenshot({ path: '/tmp/gem-login-3-submitted.png' });
+        console.log('📸 Screenshot saved: /tmp/gem-login-3-submitted.png');
+      }
+      
+      console.log('✅ Login email requested successfully');
+    } catch (error) {
+      console.error('❌ Browser automation error:', error.message);
+      console.error('Full error:', error);
+      // Try to capture screenshot on error
+      try {
+        await page.screenshot({ path: '/tmp/gem-login-error.png' });
+        console.log('📸 Error screenshot saved: /tmp/gem-login-error.png');
+      } catch (screenshotError) {
+        console.log('⚠️ Could not capture error screenshot');
+      }
+      throw new Error(`Browser automation failed: ${error.message}`);
+    } finally {
+      if (browser) {
+        await browser.close().catch(e => console.log('⚠️  Browser already closed'));
+      }
+    }
+    
+    console.log('⏳ Waiting for magic link email (max 2 minutes)...');
+    console.log('🔍 Current magic link cache status:');
+    console.log('   - Has link:', !!gemMagicLinks.link);
+    console.log('   - Expires at:', new Date(gemMagicLinks.expiresAt).toISOString());
+    console.log('   - Is valid:', gemMagicLinks.link && Date.now() < gemMagicLinks.expiresAt);
+    
+    // Wait for magic link with timeout (2 minutes)
+    const magicLink = await new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      const timeout = setTimeout(() => {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        console.log(`⏰ Timeout after ${elapsed} seconds - no magic link received`);
+        gemMagicLinks.pendingRequest = null;
+        reject(new Error('Timeout waiting for magic link email (2 minutes)'));
+      }, 120000); // 2 minutes
+      
+      console.log('📝 Registered pending request resolver');
+      
+      // Store resolver so webhook can notify us when email arrives
+      gemMagicLinks.pendingRequest = {
+        resolve: (link) => {
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          console.log(`✅ Promise resolved after ${elapsed} seconds with magic link`);
+          clearTimeout(timeout);
+          resolve(link);
+        },
+        reject: (error) => {
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          console.log(`❌ Promise rejected after ${elapsed} seconds: ${error.message}`);
+          clearTimeout(timeout);
+          reject(error);
+        }
+      };
+      
+      // Check if we already have a valid link in memory
+      if (gemMagicLinks.link && Date.now() < gemMagicLinks.expiresAt) {
+        clearTimeout(timeout);
+        console.log('✅ Using existing magic link from memory (cached)');
+        resolve(gemMagicLinks.link);
+      } else {
+        console.log('⏳ No cached link - waiting for webhook to receive email...');
+      }
+    });
+    
+    console.log('🔓 Magic link received, starting scraper...');
+    
+    // Clear the cached magic link since it's single-use
+    gemMagicLinks.link = null;
+    gemMagicLinks.expiresAt = 0;
+    
+    // Scrape Gem items using magic link
+    const scrapeResult = await scrapeGemItems(magicLink, {
+      maxItems: 5, // Limit to 5 items for initial test
+      logger: console
+    });
+    
+    if (!scrapeResult.success) {
+      return res.status(500).json({ 
+        success: false, 
+        message: scrapeResult.error || 'Scraping failed'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: scrapeResult.message,
+      itemsScraped: scrapeResult.itemsScraped,
+      itemsSaved: scrapeResult.itemsSaved,
+      items: scrapeResult.items
+    });
+    
+  } catch (error) {
+    console.error('❌ Gem sync error:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Provide user-friendly error messages
+    let userMessage = error.message;
+    if (error.message.includes('Browser automation failed')) {
+      userMessage = `Browser automation failed. This could be due to Chromium not being available or the Gem login page structure changing. Error: ${error.message}`;
+    } else if (error.message.includes('Timeout waiting for magic link')) {
+      userMessage = 'Timeout waiting for magic link email. Please check that CloudMailin is configured correctly and emails from gem.app are being forwarded.';
+    }
+    
+    res.status(500).json({ success: false, message: userMessage });
+  }
+});
 
 // Generate featured sales assets
 app.post('/admin/generate-featured-assets', async (req, res) => {
