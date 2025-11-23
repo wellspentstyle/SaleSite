@@ -45,13 +45,21 @@ export async function scrapeWithProxy(url, options = {}) {
       const errorText = await response.text();
       logger.error(`❌ [Proxy Scraper] ScraperAPI error (${response.status}):`, errorText);
       
+      let error;
       if (response.status === 401) {
-        throw new Error('ScraperAPI authentication failed - check your API key');
+        error = new Error('ScraperAPI authentication failed - check your API key');
+        error.errorType = 'FATAL';
       } else if (response.status === 429) {
-        throw new Error('ScraperAPI rate limit exceeded - upgrade your plan or wait');
+        error = new Error('ScraperAPI rate limit exceeded - upgrade your plan or wait');
+        error.errorType = 'BLOCKING';
+      } else if ([500, 502, 503, 504].includes(response.status)) {
+        error = new Error(`ScraperAPI error: ${response.status}`);
+        error.errorType = 'RETRYABLE';
       } else {
-        throw new Error(`ScraperAPI error: ${response.status}`);
+        error = new Error(`ScraperAPI error: ${response.status}`);
+        error.errorType = 'FATAL';
       }
+      throw error;
     }
 
     const html = await response.text();
@@ -285,9 +293,23 @@ Confidence scoring:
 
   } catch (error) {
     logger.error('❌ [Proxy Scraper] Error:', error.message);
+    
+    // Attach errorType if not already present
+    if (!error.errorType) {
+      const errorMsg = error.message?.toLowerCase() || '';
+      if (errorMsg.includes('placeholder image') || errorMsg.includes('missing required')) {
+        error.errorType = 'FATAL';
+      } else if (errorMsg.includes('low confidence')) {
+        error.errorType = 'FATAL';
+      } else {
+        error.errorType = 'UNKNOWN';
+      }
+    }
+    
     return {
       success: false,
       error: error.message,
+      errorType: error.errorType,
       meta: {
         method: 'proxy',
         phase: 'error',

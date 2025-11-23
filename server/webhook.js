@@ -1942,15 +1942,26 @@ app.post('/admin/scrape-product-stream', async (req, res) => {
         
         if (!result.success) {
           const errorMsg = result.error || 'Could not extract product data';
-          console.error(`  ❌ Failed: ${errorMsg}`);
+          const errorType = result.errorType || 'UNKNOWN';
+          console.error(`  ❌ Failed: ${errorMsg} (${errorType})`);
           
-          failedDomains.add(domain);
+          // Only skip domain for BLOCKING errors, not RETRYABLE ones
+          if (errorType === 'BLOCKING') {
+            failedDomains.add(domain);
+            console.log(`  🚫 Domain ${domain} marked as failed (BLOCKING error) - will skip remaining URLs from this domain`);
+          } else if (errorType === 'RETRYABLE') {
+            console.log(`  ⚠️  Retryable error - will continue with other URLs from ${domain}`);
+          } else if (errorType === 'FATAL') {
+            console.log(`  ⚠️  Fatal error for this URL only - will continue with other URLs from ${domain}`);
+          }
+          
           failureCount++;
           
           sendEvent('error', {
             index: i,
             url: productUrl,
             error: errorMsg,
+            errorType: errorType,
             progress: { current: i + 1, total: urlsToScrape.length }
           });
         } else {
@@ -1968,14 +1979,23 @@ app.post('/admin/scrape-product-stream', async (req, res) => {
         }
       } catch (error) {
         console.error(`  ❌ Error scraping ${productUrl}:`, error.message);
+        const errorType = error.errorType || 'UNKNOWN';
         
-        failedDomains.add(domain);
+        // Only skip domain for BLOCKING errors, not RETRYABLE ones
+        if (errorType === 'BLOCKING') {
+          failedDomains.add(domain);
+          console.log(`  🚫 Domain ${domain} marked as failed (BLOCKING error) - will skip remaining URLs from this domain`);
+        } else {
+          console.log(`  ⚠️  Error type: ${errorType} - will continue with other URLs from ${domain}`);
+        }
+        
         failureCount++;
         
         sendEvent('error', {
           index: i,
           url: productUrl,
           error: error.message,
+          errorType: errorType,
           progress: { current: i + 1, total: urlsToScrape.length }
         });
       }
@@ -2045,15 +2065,23 @@ app.post('/admin/scrape-product', async (req, res) => {
         
         if (!result.success) {
           const errorMsg = result.error || 'Could not extract product data';
-          console.error(`  ❌ Failed: ${errorMsg}`);
+          const errorType = result.errorType || 'UNKNOWN';
+          console.error(`  ❌ Failed: ${errorMsg} (${errorType})`);
           
-          // Mark this domain as failed
-          failedDomains.add(domain);
-          console.log(`  🚫 Domain ${domain} marked as failed - will skip remaining URLs from this domain`);
+          // Only skip domain for BLOCKING errors, not RETRYABLE ones
+          if (errorType === 'BLOCKING') {
+            failedDomains.add(domain);
+            console.log(`  🚫 Domain ${domain} marked as failed (BLOCKING error) - will skip remaining URLs from this domain`);
+          } else if (errorType === 'RETRYABLE') {
+            console.log(`  ⚠️  Retryable error - will continue with other URLs from ${domain}`);
+          } else if (errorType === 'FATAL') {
+            console.log(`  ⚠️  Fatal error for this URL only - will continue with other URLs from ${domain}`);
+          }
           
           failures.push({
             url: productUrl,
             error: errorMsg,
+            errorType: errorType,
             meta: result.meta
           });
         } else {
@@ -2068,14 +2096,20 @@ app.post('/admin/scrape-product', async (req, res) => {
         }
       } catch (error) {
         console.error(`  ❌ Error scraping ${productUrl}:`, error.message);
+        const errorType = error.errorType || 'UNKNOWN';
         
-        // Mark this domain as failed
-        failedDomains.add(domain);
-        console.log(`  🚫 Domain ${domain} marked as failed - will skip remaining URLs from this domain`);
+        // Only skip domain for BLOCKING errors, not RETRYABLE ones
+        if (errorType === 'BLOCKING') {
+          failedDomains.add(domain);
+          console.log(`  🚫 Domain ${domain} marked as failed (BLOCKING error) - will skip remaining URLs from this domain`);
+        } else {
+          console.log(`  ⚠️  Error type: ${errorType} - will continue with other URLs from ${domain}`);
+        }
         
         failures.push({
           url: productUrl,
-          error: error.message
+          error: error.message,
+          errorType: errorType
         });
       }
     }
