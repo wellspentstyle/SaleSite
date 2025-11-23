@@ -1,0 +1,46 @@
+{
+  "drafts": [
+    {
+      "id": "63901a34-f145-4546-bdc3-6f1f941ad0d2",
+      "saleId": "rec6by6CH9qW0qPFt",
+      "saleName": "Sale",
+      "salePercentOff": 35,
+      "picks": [],
+      "manualEntries": [
+        {
+          "url": "https://www.madewell.com/p/womens/shoes/boots/booties/the-lexie-ankle-boot-in-leather/NX060/?ccode=BR5832#gallery-scroll",
+          "name": "",
+          "imageUrl": "",
+          "originalPrice": 0,
+          "salePrice": 0,
+          "percentOff": 0
+        },
+        {
+          "url": "https://www.madewell.com/p/womens/shoes/boots/booties/the-lexie-ankle-boot-in-leather/NX546/?ccode=RD0146#gallery-scroll",
+          "name": "",
+          "imageUrl": "",
+          "originalPrice": 0,
+          "salePrice": 0,
+          "percentOff": 0
+        },
+        {
+          "url": "https://www.madewell.com/p/womens/shoes/flats-loafers/loafers/the-jamie-boat-shoe/NX055/?ccode=BR6850#gallery-scroll",
+          "name": "",
+          "imageUrl": "",
+          "originalPrice": 0,
+          "salePrice": 0,
+          "percentOff": 0
+        }
+      ],
+      "failedUrls": [
+        "https://www.madewell.com/p/womens/shoes/boots/booties/the-lexie-ankle-boot-in-leather/NX060/?ccode=BR5832#gallery-scroll",
+        "https://www.madewell.com/p/womens/shoes/boots/booties/the-lexie-ankle-boot-in-leather/NX546/?ccode=RD0146#gallery-scroll",
+        "https://www.madewell.com/p/womens/shoes/flats-loafers/loafers/the-jamie-boat-shoe/NX055/?ccode=BR6850#gallery-scroll"
+      ],
+      "customPercentOff": "",
+      "individualCustomPercent": {},
+      "createdAt": "2025-11-23T12:50:47.692Z",
+      "updatedAt": "2025-11-23T12:53:31.354Z"
+    }
+  ]
+}

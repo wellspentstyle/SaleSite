@@ -50,6 +50,9 @@ interface Draft {
   picks: any[];
   createdAt: string;
   updatedAt: string;
+  type?: 'manual' | 'finalize';
+  manualEntries?: any[];
+  failedUrls?: string[];
 }
 
 interface ProtectionWarning {
@@ -118,13 +121,28 @@ export function PicksAdmin() {
     const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
-      const response = await fetch(`${API_BASE}/admin/manual-picks/drafts`, {
-        headers: { 'auth': auth }
-      });
-      const data = await response.json();
-      if (data.success) {
-        setDrafts(data.drafts || []);
-      }
+      // Fetch both manual pick drafts and finalize drafts
+      const [manualResponse, finalizeResponse] = await Promise.all([
+        fetch(`${API_BASE}/admin/manual-picks/drafts`, {
+          headers: { 'auth': auth }
+        }),
+        fetch(`${API_BASE}/admin/finalize-drafts`, {
+          headers: { 'auth': auth }
+        })
+      ]);
+
+      const manualData = await manualResponse.json();
+      const finalizeData = await finalizeResponse.json();
+
+      const allDrafts = [
+        ...(manualData.success ? manualData.drafts.map((d: Draft) => ({ ...d, type: 'manual' as const })) : []),
+        ...(finalizeData.success ? finalizeData.drafts.map((d: Draft) => ({ ...d, type: 'finalize' as const })) : [])
+      ];
+
+      // Sort by updated date, newest first
+      allDrafts.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      
+      setDrafts(allDrafts);
     } catch (error) {
       console.error('Failed to fetch drafts:', error);
     } finally {
@@ -160,21 +178,39 @@ export function PicksAdmin() {
   };
 
   const handleResumeDraft = (draft: Draft) => {
-    navigate('/admin/picks/manual', {
-      state: {
-        selectedSaleId: draft.saleId,
-        saleName: draft.saleName,
-        salePercentOff: draft.salePercentOff,
-        draftId: draft.id
-      }
-    });
+    if (draft.type === 'finalize') {
+      // For finalize drafts, navigate to the finalize picks page
+      // The FinalizePicks page will auto-load the draft on mount
+      navigate('/admin/picks/finalize', {
+        state: {
+          scrapedProducts: draft.picks || [],
+          selectedSaleId: draft.saleId,
+          salePercentOff: draft.salePercentOff,
+          failures: (draft.failedUrls || []).map((url: string) => ({ url, error: 'Previously failed' }))
+        }
+      });
+    } else {
+      // For manual drafts, navigate to the manual entry page
+      navigate('/admin/picks/manual', {
+        state: {
+          selectedSaleId: draft.saleId,
+          saleName: draft.saleName,
+          salePercentOff: draft.salePercentOff,
+          draftId: draft.id
+        }
+      });
+    }
   };
 
-  const handleDeleteDraft = async (draftId: string) => {
+  const handleDeleteDraft = async (draftId: string, draftType: 'manual' | 'finalize') => {
     const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
     
     try {
-      const response = await fetch(`${API_BASE}/admin/manual-picks/drafts/${draftId}`, {
+      const endpoint = draftType === 'manual' 
+        ? `${API_BASE}/admin/manual-picks/drafts/${draftId}`
+        : `${API_BASE}/admin/finalize-drafts/${draftId}`;
+        
+      const response = await fetch(endpoint, {
         method: 'DELETE',
         headers: { 'auth': auth }
       });
@@ -847,18 +883,35 @@ export function PicksAdmin() {
                   }}
                 >
                   <div className="mb-3">
-                    <h3 
-                      style={{ 
-                        fontFamily: 'DM Sans, sans-serif', 
-                        fontWeight: 600, 
-                        fontSize: '16px',
-                        marginBottom: '4px'
-                      }}
-                    >
-                      {draft.saleName}
-                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <h3 
+                        style={{ 
+                          fontFamily: 'DM Sans, sans-serif', 
+                          fontWeight: 600, 
+                          fontSize: '16px'
+                        }}
+                      >
+                        {draft.saleName}
+                      </h3>
+                      <span
+                        style={{
+                          fontFamily: 'DM Sans, sans-serif',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          padding: '2px 6px',
+                          borderRadius: '3px',
+                          backgroundColor: draft.type === 'finalize' ? '#dbeafe' : '#fef3c7',
+                          color: draft.type === 'finalize' ? '#1e40af' : '#92400e',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}
+                      >
+                        {draft.type === 'finalize' ? 'Finalize' : 'Manual'}
+                      </span>
+                    </div>
                     <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                       {draft.salePercentOff}% Off • {draft.picks.length} pick{draft.picks.length !== 1 ? 's' : ''}
+                      {draft.type === 'finalize' && draft.manualEntries && draft.manualEntries.length > 0 && ` • ${draft.manualEntries.length} manual entr${draft.manualEntries.length !== 1 ? 'ies' : 'y'}`}
                     </p>
                   </div>
                   
@@ -882,7 +935,7 @@ export function PicksAdmin() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDeleteDraft(draft.id)}
+                      onClick={() => handleDeleteDraft(draft.id, draft.type || 'manual')}
                       style={{ 
                         fontFamily: 'DM Sans, sans-serif',
                         color: '#ef4444',
