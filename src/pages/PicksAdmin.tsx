@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Input } from '../components/ui/input';
-import { Loader2, ExternalLink, ArrowLeft, AlertTriangle, Power, Edit, FileEdit, Trash2 } from 'lucide-react';
+import { Loader2, ExternalLink, ArrowLeft, AlertTriangle, Power, Edit, FileEdit, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -86,6 +86,7 @@ export function PicksAdmin() {
     promoCode: '',
     endDate: ''
   });
+  const [deactivateSale, setDeactivateSale] = useState<Sale | null>(null);
 
   useEffect(() => {
     fetchSales();
@@ -532,6 +533,30 @@ export function PicksAdmin() {
               >
                 Inactive Sales
               </button>
+              
+              <button
+                onClick={() => setCurrentView('drafts')}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: '14px',
+                  padding: '8px 16px',
+                  backgroundColor: '#fff',
+                  color: '#000',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 400,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#999';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#ddd';
+                }}
+              >
+                Manual Entry Needed
+              </button>
             </div>
 
           {loadingSales ? (
@@ -554,12 +579,12 @@ export function PicksAdmin() {
               {filteredSales.map((sale) => (
                 <div
                   key={sale.id}
-                  onClick={() => handleSaleClick(sale)}
-                  className="border bg-white cursor-pointer transition-all hover:shadow-md"
+                  className="border bg-white transition-all hover:shadow-md"
                   style={{ 
                     padding: '20px', 
                     borderRadius: '4px',
-                    borderColor: '#e5e7eb'
+                    borderColor: '#e5e7eb',
+                    position: 'relative'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = '#9ca3af';
@@ -613,39 +638,53 @@ export function PicksAdmin() {
                       </p>
                     )}
                     
-                    <div className="space-y-2 mt-3">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => handleOpenEditDialog(sale, e)}
-                          className="flex-1"
-                          style={{ fontFamily: 'DM Sans, sans-serif' }}
-                        >
-                          <Edit className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant={sale.live === 'YES' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={(e) => handleToggleActive(sale, e)}
-                          className="flex-1"
-                          style={{ fontFamily: 'DM Sans, sans-serif' }}
-                        >
-                          <Power className="h-3 w-3 mr-1" />
-                          {sale.live === 'YES' ? 'Deactivate' : 'Activate'}
-                        </Button>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => handleManualEntry(sale, e)}
-                        className="w-full"
-                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                    <div 
+                      style={{ 
+                        position: 'absolute', 
+                        bottom: '20px', 
+                        right: '20px',
+                        display: 'flex',
+                        gap: '12px'
+                      }}
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditDialog(sale, e);
+                        }}
+                        style={{ 
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          color: '#6b7280'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#374151'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
                       >
-                        <FileEdit className="h-3 w-3 mr-1" />
-                        Manual Entry
-                      </Button>
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (sale.live === 'YES') {
+                            setDeactivateSale(sale);
+                          } else {
+                            handleToggleActive(sale, e);
+                          }
+                        }}
+                        style={{ 
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          color: '#6b7280'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#374151'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
+                      >
+                        {sale.live === 'YES' ? <X className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -680,6 +719,19 @@ export function PicksAdmin() {
             <p className="text-sm text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
               Paste product URLs below to scrape and add picks to this sale.
             </p>
+            
+            {selectedSale?.saleUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(selectedSale.saleUrl, '_blank')}
+                className="mt-3"
+                style={{ fontFamily: 'DM Sans, sans-serif' }}
+              >
+                <ExternalLink className="mr-2 h-3 w-3" />
+                Launch sale page
+              </Button>
+            )}
           </div>
 
           <form onSubmit={handleScrapePicks}>
@@ -904,6 +956,39 @@ export function PicksAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Deactivate Confirmation Dialog */}
+      <AlertDialog open={!!deactivateSale} onOpenChange={(open) => {
+        if (!open) setDeactivateSale(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Deactivate Sale
+            </AlertDialogTitle>
+            <AlertDialogDescription style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Are you sure you want to deactivate <strong>{deactivateSale?.saleName}</strong>? 
+              This will remove it from the public website.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeactivateSale(null)} style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (deactivateSale) {
+                  handleToggleActive(deactivateSale, { stopPropagation: () => {} } as any);
+                  setDeactivateSale(null);
+                }
+              }} 
+              style={{ fontFamily: 'DM Sans, sans-serif', backgroundColor: '#dc2626', color: '#fff' }}
+            >
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Protection Warning Modal */}
       <AlertDialog open={protectionWarning.show} onOpenChange={(open) => {
