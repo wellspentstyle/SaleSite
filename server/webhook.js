@@ -722,6 +722,8 @@ app.post('/admin/update-brand-in-airtable', async (req, res) => {
       PriceRange: brandData.priceRange || '',
       Category: categoryArray,
       MaxWomensSize: brandData.maxWomensSize || '',
+      SizingSource: brandData.sizingSource || '',
+      Notes: brandData.notes || '',
       Values: valuesArray,
       Description: brandData.description || '',
       URL: brandData.url || ''

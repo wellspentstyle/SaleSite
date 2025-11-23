@@ -21,6 +21,8 @@ interface BrandResult {
   category: string;
   values: string;
   maxWomensSize: string;
+  sizingSource: string;
+  notes: string;
   description: string;
   url: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -66,6 +68,8 @@ export function AddBrands() {
       category: '',
       values: '',
       maxWomensSize: '',
+      sizingSource: '',
+      notes: '',
       description: '',
       url: '',
       status: 'pending'
@@ -118,6 +122,8 @@ export function AddBrands() {
               category: data.brand.category || '',
               values: data.brand.values || '',
               maxWomensSize: data.brand.maxWomensSize || '',
+              sizingSource: data.brand.sizingSource || '',
+              notes: data.brand.notes || '',
               description: data.brand.description || '',
               url: data.brand.url || '',
               evidence: data.brand.evidence,
@@ -187,6 +193,8 @@ export function AddBrands() {
             category: data.brand.category || '',
             values: data.brand.values || '',
             maxWomensSize: data.brand.maxWomensSize || '',
+            sizingSource: data.brand.sizingSource || '',
+            notes: data.brand.notes || '',
             description: data.brand.description || '',
             url: data.brand.url || '',
             evidence: data.brand.evidence,
@@ -336,6 +344,8 @@ export function AddBrands() {
               category: categoryArray,
               values: valuesArray,
               maxWomensSize: result.maxWomensSize,
+              sizingSource: result.sizingSource,
+              notes: result.notes,
               description: result.description,
               url: result.url
             }
@@ -556,6 +566,7 @@ export function AddBrands() {
                     <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '150px' }}>Category</th>
                     <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '180px' }}>Values</th>
                     <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '100px' }}>Max Size</th>
+                    <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '180px' }}>Sizing Source</th>
                     <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '250px' }}>Description</th>
                     <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '150px' }}>URL</th>
                     <th className="px-4 py-3 text-left font-medium" style={{ minWidth: '120px' }}>Status</th>
@@ -582,6 +593,13 @@ export function AddBrands() {
                       <td className="px-4 py-3">{result.category}</td>
                       <td className="px-4 py-3">{result.values}</td>
                       <td className="px-4 py-3">{result.maxWomensSize}</td>
+                      <td className="px-4 py-3">
+                        {result.sizingSource ? (
+                          <span className="text-sm text-muted-foreground">{result.sizingSource}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3" style={{ maxWidth: '300px' }}>
                         {result.description ? (
                           <span 

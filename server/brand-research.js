@@ -844,6 +844,45 @@ Write ONLY the description, no preamble.`
 
       console.log(`\n✅ Research complete for ${brandName}`);
 
+      // ============================================
+      // GENERATE SIZING SOURCE & NOTES
+      // ============================================
+      // Short description for SizingSource field
+      let sizingSource = '';
+      if (sizeMethod === 'size-chart') {
+        sizingSource = 'brand size chart';
+      } else if (sizeMethod === 'shopping-products') {
+        sizingSource = 'analyzing current finds on the site';
+      } else if (sizeMethod === 'none') {
+        sizingSource = '';
+      }
+
+      // Detailed notes about extraction methods
+      const notesParts = [];
+      
+      // Price info
+      if (priceRangeMethod === 'shopping-api') {
+        notesParts.push(`Price: From ${products.length} products via Shopping API`);
+      } else if (priceRangeMethod === 'shopping-api-limited') {
+        notesParts.push(`Price: From ${products.length} products via Shopping API (limited data)`);
+      } else if (priceRangeMethod === 'estimated') {
+        notesParts.push(`Price: Estimated (no products found)`);
+      }
+      
+      // Category info
+      if (products.length > 0) {
+        notesParts.push(`Categories: From ${products.length} Shopping API products`);
+      } else {
+        notesParts.push(`Categories: From web search results`);
+      }
+      
+      // Size info (already covered in SizingSource, so just mention if none)
+      if (sizeMethod === 'none') {
+        notesParts.push(`Sizing: Not found`);
+      }
+
+      const notes = notesParts.join(' | ');
+
       res.json({
         success: true,
         qualityScore: Math.round(avgQuality),
@@ -861,6 +900,8 @@ Write ONLY the description, no preamble.`
           category: finalCategory,
           values: valuesData.values || '',
           maxWomensSize: finalMaxSize,
+          sizingSource: sizingSource,
+          notes: notes,
           description: brandDescription,
           url: brandUrl,
           evidence: {
