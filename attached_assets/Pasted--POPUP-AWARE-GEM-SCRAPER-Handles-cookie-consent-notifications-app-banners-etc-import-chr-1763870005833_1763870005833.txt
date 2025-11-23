@@ -1,0 +1,367 @@
+// POPUP-AWARE GEM SCRAPER
+// Handles cookie consent, notifications, app banners, etc.
+
+import { chromium } from 'playwright';
+
+export async function scrapeGemItems(magicLink, options = {}) {
+  const {
+    maxItems = 5,
+    logger = console
+  } = options;
+  
+  let browser;
+  let context;
+  let page;
+  
+  try {
+    logger.log('💎 Starting Gem scraper with popup handling...');
+    
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--window-size=1920,1080'
+      ]
+    });
+    
+    context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 },
+      locale: 'en-US',
+      timezoneId: 'America/New_York',
+      // Pre-grant permissions to avoid popups
+      permissions: [],
+      geolocation: undefined,
+      extraHTTPHeaders: {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'DNT': '1'
+      }
+    });
+    
+    // Hide webdriver
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      window.chrome = { runtime: {} };
+    });
+    
+    page = await context.newPage();
+    
+    // Function to dismiss common popups
+    async function dismissPopups() {
+      logger.log('🚫 Checking for popups/modals...');
+      
+      // Common popup close selectors
+      const popupSelectors = [
+        // Close buttons
+        'button[aria-label*="close" i]',
+        'button[aria-label*="dismiss" i]',
+        'button:has-text("Close")',
+        'button:has-text("×")',
+        'button:has-text("✕")',
+        '[class*="close" i][role="button"]',
+        '[class*="dismiss" i]',
+        
+        // Accept/OK buttons for cookie consent
+        'button:has-text("Accept")',
+        'button:has-text("OK")',
+        'button:has-text("I Accept")',
+        'button:has-text("Accept All")',
+        'button:has-text("Allow")',
+        '[id*="accept" i][role="button"]',
+        
+        // "Not now" / "Later" for notifications/app prompts
+        'button:has-text("Not Now")',
+        'button:has-text("No Thanks")',
+        'button:has-text("Later")',
+        'button:has-text("Maybe Later")',
+        'button:has-text("Continue in Browser")',
+        'button:has-text("Stay in Browser")',
+        
+        // Modal overlays
+        '[class*="modal" i] button',
+        '[class*="overlay" i] button',
+        '[role="dialog"] button',
+        
+        // Specific Gem.app patterns (if we know them)
+        '[data-testid*="close"]',
+        '[data-testid*="dismiss"]'
+      ];
+      
+      let popupsClosed = 0;
+      
+      for (const selector of popupSelectors) {
+        try {
+          const popup = page.locator(selector).first();
+          const count = await popup.count();
+          
+          if (count > 0) {
+            const isVisible = await popup.isVisible().catch(() => false);
+            
+            if (isVisible) {
+              logger.log(`   Found popup: ${selector}`);
+              await popup.click({ timeout: 2000 });
+              await page.waitForTimeout(1000); // Wait for animation
+              popupsClosed++;
+              logger.log(`   ✅ Closed popup`);
+            }
+          }
+        } catch (error) {
+          // Ignore - popup might not exist or already be closed
+        }
+      }
+      
+      if (popupsClosed > 0) {
+        logger.log(`✅ Dismissed ${popupsClosed} popup(s)`);
+      } else {
+        logger.log('   No popups found');
+      }
+      
+      return popupsClosed;
+    }
+    
+    // STEP 1: Navigate to magic link
+    logger.log('🔗 Navigating to magic link...');
+    
+    await page.goto(magicLink, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
+    
+    // Wait for page to settle
+    await page.waitForTimeout(2000);
+    
+    logger.log(`📍 URL: ${page.url()}`);
+    logger.log(`📄 Title: ${await page.title()}`);
+    
+    // STEP 2: Dismiss any popups that appear
+    await dismissPopups();
+    
+    // STEP 3: Check if we need to click a continue button
+    const continueSelectors = [
+      'button:has-text("Continue")',
+      'button:has-text("Log In")',
+      'button:has-text("Enter")',
+      'button:has-text("Get Started")',
+      'a:has-text("Continue")',
+      '[type="submit"]'
+    ];
+    
+    let buttonClicked = false;
+    for (const selector of continueSelectors) {
+      try {
+        const button = page.locator(selector).first();
+        if (await button.count() > 0 && await button.isVisible()) {
+          logger.log(`🔘 Found button: ${selector}`);
+          await button.click();
+          await page.waitForTimeout(2000);
+          buttonClicked = true;
+          logger.log('✅ Clicked continue button');
+          break;
+        }
+      } catch (error) {
+        // Button not found or not clickable
+      }
+    }
+    
+    // STEP 4: Wait for authentication/redirect
+    logger.log('⏳ Waiting for authentication...');
+    
+    try {
+      // Wait for URL to change to items/shop page
+      await page.waitForURL(url => {
+        return url.includes('/shop') || 
+               url.includes('/items') || 
+               url.includes('/collection') ||
+               !url.includes('emailLogIn');
+      }, { timeout: 15000 });
+      
+      logger.log('✅ URL changed - authenticated!');
+    } catch (waitError) {
+      logger.log('⚠️  No redirect detected, checking current page...');
+    }
+    
+    // Dismiss any post-login popups
+    await page.waitForTimeout(2000);
+    await dismissPopups();
+    
+    // STEP 5: Verify we're logged in
+    const currentUrl = page.url();
+    const currentTitle = await page.title();
+    
+    logger.log(`📍 Current URL: ${currentUrl}`);
+    logger.log(`📄 Current Title: ${currentTitle}`);
+    
+    const isLoggedIn = currentUrl.includes('/shop') || 
+                       currentUrl.includes('/items') ||
+                       currentUrl.includes('/collection') ||
+                       !currentUrl.includes('emailLogIn');
+    
+    await page.screenshot({ path: '/tmp/gem-after-auth.png', fullPage: true });
+    logger.log('📸 Screenshot: /tmp/gem-after-auth.png');
+    
+    if (!isLoggedIn) {
+      // Last resort: manually navigate to items page
+      logger.log('⚠️  Not on items page, navigating manually...');
+      
+      try {
+        await page.goto('https://gem.app/items', {
+          waitUntil: 'domcontentloaded',
+          timeout: 30000
+        });
+        
+        await page.waitForTimeout(2000);
+        await dismissPopups();
+        
+        logger.log('✅ Navigated to items page');
+      } catch (navError) {
+        throw new Error('Magic link authentication failed - not logged in after using link');
+      }
+    } else {
+      logger.log('✅ Successfully authenticated!');
+    }
+    
+    // STEP 6: Extract items
+    logger.log('📦 Extracting items...');
+    
+    // Wait for items to load
+    await page.waitForTimeout(3000);
+    
+    // Try multiple selector strategies
+    const items = await page.evaluate((maxItems) => {
+      const results = [];
+      
+      // Common selectors for product/item cards
+      const selectors = [
+        'article',
+        '[data-testid*="item"]',
+        '[data-testid*="product"]',
+        '.item-card',
+        '[class*="ItemCard"]',
+        'a[href*="/item/"]'
+      ];
+      
+      let elements = [];
+      for (const selector of selectors) {
+        elements = document.querySelectorAll(selector);
+        if (elements.length > 0) {
+          console.log(`Found ${elements.length} items with: ${selector}`);
+          break;
+        }
+      }
+      
+      if (elements.length === 0) {
+        console.log('No items found with any selector');
+        
+        // Debug: log page structure
+        const allTags = {};
+        document.querySelectorAll('*').forEach(el => {
+          const tag = el.tagName.toLowerCase();
+          allTags[tag] = (allTags[tag] || 0) + 1;
+        });
+        console.log('Page structure:', allTags);
+        
+        return [];
+      }
+      
+      const itemsToExtract = Math.min(elements.length, maxItems);
+      
+      for (let i = 0; i < itemsToExtract; i++) {
+        const element = elements[i];
+        
+        try {
+          // Extract URL
+          let url = '';
+          const link = element.querySelector('a') || (element.tagName === 'A' ? element : null);
+          if (link) {
+            url = link.href;
+          }
+          
+          // Extract image
+          let imageUrl = '';
+          const img = element.querySelector('img');
+          if (img) {
+            imageUrl = img.src || img.dataset.src || img.getAttribute('data-src');
+          }
+          
+          // Extract name
+          let name = '';
+          const titleEl = element.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]');
+          if (titleEl) {
+            name = titleEl.textContent?.trim();
+          }
+          
+          // Extract price
+          let price = '';
+          const priceEl = element.querySelector('[class*="price"], [data-testid*="price"]');
+          if (priceEl) {
+            price = priceEl.textContent?.trim();
+          }
+          
+          if (url || imageUrl) {
+            results.push({
+              name: name || 'Unnamed Item',
+              url: url,
+              imageUrl: imageUrl,
+              price: price
+            });
+          }
+        } catch (err) {
+          console.error('Error extracting item:', err);
+        }
+      }
+      
+      return results;
+    }, maxItems);
+    
+    logger.log(`✅ Extracted ${items.length} items`);
+    
+    if (items.length > 0) {
+      logger.log('📝 Sample item:', items[0]);
+    }
+    
+    await browser.close();
+    
+    return {
+      success: true,
+      message: `Successfully scraped ${items.length} items from Gem`,
+      itemsScraped: items.length,
+      itemsSaved: 0, // TODO: Save to Airtable
+      items: items
+    };
+    
+  } catch (error) {
+    logger.error('❌ Gem scraping error:', error.message);
+    
+    if (page) {
+      try {
+        const url = page.url();
+        const title = await page.title();
+        
+        logger.error(`❌ Error at URL: ${url}`);
+        logger.error(`❌ Page title: ${title}`);
+        
+        await page.screenshot({ path: '/tmp/gem-error-state.png', fullPage: true });
+        logger.log('📸 Error screenshot: /tmp/gem-error-state.png');
+      } catch (e) {
+        // Ignore screenshot errors
+      }
+    }
+    
+    if (browser) {
+      await browser.close();
+    }
+    
+    return {
+      success: false,
+      error: error.message,
+      itemsScraped: 0,
+      itemsSaved: 0,
+      items: []
+    };
+  }
+}
