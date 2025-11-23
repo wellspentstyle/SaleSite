@@ -1,0 +1,152 @@
+2025-11-23 15:19:37.98
+021110b0
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-11-23 15:32:53.15
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:32:54.67
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:32:54.94
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
+2025-11-23 15:33:03.08
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:33:04.77
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:33:05.02
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
+2025-11-23 15:33:07.96
+25c3fdbd
+User
+❌ [Fast Scraper] Error: Low confidence (30%) - data may be inaccurate
+2025-11-23 15:33:14.45
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:33:17.29
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:33:17.75
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: Low confidence (30%) - data may be inaccurate, Playwright: Bot detection triggered: captcha element found (FATAL)
+2025-11-23 15:33:22.67
+021110b0
+System
+command finished with error [node server/webhook.js]: signal: terminated
+2025-11-23 15:33:23.34
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:33:23.69
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
+2025-11-23 15:33:26.22
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:33:28.19
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:33:28.69
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
+2025-11-23 15:33:31.26
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:33:33.17
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:33:33.38
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
+2025-11-23 15:33:41.98
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:33:45.14
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:33:45.22
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:33:45.52
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
+2025-11-23 15:33:47.01
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:33:47.23
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
+2025-11-23 15:33:53.84
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:33:56.60
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:33:56.88
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:33:57.19
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
+2025-11-23 15:33:58.46
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:33:58.65
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
+2025-11-23 15:34:04.72
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:34:06.33
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:34:06.58
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
+2025-11-23 15:34:13.74
+25c3fdbd
+User
+[Stealth] ❌ Bot detection page detected: "captcha element found"
+2025-11-23 15:34:15.30
+25c3fdbd
+User
+[Playwright] Error: Bot detection triggered: captcha element found
+2025-11-23 15:34:15.50
+25c3fdbd
+User
+❌ Failed: Both scrapers failed. Fast: undefined, Playwright: Bot detection triggered: captcha element found (UNKNOWN)
