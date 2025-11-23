@@ -260,9 +260,20 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
       // Extract brand name from official domain (e.g., "everlane" from "everlane.com")
       const domainBrand = officialDomain.split('.')[0].toLowerCase();
 
+      // Helper: Normalize brand names for matching (remove spaces, punctuation)
+      const normalizeBrand = (name) => {
+        return name
+          .toLowerCase()
+          .replace(/[.\s&'-]/g, '') // Remove spaces, dots, ampersands, apostrophes, hyphens
+          .trim();
+      };
+
+      const normalizedDomainBrand = normalizeBrand(domainBrand);
+
       sortedSources.forEach(([source, count]) => {
-        const isMatch = source.toLowerCase().includes(domainBrand) || 
-                       domainBrand.includes(source.toLowerCase());
+        const normalizedSource = normalizeBrand(source);
+        const isMatch = normalizedSource.includes(normalizedDomainBrand) || 
+                       normalizedDomainBrand.includes(normalizedSource);
         console.log(`      ${isMatch ? '✅' : '❌'} ${source}: ${count} products`);
       });
       console.log('');
@@ -271,9 +282,10 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
       const officialProducts = shoppingResults.filter(product => {
         if (!product.source) return false;
 
-        const source = product.source.toLowerCase();
-        // Accept if source contains brand name or vice versa
-        return source.includes(domainBrand) || domainBrand.includes(source);
+        const normalizedSource = normalizeBrand(product.source);
+        // Accept if source contains brand name or vice versa (after normalization)
+        return normalizedSource.includes(normalizedDomainBrand) || 
+               normalizedDomainBrand.includes(normalizedSource);
       });
 
       console.log(`✅ Filtered to ${officialProducts.length} products from official domain`);
