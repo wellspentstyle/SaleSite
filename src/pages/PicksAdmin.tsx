@@ -84,8 +84,6 @@ export function PicksAdmin() {
   
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
-  const cancelScrapingRef = useRef(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const [editForm, setEditForm] = useState({
     percentOff: '',
     promoCode: '',
@@ -328,135 +326,62 @@ export function PicksAdmin() {
 
   const performScraping = async (urlList: string[]) => {
     setIsLoading(true);
-    cancelScrapingRef.current = false;
     const auth = sessionStorage.getItem('adminAuth');
 
-    const scrapedProducts: any[] = [];
-    const failures: any[] = [];
-    
-    // Create and store AbortController
-    abortControllerRef.current = new AbortController();
-
     try {
-      // Use streaming endpoint with POST body
-      const response = await fetch(`${API_BASE}/admin/scrape-product-stream`, {
+      toast.info(`Scraping ${urlList.length} product${urlList.length > 1 ? 's' : ''}...`);
+      
+      const response = await fetch(`${API_BASE}/admin/scrape-product`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'auth': auth || ''
         },
-        body: JSON.stringify({ urls: urlList }),
-        signal: abortControllerRef.current.signal
+        body: JSON.stringify({ urls: urlList })
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to start scraping');
+      const data = await response.json();
+
+      if (!data.success) {
+        toast.error(data.message || 'Scraping failed');
+        return;
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      const scrapedProducts = (data.successes || []).map((s: any) => ({
+        ...s.product,
+        confidence: s.confidence,
+        extractionMethod: s.extractionMethod
+      }));
+      
+      const failures = data.failures || [];
 
-      if (!reader) {
-        throw new Error('No response body');
+      if (scrapedProducts.length > 0) {
+        toast.success(`Successfully scraped ${scrapedProducts.length} product${scrapedProducts.length > 1 ? 's' : ''}!`);
+      }
+      
+      if (failures.length > 0) {
+        toast.error(`${failures.length} product${failures.length > 1 ? 's' : ''} failed to scrape`);
       }
 
-      let buffer = '';
-      let currentEvent = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        console.log('[Stream] Read chunk, done:', done, 'value length:', value?.length);
-        
-        if (done || cancelScrapingRef.current) {
-          if (cancelScrapingRef.current) {
-            reader.cancel();
-            toast.info('Scraping cancelled');
-          }
-          console.log('[Stream] Exiting loop, done:', done, 'cancelled:', cancelScrapingRef.current);
-          break;
+      // Navigate to finalize page with results
+      navigate('/admin/picks/finalize', {
+        state: {
+          scrapedProducts,
+          selectedSaleId: selectedSale?.id,
+          saleName: selectedSale?.saleName,
+          salePercentOff: selectedSale?.percentOff,
+          failures
         }
-
-        // Add new chunk to buffer
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Process complete lines
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            currentEvent = line.substring(7).trim();
-            console.log('[Stream] Event:', currentEvent);
-          } else if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.substring(6));
-              console.log('[Stream] Data for event', currentEvent, ':', data);
-
-              if (currentEvent === 'start') {
-                toast.info(`Scraping ${data.total} products...`);
-              } else if (currentEvent === 'scraping') {
-                toast.info(`Scraping ${data.progress.current}/${data.progress.total}...`, {
-                  duration: 1000
-                });
-              } else if (currentEvent === 'success') {
-                scrapedProducts.push({
-                  ...data.product,
-                  confidence: data.confidence,
-                  extractionMethod: data.extractionMethod
-                });
-                toast.success(`Scraped: ${data.product.name}`);
-              } else if (currentEvent === 'error' || currentEvent === 'skip') {
-                failures.push({
-                  url: data.url,
-                  error: data.error
-                });
-                if (currentEvent === 'error') {
-                  toast.error(`Failed: ${data.error}`);
-                }
-              } else if (currentEvent === 'complete') {
-                toast.success(`Complete: ${data.successCount} succeeded, ${data.failureCount} failed`);
-              }
-              
-              currentEvent = '';
-            } catch (e) {
-              console.error('[Stream] Parse error:', e, 'Line:', line);
-            }
-          }
-        }
-      }
-
-      // Only navigate if not cancelled
-      if (!cancelScrapingRef.current) {
-        navigate('/admin/picks/finalize', {
-          state: {
-            scrapedProducts,
-            selectedSaleId: selectedSale?.id,
-            saleName: selectedSale?.saleName,
-            salePercentOff: selectedSale?.percentOff,
-            failures
-          }
-        });
-      }
+      });
 
     } catch (error: any) {
-      if (!cancelScrapingRef.current) {
-        console.error('Scraping error:', error);
-        toast.error('An error occurred while scraping. Please try again.');
-      }
+      console.error('Scraping error:', error);
+      toast.error('An error occurred while scraping. Please try again.');
     } finally {
       setIsLoading(false);
-      cancelScrapingRef.current = false;
-      abortControllerRef.current = null;
     }
   };
 
-  const handleCancelScraping = () => {
-    cancelScrapingRef.current = true;
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-  };
 
   const handleScrapePicks = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -901,25 +826,6 @@ export function PicksAdmin() {
                   'Scrape Picks'
                 )}
               </Button>
-              
-              {isLoading && (
-                <Button 
-                  type="button"
-                  onClick={handleCancelScraping}
-                  variant="outline"
-                  style={{ 
-                    fontFamily: 'DM Sans, sans-serif',
-                    height: '44px',
-                    paddingLeft: '24px',
-                    paddingRight: '24px',
-                    borderColor: '#e5e5e5',
-                    color: '#666'
-                  }}
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Cancel
-                </Button>
-              )}
               
               <Button
                 type="button"
