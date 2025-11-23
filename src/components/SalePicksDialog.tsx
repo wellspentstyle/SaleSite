@@ -34,6 +34,24 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
           )}
         </DialogHeader>
         
+        {sale.discountCode && (
+          <div style={{
+            padding: '16px 24px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '4px',
+            marginTop: '16px'
+          }}>
+            <div style={{
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#000'
+            }}>
+              Promo code: <span style={{ fontWeight: 700, letterSpacing: '0.5px' }}>{sale.discountCode}</span>
+            </div>
+          </div>
+        )}
+        
         <ScrollArea className="h-[60vh] pr-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {sale.picks.map((pick) => {
