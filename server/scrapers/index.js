@@ -10,7 +10,10 @@ function isDepartmentStore(url) {
     'saksfifthavenue.com',
     'neimanmarcus.com',
     'bloomingdales.com',
-    'bergdorfgoodman.com'
+    'bergdorfgoodman.com',
+    'shopbop.com',
+    'ssense.com',
+    'farfetch.com'
   ];
   return departmentStores.some(store => hostname.includes(store));
 }
