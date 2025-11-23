@@ -35,12 +35,18 @@ export function SalesApprovals() {
   }, []);
 
   const loadData = async () => {
+    const auth = sessionStorage.getItem('adminAuth') || '';
+    
     try {
       setLoading(true);
       
       const [salesRes, settingsRes] = await Promise.all([
-        fetch(`${API_BASE}/pending-sales`),
-        fetch(`${API_BASE}/approval-settings`)
+        fetch(`${API_BASE}/pending-sales`, {
+          headers: { 'auth': auth }
+        }),
+        fetch(`${API_BASE}/approval-settings`, {
+          headers: { 'auth': auth }
+        })
       ]);
       
       const salesData = await salesRes.json();
@@ -61,12 +67,17 @@ export function SalesApprovals() {
   };
 
   const handleToggleApprovals = async (enabled: boolean) => {
+    const auth = sessionStorage.getItem('adminAuth') || '';
+    
     try {
       setSettingsLoading(true);
       
       const response = await fetch(`${API_BASE}/approval-settings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'auth': auth
+        },
         body: JSON.stringify({ approvalsEnabled: enabled })
       });
       
@@ -83,11 +94,14 @@ export function SalesApprovals() {
   };
 
   const handleApproveSale = async (id: string) => {
+    const auth = sessionStorage.getItem('adminAuth') || '';
+    
     try {
       setActionLoading(id);
       
       const response = await fetch(`${API_BASE}/approve-sale/${id}`, {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'auth': auth }
       });
       
       const data = await response.json();
@@ -110,11 +124,14 @@ export function SalesApprovals() {
       return;
     }
     
+    const auth = sessionStorage.getItem('adminAuth') || '';
+    
     try {
       setActionLoading(id);
       
       const response = await fetch(`${API_BASE}/reject-sale/${id}`, {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'auth': auth }
       });
       
       const data = await response.json();
