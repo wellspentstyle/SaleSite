@@ -826,6 +826,122 @@ app.patch('/admin/sales/:saleId', async (req, res) => {
   }
 });
 
+// Update or create a brand in Airtable Companies table
+app.post('/admin/update-brand-in-airtable', async (req, res) => {
+  const { auth } = req.headers;
+  const { brandData } = req.body;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  if (!brandData || !brandData.name) {
+    return res.status(400).json({ success: false, message: 'Brand data with name is required' });
+  }
+  
+  try {
+    console.log(`🔍 Looking up brand "${brandData.name}" in Airtable...`);
+    
+    // Search for existing brand by name
+    const searchUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}`;
+    // Properly escape Airtable formula - single quotes in names must be doubled
+    const escapedName = brandData.name.replace(/'/g, "''");
+    const searchParams = new URLSearchParams({
+      filterByFormula: `{Name} = '${escapedName}'`,
+      maxRecords: '1'
+    });
+    
+    const searchResponse = await fetch(`${searchUrl}?${searchParams}`, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`
+      }
+    });
+    
+    if (!searchResponse.ok) {
+      const error = await searchResponse.json();
+      console.error('❌ Airtable search error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to search Airtable' });
+    }
+    
+    const searchData = await searchResponse.json();
+    const existingRecord = searchData.records && searchData.records.length > 0 ? searchData.records[0] : null;
+    
+    // Prepare fields for Airtable
+    // Category and Values may already be arrays from frontend
+    const categoryArray = Array.isArray(brandData.category)
+      ? brandData.category
+      : (brandData.category ? brandData.category.split(',').map(c => c.trim()) : []);
+    
+    const valuesArray = Array.isArray(brandData.values)
+      ? brandData.values
+      : (brandData.values ? brandData.values.split(',').map(v => v.trim()).filter(v => v) : []);
+    
+    const fields = {
+      Name: brandData.name,
+      Type: brandData.type || 'Brand',
+      PriceRange: brandData.priceRange || '',
+      Category: categoryArray,
+      MaxWomensSize: brandData.maxWomensSize || '',
+      Values: valuesArray,
+      Description: brandData.description || '',
+      URL: brandData.url || ''
+    };
+    
+    let result;
+    
+    if (existingRecord) {
+      // Update existing record
+      console.log(`✏️ Updating existing brand record ${existingRecord.id}...`);
+      
+      const updateResponse = await fetch(`${searchUrl}/${existingRecord.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fields })
+      });
+      
+      if (!updateResponse.ok) {
+        const error = await updateResponse.json();
+        console.error('❌ Airtable update error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to update brand in Airtable' });
+      }
+      
+      result = await updateResponse.json();
+      console.log(`✅ Updated brand "${brandData.name}" in Airtable`);
+      
+      res.json({ success: true, action: 'updated', record: result });
+    } else {
+      // Create new record
+      console.log(`➕ Creating new brand record...`);
+      
+      const createResponse = await fetch(searchUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fields })
+      });
+      
+      if (!createResponse.ok) {
+        const error = await createResponse.json();
+        console.error('❌ Airtable create error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to create brand in Airtable' });
+      }
+      
+      result = await createResponse.json();
+      console.log(`✅ Created new brand "${brandData.name}" in Airtable`);
+      
+      res.json({ success: true, action: 'created', record: result });
+    }
+  } catch (error) {
+    console.error('❌ Error updating brand in Airtable:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Improved brand research endpoint - uses Serper web search + AI with strict validation
 app.post('/admin/brand-research', async (req, res) => {
   const { auth } = req.headers;

@@ -296,6 +296,83 @@ export function AddBrands() {
     toast.success('Brand data updated');
   };
 
+  const handleSendToAirtable = async () => {
+    const completedResults = results.filter(r => r.status === 'completed');
+    
+    if (completedResults.length === 0) {
+      toast.error('No completed results to send');
+      return;
+    }
+
+    const auth = sessionStorage.getItem('adminAuth') || '';
+    let updatedCount = 0;
+    let createdCount = 0;
+    let failedCount = 0;
+
+    toast.info(`Sending ${completedResults.length} brands to Airtable...`);
+
+    for (const result of completedResults) {
+      try {
+        // Handle both string and array formats for category/values
+        const categoryArray = Array.isArray(result.category)
+          ? result.category
+          : (result.category ? result.category.split(',').map(c => c.trim()).filter(c => c) : []);
+        
+        const valuesArray = Array.isArray(result.values)
+          ? result.values
+          : (result.values ? result.values.split(',').map(v => v.trim()).filter(v => v) : []);
+        
+        const response = await fetch(`${API_BASE}/admin/update-brand-in-airtable`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'auth': auth
+          },
+          body: JSON.stringify({
+            brandData: {
+              name: result.name,
+              type: result.type || 'Brand',
+              priceRange: result.priceRange,
+              category: categoryArray,
+              values: valuesArray,
+              maxWomensSize: result.maxWomensSize,
+              description: result.description,
+              url: result.url
+            }
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          if (data.action === 'updated') {
+            updatedCount++;
+          } else if (data.action === 'created') {
+            createdCount++;
+          }
+        } else {
+          failedCount++;
+          console.error(`Failed to send ${result.name}:`, data.message);
+        }
+      } catch (error) {
+        failedCount++;
+        console.error(`Error sending ${result.name}:`, error);
+      }
+    }
+
+    // Show summary toast
+    const summary = [];
+    if (createdCount > 0) summary.push(`${createdCount} created`);
+    if (updatedCount > 0) summary.push(`${updatedCount} updated`);
+    if (failedCount > 0) summary.push(`${failedCount} failed`);
+
+    if (failedCount === 0) {
+      toast.success(`Successfully sent to Airtable! ${summary.join(', ')}`);
+    } else {
+      toast.warning(`Partially completed: ${summary.join(', ')}`);
+    }
+  };
+
   const completedCount = results.filter(r => r.status === 'completed').length;
   const failedCount = results.filter(r => r.status === 'failed').length;
 
@@ -425,20 +502,36 @@ export function AddBrands() {
               >
                 Results
               </h2>
-              <Button
-                onClick={handleCopyTable}
-                variant="outline"
-                disabled={completedCount === 0}
-                style={{ 
-                  fontFamily: 'DM Sans, sans-serif',
-                  height: '48px',
-                  paddingLeft: '32px',
-                  paddingRight: '32px'
-                }}
-              >
-                <Copy className="mr-2 h-4 w-4" />
-                Copy Table ({completedCount} rows)
-              </Button>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <Button
+                  onClick={handleSendToAirtable}
+                  disabled={completedCount === 0}
+                  style={{ 
+                    fontFamily: 'DM Sans, sans-serif',
+                    height: '48px',
+                    paddingLeft: '32px',
+                    paddingRight: '32px',
+                    backgroundColor: '#000',
+                    color: '#fff'
+                  }}
+                >
+                  Send to Airtable ({completedCount})
+                </Button>
+                <Button
+                  onClick={handleCopyTable}
+                  variant="outline"
+                  disabled={completedCount === 0}
+                  style={{ 
+                    fontFamily: 'DM Sans, sans-serif',
+                    height: '48px',
+                    paddingLeft: '32px',
+                    paddingRight: '32px'
+                  }}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy Table
+                </Button>
+              </div>
             </div>
 
             {/* Results Table */}
