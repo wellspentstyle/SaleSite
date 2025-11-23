@@ -46,6 +46,8 @@ interface LocationState {
   saleName?: string;
   salePercentOff?: number;
   failures?: Failure[];
+  urlsToScrape?: string[];  // NEW
+  startScraping?: boolean;   // NEW
 }
 
 const API_BASE = '/api';
@@ -75,6 +77,17 @@ export function FinalizePicks() {
   const [calcSalePrice, setCalcSalePrice] = useState<string>('');
   const [calcPercentOff, setCalcPercentOff] = useState<string>('');
   const [calcOriginalPrice, setCalcOriginalPrice] = useState<number | null>(null);
+  
+  // Progressive scraping state
+  const [scrapingProgress, setScrapingProgress] = useState<{
+    current: number;
+    total: number;
+    isScrapingNow: boolean;
+  }>({
+    current: 0,
+    total: 0,
+    isScrapingNow: false
+  });
 
   useEffect(() => {
     if (!state?.scrapedProducts || !state?.selectedSaleId) {
@@ -120,6 +133,129 @@ export function FinalizePicks() {
     };
     loadDraft();
   }, [state, navigate]);
+
+  // Progressive scraping useEffect
+  useEffect(() => {
+    // Progressive scraping logic
+    if (state?.startScraping && state?.urlsToScrape && state.urlsToScrape.length > 0) {
+      scrapeProgressively(state.urlsToScrape);
+    }
+  }, [state?.startScraping, state?.urlsToScrape]);
+
+  // Helper function to extract domain from URL
+  const extractDomain = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname.replace('www.', '');
+    } catch {
+      return url;
+    }
+  };
+
+  // Progressive scraping function
+  const scrapeProgressively = async (urls: string[]) => {
+    const auth = sessionStorage.getItem('adminAuth');
+    const failedDomains = new Set<string>();
+    const toastedBlockedDomains = new Set<string>(); // Track domains we've already toasted about
+    let successCount = 0;
+    let failureCount = 0;
+    
+    setScrapingProgress({
+      current: 0,
+      total: urls.length,
+      isScrapingNow: true
+    });
+    
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      
+      // Extract domain to check if it's already blocked
+      const domain = extractDomain(url);
+      
+      // Update progress first
+      setScrapingProgress({
+        current: i + 1,
+        total: urls.length,
+        isScrapingNow: true
+      });
+      
+      // Skip if domain is blocked
+      if (failedDomains.has(domain)) {
+        setFailedUrls(prev => [...prev, url]);
+        failureCount++;
+        // Only toast once per domain to avoid spam
+        if (!toastedBlockedDomains.has(domain)) {
+          toast.error(`Skipping ${domain} URLs - domain is blocked`);
+          toastedBlockedDomains.add(domain);
+        }
+        continue;
+      }
+      
+      try {
+        const response = await fetch(`${API_BASE}/admin/scrape-product`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'auth': auth || ''
+          },
+          body: JSON.stringify({ url }) // Single URL
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.successes && data.successes.length > 0) {
+          const scrapedProduct = {
+            ...data.successes[0].product,
+            confidence: data.successes[0].confidence,
+            extractionMethod: data.successes[0].extractionMethod
+          };
+          
+          // Add to picks immediately - UI updates progressively!
+          setPicks(prev => [...prev, scrapedProduct]);
+          successCount++;
+          
+          toast.success(`✓ Scraped ${i + 1}/${urls.length}: ${scrapedProduct.name.substring(0, 40)}...`);
+          
+        } else if (data.failures && data.failures.length > 0) {
+          const failure = data.failures[0];
+          
+          // Check if it's a blocking error - if so, skip remaining URLs from this domain
+          if (failure.errorType === 'BLOCKING') {
+            failedDomains.add(domain);
+            toast.error(`Domain ${domain} is blocking us - skipping remaining URLs from this store`);
+          }
+          
+          setFailedUrls(prev => [...prev, url]);
+          failureCount++;
+          toast.error(`✗ Failed ${i + 1}/${urls.length}: ${failure.error}`);
+        } else {
+          // Unknown error
+          setFailedUrls(prev => [...prev, url]);
+          failureCount++;
+          toast.error(`✗ Failed ${i + 1}/${urls.length}`);
+        }
+        
+      } catch (error) {
+        console.error('Scraping error:', error);
+        setFailedUrls(prev => [...prev, url]);
+        failureCount++;
+        toast.error(`✗ Error ${i + 1}/${urls.length}: Network error`);
+      }
+    }
+    
+    // Done scraping
+    setScrapingProgress({
+      current: urls.length,
+      total: urls.length,
+      isScrapingNow: false
+    });
+    
+    if (successCount > 0) {
+      toast.success(`🎉 Scraping complete! ${successCount} successful, ${failureCount} failed`);
+    } else {
+      toast.error(`All ${failureCount} products failed to scrape`);
+    }
+  };
 
   const handleDelete = (index: number) => {
     setPicks(picks.filter((_, i) => i !== index));
@@ -586,6 +722,45 @@ export function FinalizePicks() {
             )}
           </div>
         </div>
+
+        {/* Progressive Scraping Progress Indicator */}
+        {scrapingProgress.isScrapingNow && (
+          <div 
+            style={{ 
+              padding: '16px',
+              backgroundColor: '#f0f9ff',
+              border: '1px solid #0284c7',
+              borderRadius: '4px',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}
+          >
+            <Loader2 className="h-5 w-5 animate-spin" style={{ color: '#0284c7' }} />
+            <div style={{ flex: 1 }}>
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
+                Scraping products... {scrapingProgress.current} of {scrapingProgress.total}
+              </p>
+              <div style={{ 
+                width: '100%', 
+                height: '6px', 
+                backgroundColor: '#e0f2fe', 
+                borderRadius: '3px',
+                overflow: 'hidden'
+              }}>
+                <div 
+                  style={{ 
+                    width: `${(scrapingProgress.current / scrapingProgress.total) * 100}%`,
+                    height: '100%',
+                    backgroundColor: '#0284c7',
+                    transition: 'width 0.3s ease'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Manual Entry Forms (for failed scrapes) */}
         {failedUrls.length > 0 && (

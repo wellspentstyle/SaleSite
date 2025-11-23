@@ -326,60 +326,22 @@ export function PicksAdmin() {
 
   const performScraping = async (urlList: string[]) => {
     setIsLoading(true);
-    const auth = sessionStorage.getItem('adminAuth');
-
-    try {
-      toast.info(`Scraping ${urlList.length} product${urlList.length > 1 ? 's' : ''}...`);
-      
-      const response = await fetch(`${API_BASE}/admin/scrape-product`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'auth': auth || ''
-        },
-        body: JSON.stringify({ urls: urlList })
-      });
-
-      const data = await response.json();
-
-      if (!data.success) {
-        toast.error(data.message || 'Scraping failed');
-        return;
+    
+    // Navigate IMMEDIATELY to finalize page with URLs to scrape
+    // The finalize page will handle progressive scraping
+    navigate('/admin/picks/finalize', {
+      state: {
+        scrapedProducts: [], // Start empty
+        selectedSaleId: selectedSale?.id,
+        saleName: selectedSale?.saleName,
+        salePercentOff: selectedSale?.percentOff,
+        failures: [],
+        urlsToScrape: urlList, // Pass URLs for progressive scraping
+        startScraping: true // Flag to trigger scraping
       }
-
-      const scrapedProducts = (data.successes || []).map((s: any) => ({
-        ...s.product,
-        confidence: s.confidence,
-        extractionMethod: s.extractionMethod
-      }));
-      
-      const failures = data.failures || [];
-
-      if (scrapedProducts.length > 0) {
-        toast.success(`Successfully scraped ${scrapedProducts.length} product${scrapedProducts.length > 1 ? 's' : ''}!`);
-      }
-      
-      if (failures.length > 0) {
-        toast.error(`${failures.length} product${failures.length > 1 ? 's' : ''} failed to scrape`);
-      }
-
-      // Navigate to finalize page with results
-      navigate('/admin/picks/finalize', {
-        state: {
-          scrapedProducts,
-          selectedSaleId: selectedSale?.id,
-          saleName: selectedSale?.saleName,
-          salePercentOff: selectedSale?.percentOff,
-          failures
-        }
-      });
-
-    } catch (error: any) {
-      console.error('Scraping error:', error);
-      toast.error('An error occurred while scraping. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    });
+    
+    setIsLoading(false);
   };
 
 
