@@ -19,6 +19,12 @@ import {
   setApprovalsEnabled,
   getApprovalSettings
 } from './pending-sales.js';
+import { 
+  getAllDrafts,
+  getDraftById,
+  saveDraft,
+  deleteDraft
+} from './manual-pick-drafts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3891,6 +3897,127 @@ app.post('/approval-settings', (req, res) => {
     
   } catch (error) {
     console.error('Error updating approval settings:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// MANUAL PICK DRAFTS API
+// ============================================
+
+// Get all drafts
+app.get('/admin/manual-picks/drafts', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const drafts = await getAllDrafts();
+    res.json({ success: true, drafts });
+  } catch (error) {
+    console.error('Error getting drafts:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get a specific draft
+app.get('/admin/manual-picks/drafts/:id', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { id } = req.params;
+    const draft = await getDraftById(id);
+    
+    if (!draft) {
+      return res.status(404).json({ success: false, error: 'Draft not found' });
+    }
+    
+    res.json({ success: true, draft });
+  } catch (error) {
+    console.error('Error getting draft:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Save or update a draft
+app.post('/admin/manual-picks/drafts', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { id, saleId, saleName, salePercentOff, picks } = req.body;
+    
+    if (!saleId || !saleName || !picks || !Array.isArray(picks)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: saleId, saleName, picks' 
+      });
+    }
+    
+    // Validate that at least one pick has a URL
+    if (!picks.some(p => p.url && p.url.trim())) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'At least one pick must have a URL' 
+      });
+    }
+    
+    const savedDraft = await saveDraft({
+      id,
+      saleId,
+      saleName,
+      salePercentOff,
+      picks
+    });
+    
+    console.log(`💾 ${id ? 'Updated' : 'Created'} draft for sale: ${saleName}`);
+    
+    res.json({ 
+      success: true, 
+      message: id ? 'Draft updated' : 'Draft saved',
+      draft: savedDraft
+    });
+    
+  } catch (error) {
+    console.error('Error saving draft:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete a draft
+app.delete('/admin/manual-picks/drafts/:id', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { id } = req.params;
+    const deleted = await deleteDraft(id);
+    
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'Draft not found' });
+    }
+    
+    console.log(`🗑️  Deleted draft: ${id}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Draft deleted'
+    });
+    
+  } catch (error) {
+    console.error('Error deleting draft:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

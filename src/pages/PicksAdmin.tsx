@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Input } from '../components/ui/input';
-import { Loader2, ExternalLink, ArrowLeft, AlertTriangle, Power, Edit, FileEdit } from 'lucide-react';
+import { Loader2, ExternalLink, ArrowLeft, AlertTriangle, Power, Edit, FileEdit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -39,8 +39,18 @@ interface Sale {
   promoCode?: string;
 }
 
-type View = 'sales-list' | 'url-entry';
+type View = 'sales-list' | 'url-entry' | 'drafts';
 type FilterType = 'active-no-picks' | 'active-with-picks' | 'inactive';
+
+interface Draft {
+  id: string;
+  saleId: string;
+  saleName: string;
+  salePercentOff: number;
+  picks: any[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface ProtectionWarning {
   show: boolean;
@@ -53,10 +63,12 @@ interface ProtectionWarning {
 export function PicksAdmin() {
   const navigate = useNavigate();
   const [sales, setSales] = useState<Sale[]>([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [urls, setUrls] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingSales, setLoadingSales] = useState(true);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
   const [filterType, setFilterType] = useState<FilterType>('active-no-picks');
   const [currentView, setCurrentView] = useState<View>('sales-list');
   const [protectionWarning, setProtectionWarning] = useState<ProtectionWarning>({
@@ -77,7 +89,10 @@ export function PicksAdmin() {
 
   useEffect(() => {
     fetchSales();
-  }, []);
+    if (currentView === 'drafts') {
+      fetchDrafts();
+    }
+  }, [currentView]);
 
   const fetchSales = async () => {
     const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
@@ -94,6 +109,25 @@ export function PicksAdmin() {
       console.error('Failed to fetch sales:', error);
     } finally {
       setLoadingSales(false);
+    }
+  };
+
+  const fetchDrafts = async () => {
+    setLoadingDrafts(true);
+    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/manual-picks/drafts`, {
+        headers: { 'auth': auth }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDrafts(data.drafts || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch drafts:', error);
+    } finally {
+      setLoadingDrafts(false);
     }
   };
 
@@ -126,6 +160,38 @@ export function PicksAdmin() {
     setCurrentView('sales-list');
     setSelectedSale(null);
     setUrls('');
+  };
+
+  const handleResumeDraft = (draft: Draft) => {
+    navigate('/admin/picks/manual', {
+      state: {
+        selectedSaleId: draft.saleId,
+        saleName: draft.saleName,
+        salePercentOff: draft.salePercentOff,
+        draftId: draft.id
+      }
+    });
+  };
+
+  const handleDeleteDraft = async (draftId: string) => {
+    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    
+    try {
+      const response = await fetch(`${API_BASE}/admin/manual-picks/drafts/${draftId}`, {
+        method: 'DELETE',
+        headers: { 'auth': auth }
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Draft deleted');
+        fetchDrafts();
+      } else {
+        toast.error(data.message || 'Failed to delete draft');
+      }
+    } catch (error) {
+      toast.error('An error occurred while deleting draft');
+    }
   };
 
   const handleToggleActive = async (sale: Sale, e: React.MouseEvent) => {
@@ -370,6 +436,13 @@ export function PicksAdmin() {
                 <h1 className="text-3xl font-bold">Add Picks to Sales</h1>
                 <p className="text-gray-600 mt-1">Select a sale to add curated product picks</p>
               </div>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentView('drafts')}
+                style={{ fontFamily: 'DM Sans, sans-serif' }}
+              >
+                View Drafts {drafts.length > 0 && `(${drafts.length})`}
+              </Button>
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -670,7 +743,110 @@ export function PicksAdmin() {
             </div>
           </form>
         </div>
-      )}
+      ) : currentView === 'drafts' ? (
+        <div className="border border-border bg-white" style={{ padding: '32px', borderRadius: '4px' }}>
+          <div className="mb-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentView('sales-list')}
+              className="mb-4"
+              style={{ fontFamily: 'DM Sans, sans-serif' }}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Sales List
+            </Button>
+            
+            <h2 
+              style={{ 
+                fontFamily: 'DM Sans, sans-serif', 
+                fontWeight: 700, 
+                fontSize: '20px',
+                marginBottom: '4px'
+              }}
+            >
+              Saved Drafts
+            </h2>
+            <p className="text-sm text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Resume editing incomplete manual pick entries.
+            </p>
+          </div>
+
+          {loadingDrafts ? (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground" style={{ padding: '60px' }}>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Loading drafts...</span>
+            </div>
+          ) : drafts.length === 0 ? (
+            <div className="border border-dashed border-border bg-muted/20" style={{ padding: '60px', textAlign: 'center', borderRadius: '8px' }}>
+              <p className="text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                No saved drafts found.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {drafts.map((draft) => (
+                <div
+                  key={draft.id}
+                  className="border bg-white"
+                  style={{ 
+                    padding: '20px', 
+                    borderRadius: '4px',
+                    borderColor: '#e5e7eb'
+                  }}
+                >
+                  <div className="mb-3">
+                    <h3 
+                      style={{ 
+                        fontFamily: 'DM Sans, sans-serif', 
+                        fontWeight: 600, 
+                        fontSize: '16px',
+                        marginBottom: '4px'
+                      }}
+                    >
+                      {draft.saleName}
+                    </h3>
+                    <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                      {draft.salePercentOff}% Off • {draft.picks.length} pick{draft.picks.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  
+                  <div className="text-xs text-muted-foreground mb-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                    Last updated: {new Date(draft.updatedAt).toLocaleDateString()} at {new Date(draft.updatedAt).toLocaleTimeString()}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleResumeDraft(draft)}
+                      style={{ 
+                        fontFamily: 'DM Sans, sans-serif',
+                        backgroundColor: '#000',
+                        color: '#fff',
+                        flex: 1
+                      }}
+                    >
+                      Resume Editing
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteDraft(draft.id)}
+                      style={{ 
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: '#ef4444',
+                        borderColor: '#ef4444'
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {/* Edit Sale Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

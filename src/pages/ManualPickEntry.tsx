@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Loader2, ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { Loader2, ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE = '/api';
@@ -23,6 +23,7 @@ interface LocationState {
   saleName: string;
   salePercentOff: number;
   urls?: string[];
+  draftId?: string;
 }
 
 export function ManualPickEntry() {
@@ -55,6 +56,33 @@ export function ManualPickEntry() {
     ];
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<string | undefined>(state?.draftId);
+
+  // Load draft if draftId is provided
+  useEffect(() => {
+    const loadDraft = async () => {
+      if (!state?.draftId) return;
+
+      const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+      
+      try {
+        const response = await fetch(`${API_BASE}/admin/manual-picks/drafts/${state.draftId}`, {
+          headers: { 'auth': auth }
+        });
+        
+        const data = await response.json();
+        if (data.success && data.draft) {
+          setPicks(data.draft.picks);
+          toast.success('Draft loaded');
+        }
+      } catch (error) {
+        toast.error('Failed to load draft');
+      }
+    };
+
+    loadDraft();
+  }, [state?.draftId]);
 
   if (!state?.selectedSaleId) {
     return <Navigate to="/admin/picks" replace />;
@@ -131,6 +159,50 @@ export function ManualPickEntry() {
     return null;
   };
 
+  const validateDraft = (): boolean => {
+    // For drafts, only require URLs
+    return picks.some(p => p.url && p.url.trim());
+  };
+
+  const handleSaveDraft = async () => {
+    if (!validateDraft()) {
+      toast.error('At least one pick must have a URL to save draft');
+      return;
+    }
+
+    setIsSavingDraft(true);
+    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/manual-picks/drafts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'auth': auth
+        },
+        body: JSON.stringify({
+          id: currentDraftId,
+          saleId: state.selectedSaleId,
+          saleName: state.saleName,
+          salePercentOff: state.salePercentOff,
+          picks
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setCurrentDraftId(data.draft.id);
+        toast.success(currentDraftId ? 'Draft updated' : 'Draft saved');
+      } else {
+        toast.error(data.message || 'Failed to save draft');
+      }
+    } catch (error) {
+      toast.error('An error occurred while saving draft');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
   const handleSave = async () => {
     // Validate all picks
     for (let i = 0; i < picks.length; i++) {
@@ -162,6 +234,13 @@ export function ManualPickEntry() {
 
       const data = await response.json();
       if (data.success) {
+        // Delete draft if it exists
+        if (currentDraftId) {
+          await fetch(`${API_BASE}/admin/manual-picks/drafts/${currentDraftId}`, {
+            method: 'DELETE',
+            headers: { 'auth': auth }
+          });
+        }
         toast.success(`Successfully added ${picks.length} pick(s)`);
         navigate('/admin/picks');
       } else {
@@ -330,25 +409,45 @@ export function ManualPickEntry() {
           Add Another Pick
         </Button>
 
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-          style={{
-            fontFamily: 'DM Sans, sans-serif',
-            backgroundColor: '#000',
-            color: '#fff',
-            marginLeft: 'auto'
-          }}
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            `Save ${picks.length} Pick(s)`
-          )}
-        </Button>
+        <div className="flex gap-3 ml-auto">
+          <Button
+            variant="outline"
+            onClick={handleSaveDraft}
+            disabled={isSavingDraft || isSaving}
+            style={{ fontFamily: 'DM Sans, sans-serif' }}
+          >
+            {isSavingDraft ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving Draft...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save Draft
+              </>
+            )}
+          </Button>
+
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || isSavingDraft}
+            style={{
+              fontFamily: 'DM Sans, sans-serif',
+              backgroundColor: '#000',
+              color: '#fff'
+            }}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              `Save ${picks.length} Pick(s)`
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
