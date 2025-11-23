@@ -107,13 +107,17 @@ export function PicksAdmin() {
     }
   };
 
-  const handleManualEntry = (sale: Sale, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleManualEntry = (sale: Sale, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    
+    const urlList = urls.trim().split('\n').filter(url => url.trim());
+    
     navigate('/admin/picks/manual', {
       state: {
-        selectedSaleId: sale.id,
-        saleName: sale.saleName,
-        salePercentOff: sale.percentOff
+        selectedSaleId: sale?.id ?? selectedSale?.id,
+        saleName: sale?.saleName ?? selectedSale?.saleName,
+        salePercentOff: sale?.percentOff ?? selectedSale?.percentOff,
+        urls: urlList.length > 0 ? urlList : undefined
       }
     });
   };
@@ -625,27 +629,45 @@ export function PicksAdmin() {
               />
             </div>
 
-            <Button 
-              type="submit" 
-              style={{ 
-                fontFamily: 'DM Sans, sans-serif',
-                backgroundColor: '#000',
-                color: '#fff',
-                height: '44px',
-                paddingLeft: '24px',
-                paddingRight: '24px'
-              }}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Scraping...
-                </>
-              ) : (
-                'Scrape Picks'
-              )}
-            </Button>
+            <div className="flex gap-3">
+              <Button 
+                type="submit" 
+                style={{ 
+                  fontFamily: 'DM Sans, sans-serif',
+                  backgroundColor: '#000',
+                  color: '#fff',
+                  height: '44px',
+                  paddingLeft: '24px',
+                  paddingRight: '24px'
+                }}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Scraping...
+                  </>
+                ) : (
+                  'Scrape Picks'
+                )}
+              </Button>
+              
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleManualEntry(selectedSale!)}
+                style={{ 
+                  fontFamily: 'DM Sans, sans-serif',
+                  height: '44px',
+                  paddingLeft: '24px',
+                  paddingRight: '24px'
+                }}
+                disabled={isLoading || !urls.trim()}
+              >
+                <FileEdit className="mr-2 h-4 w-4" />
+                Manual Entry
+              </Button>
+            </div>
           </form>
         </div>
       )}

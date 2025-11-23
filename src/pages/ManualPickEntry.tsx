@@ -22,6 +22,7 @@ interface LocationState {
   selectedSaleId: string;
   saleName: string;
   salePercentOff: number;
+  urls?: string[];
 }
 
 export function ManualPickEntry() {
@@ -29,17 +30,30 @@ export function ManualPickEntry() {
   const location = useLocation();
   const state = location.state as LocationState;
 
-  const [picks, setPicks] = useState<Product[]>([
-    {
-      url: '',
-      name: '',
-      brand: '',
-      imageUrl: '',
-      originalPrice: null,
-      salePrice: null,
-      percentOff: null
+  const [picks, setPicks] = useState<Product[]>(() => {
+    if (state?.urls && state.urls.length > 0) {
+      return state.urls.map(url => ({
+        url: url.trim(),
+        name: '',
+        brand: '',
+        imageUrl: '',
+        originalPrice: null,
+        salePrice: null,
+        percentOff: state.salePercentOff ?? null
+      }));
     }
-  ]);
+    return [
+      {
+        url: '',
+        name: '',
+        brand: '',
+        imageUrl: '',
+        originalPrice: null,
+        salePrice: null,
+        percentOff: state.salePercentOff ?? null
+      }
+    ];
+  });
   const [isSaving, setIsSaving] = useState(false);
 
   if (!state?.selectedSaleId) {
