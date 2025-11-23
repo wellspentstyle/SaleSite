@@ -2634,12 +2634,12 @@ app.post('/admin/picks/nightly-check', async (req, res) => {
   }
 });
 
-// CloudMailin/AgentMail webhook endpoint - handle both JSON and multipart
+// CloudMailin/AgentMail webhook endpoint - IMPROVED VERSION
 app.post('/webhook/agentmail', upload.none(), async (req, res) => {
   console.log('📧 Received email webhook');
+  console.log('📦 Headers:', JSON.stringify(req.headers, null, 2));
   
   // SECURITY: Verify webhook authenticity
-  // CloudMailin recommends Basic Authentication over HTTPS
   if (CLOUDMAIL_SECRET) {
     const authHeader = req.headers.authorization;
     
@@ -2648,18 +2648,17 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
     
-    // Decode Basic Auth credentials
     const base64Credentials = authHeader.split(' ')[1];
     const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
-    // Split only on first colon to support passwords containing colons
-    const colonIndex = credentials.indexOf(':');
-    const username = credentials.substring(0, colonIndex);
-    const password = credentials.substring(colonIndex + 1);
+    const [username, ...passwordParts] = credentials.split(':');
+    const password = passwordParts.join(':'); // Handle colons in password
     
-    // Verify password matches CLOUDMAIL_SECRET
-    // (CloudMailin sends the secret as the password)
-    if (password !== CLOUDMAIL_SECRET) {
+    // CloudMailin sends the secret as either username OR password depending on config
+    if (password !== CLOUDMAIL_SECRET && username !== CLOUDMAIL_SECRET) {
       console.error('❌ Unauthorized webhook request - invalid credentials');
+      console.error('   Expected:', CLOUDMAIL_SECRET);
+      console.error('   Got username:', username);
+      console.error('   Got password:', password);
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
     
@@ -2669,71 +2668,90 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
   }
   
   try {
-    // CloudMailin can send data as JSON or form-data
     const emailData = req.body;
     
-    // Log the entire request body to understand the format
-    console.log('📦 Request body type:', typeof emailData);
-    console.log('📦 Request body:', JSON.stringify(emailData, null, 2));
-    console.log('📦 Request body keys:', Object.keys(emailData || {}));
+    // IMPROVED: Log full structure for debugging
+    console.log('📦 Raw email data keys:', Object.keys(emailData || {}));
+    console.log('📦 Email data structure:', JSON.stringify(emailData, null, 2).substring(0, 1000));
     
-    // CloudMailin format: { envelope: {...}, headers: {...}, plain: "...", html: "..." }
-    // Extract email metadata and content based on CloudMailin's format
-    const from = emailData.envelope?.from || emailData.from || 'unknown';
-    const subject = emailData.headers?.subject || emailData.subject || 'No subject';
+    // IMPROVED: Extract metadata with multiple fallback paths
+    const from = emailData.envelope?.from || 
+                 emailData.headers?.from || 
+                 emailData.from || 
+                 'unknown';
     
-    // Log the incoming email for debugging
-    console.log('📧 Email from:', from);
+    const subject = emailData.headers?.subject || 
+                    emailData.headers?.Subject ||
+                    emailData.subject || 
+                    'No subject';
+    
+    console.log('📧 From:', from);
     console.log('📧 Subject:', subject);
     
-    // Extract email content (try both plain and HTML)
-    const emailContent = emailData.plain || emailData.html || emailData.text || emailData.body || '';
+    // IMPROVED: Extract and clean email content with better HTML handling
+    let emailContent = '';
     
-    if (!emailContent) {
-      console.log('⚠️  No email content found');
-      return res.status(200).json({ success: false, message: 'No content' });
+    // Try plain text first (best for AI parsing)
+    if (emailData.plain) {
+      emailContent = emailData.plain;
+      console.log('✅ Using plain text content');
+    } 
+    // Fallback to HTML, but strip tags
+    else if (emailData.html) {
+      console.log('⚠️  No plain text, parsing HTML...');
+      emailContent = emailData.html
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove styles
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
+        .replace(/<[^>]+>/g, ' ') // Remove HTML tags
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+    }
+    // Last resort fallbacks
+    else if (emailData.text) {
+      emailContent = emailData.text;
+    } else if (emailData.body) {
+      emailContent = emailData.body;
     }
     
-    // Check if this is a Gem login email
-    // More flexible matching: from gem.app OR subject contains login/log-in related keywords
+    if (!emailContent) {
+      console.error('❌ No email content found in any field');
+      console.error('Available fields:', Object.keys(emailData));
+      return res.status(200).json({ 
+        success: false, 
+        message: 'No content found',
+        availableFields: Object.keys(emailData)
+      });
+    }
+    
+    console.log('📧 Content length:', emailContent.length);
+    console.log('📧 Content preview:', emailContent.substring(0, 300));
+    
+    // Check if this is a Gem login email (unchanged)
     const subjectLower = subject.toLowerCase();
     const isGemEmail = from.includes('gem.app') || 
                        subjectLower.includes('gem') ||
                        (subjectLower.includes('log') && subjectLower.includes('in')) ||
                        subjectLower.includes('login');
     
-    console.log('🔍 Gem email check:', {
-      fromIncludesGem: from.includes('gem.app'),
-      subjectIncludesGem: subjectLower.includes('gem'),
-      subjectHasLogIn: subjectLower.includes('log') && subjectLower.includes('in'),
-      subjectHasLogin: subjectLower.includes('login'),
-      isGemEmail
-    });
-    
     if (isGemEmail) {
-      console.log('🔐 Detected Gem login email');
-      console.log('📧 Email content preview:', emailContent.substring(0, 500));
+      console.log('🔐 Detected Gem login email - processing...');
       
-      // Extract magic link from email content
-      // Gem sends links like: https://gem.app/emailLogIn?email=...&token=...
       const magicLinkMatch = emailContent.match(/https:\/\/gem\.app\/emailLogIn\?[^\s<>"'\r\n]+/i);
       
       if (magicLinkMatch) {
         const magicLink = magicLinkMatch[0];
-        console.log('✅ Extracted Gem magic link:', magicLink);
-        console.log('🔍 Pending request status:', gemMagicLinks.pendingRequest ? 'WAITING' : 'NONE');
+        console.log('✅ Extracted Gem magic link');
         
-        // Store magic link in memory (expires in 5 minutes)
         gemMagicLinks.link = magicLink;
         gemMagicLinks.expiresAt = Date.now() + (5 * 60 * 1000);
         
-        // Resolve pending request if sync endpoint is waiting
         if (gemMagicLinks.pendingRequest) {
-          console.log('🔓 Resolving pending sync request with magic link');
           gemMagicLinks.pendingRequest.resolve(magicLink);
           gemMagicLinks.pendingRequest = null;
-        } else {
-          console.log('💾 No pending request - magic link stored in memory for 5 minutes');
         }
         
         return res.status(200).json({ 
@@ -2742,9 +2760,7 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
         });
       } else {
         console.log('❌ Could not extract magic link from Gem email');
-        console.log('📧 Full email content:', emailContent);
         
-        // Still resolve pending request with error
         if (gemMagicLinks.pendingRequest) {
           gemMagicLinks.pendingRequest.reject(new Error('Magic link not found in email'));
           gemMagicLinks.pendingRequest = null;
@@ -2759,48 +2775,65 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
     
     console.log('📝 Extracting sale information with AI...');
     
-    // Use OpenAI to extract structured sale information from email
+    // IMPROVED: Better AI prompt with clearer instructions
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: `You are a sales email parser. Extract sale information from PROMOTIONAL SALE emails and return ONLY valid JSON.
+          content: `You are a sales email parser. Extract sale information from TIME-LIMITED PROMOTIONAL SALES ONLY.
 
-IMPORTANT: Only extract information from TIME-LIMITED PROMOTIONAL SALES. DO NOT process:
-- Welcome emails (e.g., "Welcome! Get 10% off your first order")
-- Account creation emails or signup bonuses
-- Newsletter emails or general marketing emails
+REJECT these types of emails (return {"error": "Not a promotional sale email"}):
+- Welcome emails with first-order discounts (e.g., "Welcome! Get 10% off")
+- New customer signup bonuses
+- Newsletter/marketing emails without time-limited sales
 - Referral program emails
-- Emails containing "welcome", "welcome to", "thanks for signing up", "verify your account"
-- Ongoing/permanent new customer discounts
-For these, return: {"error": "Not a promotional sale email"}
+- Account verification emails
+- Emails with keywords: "welcome", "thanks for signing up", "verify account", "first order"
 
-Return this exact structure for PROMOTIONAL SALES ONLY:
+ACCEPT these types of emails:
+- Flash sales with deadlines (e.g., "48-hour sale", "Weekend only")
+- Seasonal sales (e.g., "Holiday Sale - 30% off until Dec 25")
+- Clearance/End-of-season sales
+- Event sales (e.g., "Black Friday Sale")
+
+Return this JSON structure for VALID PROMOTIONAL SALES:
 {
-  "company": "Brand Name",
+  "company": "Brand Name (as it appears in email)",
   "percentOff": 30,
   "saleUrl": "https://example.com/sale",
   "discountCode": "CODE123",
-  "startDate": "2025-11-04",
-  "endDate": "2025-11-10",
-  "confidence": 95
+  "startDate": "2025-11-22",
+  "endDate": "2025-11-25",
+  "confidence": 85,
+  "reasoning": "Brief explanation of why this is/isn't a promotional sale"
 }
 
+Confidence scoring:
+- 90-100: Very clear promotional sale with explicit dates and terms
+- 75-89: Clear sale but missing some details (like end date)
+- 60-74: Likely a sale but ambiguous wording
+- Below 60: Questionable - likely welcome email or unclear offer
+
 Rules:
-- company: Extract brand/company name (required)
-- percentOff: Extract discount percentage as a number (required, use best estimate if not explicit)
-- saleUrl: Find the main sale/shopping URL (required)
-- discountCode: Extract promo code if mentioned (optional, use null if not found)
-- startDate: Use today's date in YYYY-MM-DD format (required)
-- endDate: Extract end date or use null if not mentioned
-- confidence: Rate your confidence in the extraction accuracy from 1-100 (required). Use 90-100 for very clear sales emails with explicit information, 70-89 for emails with some ambiguity. Use confidence below 70 for welcome emails, signup bonuses, or uncertain extractions.
-- Return ONLY the JSON object, no markdown, no explanations
-- If the email is not a promotional sale, return: {"error": "Not a promotional sale email"}`
+- company: Extract exact brand name from email
+- percentOff: Extract percentage as number (estimate if range like "up to 30%", use midpoint)
+- saleUrl: Main shopping/sale link (prefer link labeled "Shop Sale" over homepage)
+- discountCode: Only if explicitly mentioned (use null if auto-applied at checkout)
+- startDate: Use today's date (2025-11-22) in YYYY-MM-DD format
+- endDate: Extract if mentioned, otherwise null
+- confidence: 1-100 based on clarity
+- reasoning: Brief explanation of your decision
+
+Return ONLY valid JSON, no markdown formatting.`
         },
         {
           role: 'user',
-          content: emailContent.substring(0, 4000) // Limit content length
+          content: `Email from: ${from}
+Subject: ${subject}
+
+Content:
+${emailContent.substring(0, 4000)}`
         }
       ],
       temperature: 0.1,
@@ -2809,69 +2842,136 @@ Rules:
     const aiResponse = completion.choices[0].message.content.trim();
     console.log('🤖 AI Response:', aiResponse);
     
-    // Parse the AI response
+    // Parse AI response with better error handling
     let saleData;
     try {
-      // Remove markdown code blocks if present
-      const jsonString = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const jsonString = aiResponse
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
       saleData = JSON.parse(jsonString);
     } catch (parseError) {
-      console.error('❌ Failed to parse AI response as JSON:', parseError);
-      return res.status(200).json({ success: false, message: 'AI response parsing failed' });
+      console.error('❌ Failed to parse AI response:', parseError);
+      console.error('Raw response:', aiResponse);
+      return res.status(200).json({ 
+        success: false, 
+        message: 'AI response parsing failed',
+        aiResponse: aiResponse
+      });
     }
     
-    // Check if it's a valid sale
+    // IMPROVED: Log reasoning for transparency
+    console.log('🤖 AI Reasoning:', saleData.reasoning || 'No reasoning provided');
+    console.log('🤖 AI Confidence:', saleData.confidence);
+    
+    // Check if rejected
     if (saleData.error) {
-      console.log('ℹ️  Not a promotional sale email:', saleData.error);
-      return res.status(200).json({ success: false, message: saleData.error });
+      console.log('ℹ️  Email rejected:', saleData.error);
+      console.log('   Reasoning:', saleData.reasoning);
+      return res.status(200).json({ 
+        success: false, 
+        message: saleData.error,
+        reasoning: saleData.reasoning,
+        from: from,
+        subject: subject
+      });
     }
     
     // Validate required fields
     if (!saleData.company || !saleData.saleUrl || !saleData.percentOff) {
-      console.log('❌ Missing required fields');
-      return res.status(200).json({ success: false, message: 'Missing required fields' });
-    }
-    
-    // Validate confidence threshold (reject low confidence extractions)
-    const confidenceThreshold = 70;
-    if (saleData.confidence && saleData.confidence < confidenceThreshold) {
-      console.log(`⚠️  Low confidence (${saleData.confidence}%) - likely not a promotional sale. Rejecting.`);
+      console.log('❌ Missing required fields:', {
+        hasCompany: !!saleData.company,
+        hasSaleUrl: !!saleData.saleUrl,
+        hasPercentOff: !!saleData.percentOff
+      });
       return res.status(200).json({ 
         success: false, 
-        message: `Low confidence extraction (${saleData.confidence}%) - likely not a promotional sale` 
+        message: 'Missing required fields',
+        extractedData: saleData
+      });
+    }
+    
+    // IMPROVED: Lower confidence threshold and log borderline cases
+    const confidenceThreshold = 60; // Lowered from 70
+    if (saleData.confidence && saleData.confidence < confidenceThreshold) {
+      console.log(`⚠️  Low confidence (${saleData.confidence}%) - rejecting`);
+      console.log('   Reasoning:', saleData.reasoning);
+      console.log('   Email from:', from);
+      console.log('   Subject:', subject);
+      
+      // Log to help debug false negatives
+      return res.status(200).json({ 
+        success: false, 
+        message: `Low confidence extraction (${saleData.confidence}%)`,
+        reasoning: saleData.reasoning,
+        extractedData: saleData,
+        from: from,
+        subject: subject
       });
     }
     
     console.log('✅ Parsed sale data:', saleData);
     
-    // Check for duplicates in Airtable (same company + percent within 2 weeks)
+    // IMPROVED: Smarter duplicate detection with fuzzy matching
     console.log('🔍 Checking for duplicates...');
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
     const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
     
-    const duplicateCheckUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?filterByFormula=AND({Company}='${saleData.company.replace(/'/g, "\\'")}',{PercentOff}=${saleData.percentOff},IS_AFTER({StartDate},'${twoWeeksAgoStr}'))`;
+    // Normalize company name for comparison
+    const normalizedCompany = saleData.company
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[^a-z0-9]/g, '');
     
-    const duplicateResponse = await fetch(duplicateCheckUrl, {
+    // Fetch recent sales from same company (within 2 weeks)
+    const recentSalesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?filterByFormula=IS_AFTER({StartDate},'${twoWeeksAgoStr}')&fields[]=Company&fields[]=PercentOff&fields[]=StartDate`;
+    
+    const recentSalesResponse = await fetch(recentSalesUrl, {
       headers: {
         'Authorization': `Bearer ${AIRTABLE_PAT}`
       }
     });
     
-    if (duplicateResponse.ok) {
-      const duplicateData = await duplicateResponse.json();
-      if (duplicateData.records && duplicateData.records.length > 0) {
-        console.log(`⏭️  Duplicate found: ${saleData.company} ${saleData.percentOff}% already exists from the past 2 weeks`);
+    if (recentSalesResponse.ok) {
+      const recentSalesData = await recentSalesResponse.json();
+      
+      // Check for fuzzy duplicates
+      const isDuplicate = recentSalesData.records.some(record => {
+        const recordCompany = (record.fields.Company || '')
+          .toLowerCase()
+          .replace(/\s+/g, '')
+          .replace(/[^a-z0-9]/g, '');
+        
+        const recordPercent = record.fields.PercentOff;
+        
+        // Match if company name is similar AND percent is within 5%
+        const companySimilar = recordCompany === normalizedCompany || 
+                               recordCompany.includes(normalizedCompany) || 
+                               normalizedCompany.includes(recordCompany);
+        
+        const percentSimilar = Math.abs(recordPercent - saleData.percentOff) <= 5;
+        
+        if (companySimilar && percentSimilar) {
+          console.log(`⏭️  Duplicate found: ${record.fields.Company} ${recordPercent}%`);
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (isDuplicate) {
         return res.status(200).json({ 
           success: false, 
-          message: 'Duplicate sale - already exists in past 2 weeks',
-          existingRecordId: duplicateData.records[0].id
+          message: 'Duplicate sale - similar sale exists in past 2 weeks',
+          newSale: saleData
         });
       }
     }
+    
     console.log('✅ No duplicates found');
     
-    // Clean the URL using curl redirect following
+    // Clean the URL
     console.log('🔄 Cleaning URL...');
     let cleanUrl = saleData.saleUrl;
     try {
@@ -2888,21 +2988,20 @@ Rules:
     console.log('💾 Creating Airtable record...');
     const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
     
-    // Determine if sale should be live based on start date
     const today = new Date().toISOString().split('T')[0];
     const isLive = saleData.startDate <= today ? 'YES' : 'NO';
     
-    // Build fields object, only including fields with actual values
     const fields = {
       Company: saleData.company,
       PercentOff: saleData.percentOff,
       SaleURL: saleData.saleUrl,
       CleanURL: cleanUrl !== saleData.saleUrl ? cleanUrl : saleData.saleUrl,
       StartDate: saleData.startDate,
-      Confidence: saleData.confidence || 50, // AI confidence rating 1-100
-      Live: isLive, // YES if starting today or earlier, NO if future date
+      Confidence: saleData.confidence || 60,
+      Live: isLive,
       Description: JSON.stringify({
         source: 'email',
+        aiReasoning: saleData.reasoning,
         originalEmail: {
           from: from,
           subject: subject,
@@ -2911,7 +3010,6 @@ Rules:
       })
     };
     
-    // Only add optional fields if they have values
     if (saleData.discountCode) {
       fields.PromoCode = saleData.discountCode;
     }
@@ -2931,11 +3029,18 @@ Rules:
     if (!airtableResponse.ok) {
       const errorText = await airtableResponse.text();
       console.error('❌ Airtable error:', errorText);
-      return res.status(200).json({ success: false, message: 'Airtable error' });
+      return res.status(200).json({ 
+        success: false, 
+        message: 'Airtable error',
+        error: errorText
+      });
     }
     
     const airtableData = await airtableResponse.json();
     console.log('✅ Created Airtable record:', airtableData.id);
+    
+    // Clear sales cache
+    clearSalesCache();
     
     res.status(200).json({ 
       success: true, 
@@ -2944,13 +3049,20 @@ Rules:
       saleData: {
         company: saleData.company,
         percentOff: saleData.percentOff,
-        cleanUrl: cleanUrl
+        cleanUrl: cleanUrl,
+        confidence: saleData.confidence,
+        reasoning: saleData.reasoning
       }
     });
     
   } catch (error) {
     console.error('❌ Webhook processing error:', error);
-    res.status(200).json({ success: false, message: error.message });
+    console.error('Stack trace:', error.stack);
+    res.status(200).json({ 
+      success: false, 
+      message: error.message,
+      stack: error.stack
+    });
   }
 });
 
