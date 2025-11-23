@@ -11,6 +11,14 @@ import { fileURLToPath } from 'url';
 import { initializeTelegramBot } from './telegram-bot.js';
 import { scrapeGemItems } from './gem-scraper.js';
 import { generateMultipleFeaturedAssets } from './featured-assets-generator.js';
+import { 
+  addPendingSale, 
+  getPendingSales, 
+  removePendingSale, 
+  isApprovalsEnabled,
+  setApprovalsEnabled,
+  getApprovalSettings
+} from './pending-sales.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3139,6 +3147,33 @@ ${emailContent.substring(0, 4000)}`
       console.error('⚠️  URL cleaning failed, using original URL:', error.message);
     }
     
+    // Check if approvals are enabled
+    if (isApprovalsEnabled()) {
+      console.log('⏸️  Approvals enabled - adding to pending sales');
+      
+      const pendingSale = addPendingSale({
+        company: saleData.company,
+        percentOff: saleData.percentOff,
+        saleUrl: saleData.saleUrl,
+        cleanUrl: cleanUrl,
+        discountCode: saleData.discountCode,
+        startDate: saleData.startDate,
+        endDate: saleData.endDate,
+        confidence: saleData.confidence,
+        reasoning: saleData.reasoning,
+        companyRecordId: companyRecordId,
+        emailFrom: from,
+        emailSubject: subject
+      });
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Sale pending approval',
+        pendingSaleId: pendingSale.id,
+        requiresApproval: true
+      });
+    }
+    
     // Create Airtable record
     console.log('💾 Creating Airtable record...');
     const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
@@ -3334,6 +3369,169 @@ app.use((req, res) => {
   
   // Everything else (/, /admin, etc.) is a SPA route and should get index.html
   res.sendFile(path.join(buildPath, 'index.html'));
+});
+
+// ==================== PENDING SALES APPROVAL API ====================
+
+// Get all pending sales
+app.get('/api/pending-sales', (req, res) => {
+  try {
+    const pending = getPendingSales();
+    res.json({ success: true, sales: pending });
+  } catch (error) {
+    console.error('Error getting pending sales:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Approve a pending sale (move to Airtable)
+app.post('/api/approve-sale/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pendingSale = removePendingSale(id);
+    
+    if (!pendingSale) {
+      return res.status(404).json({ success: false, error: 'Sale not found' });
+    }
+    
+    console.log(`✅ Approving sale: ${pendingSale.company} ${pendingSale.percentOff}%`);
+    
+    // Create Airtable record
+    const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const isLive = pendingSale.startDate <= today ? 'YES' : 'NO';
+    
+    const fields = {
+      OriginalCompanyName: pendingSale.company,
+      PercentOff: pendingSale.percentOff,
+      SaleURL: pendingSale.saleUrl,
+      CleanURL: pendingSale.cleanUrl,
+      StartDate: pendingSale.startDate,
+      Confidence: pendingSale.confidence || 60,
+      Live: isLive,
+      Description: JSON.stringify({
+        source: 'email',
+        aiReasoning: pendingSale.reasoning,
+        confidence: pendingSale.confidence,
+        originalEmail: {
+          from: pendingSale.emailFrom,
+          subject: pendingSale.emailSubject,
+          receivedAt: pendingSale.receivedAt
+        },
+        approved: true,
+        approvedAt: new Date().toISOString()
+      })
+    };
+    
+    if (pendingSale.companyRecordId) {
+      fields.Company = [pendingSale.companyRecordId];
+    }
+    
+    if (pendingSale.discountCode) {
+      fields.PromoCode = pendingSale.discountCode;
+    }
+    if (pendingSale.endDate) {
+      fields.EndDate = pendingSale.endDate;
+    }
+    
+    const airtableResponse = await fetch(airtableUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ fields })
+    });
+    
+    if (!airtableResponse.ok) {
+      const errorText = await airtableResponse.text();
+      console.error('❌ Airtable error:', errorText);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Airtable error',
+        details: errorText
+      });
+    }
+    
+    const airtableData = await airtableResponse.json();
+    console.log('✅ Created Airtable record:', airtableData.id);
+    
+    // Clear sales cache
+    clearSalesCache();
+    
+    res.json({ 
+      success: true, 
+      message: 'Sale approved and added to Airtable',
+      recordId: airtableData.id
+    });
+    
+  } catch (error) {
+    console.error('Error approving sale:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Reject a pending sale (delete it)
+app.post('/api/reject-sale/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const pendingSale = removePendingSale(id);
+    
+    if (!pendingSale) {
+      return res.status(404).json({ success: false, error: 'Sale not found' });
+    }
+    
+    console.log(`❌ Rejected sale: ${pendingSale.company} ${pendingSale.percentOff}%`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Sale rejected',
+      sale: pendingSale
+    });
+    
+  } catch (error) {
+    console.error('Error rejecting sale:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get approval settings
+app.get('/api/approval-settings', (req, res) => {
+  try {
+    const settings = getApprovalSettings();
+    res.json({ success: true, settings });
+  } catch (error) {
+    console.error('Error getting approval settings:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update approval settings
+app.post('/api/approval-settings', (req, res) => {
+  try {
+    const { approvalsEnabled } = req.body;
+    
+    if (typeof approvalsEnabled !== 'boolean') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'approvalsEnabled must be a boolean' 
+      });
+    }
+    
+    setApprovalsEnabled(approvalsEnabled);
+    console.log(`⚙️  Approval mode ${approvalsEnabled ? 'ENABLED' : 'DISABLED'}`);
+    
+    res.json({ 
+      success: true, 
+      message: `Approvals ${approvalsEnabled ? 'enabled' : 'disabled'}`,
+      settings: { approvalsEnabled }
+    });
+    
+  } catch (error) {
+    console.error('Error updating approval settings:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
