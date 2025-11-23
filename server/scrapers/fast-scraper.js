@@ -54,19 +54,27 @@ export async function scrapeProduct(url, options = {}) {
             // We got product info from Google Shopping!
             logger.log('✅ [Fast Scraper] Google Shopping found product data');
             
-            // Now fetch the page for fresh sale price
-            logger.log('📄 [Fast Scraper] Fetching page for fresh sale price...');
+            // Try to get fresh sale price from page, but don't fail if it doesn't work
+            let freshPrice = null;
+            if (!googleShoppingResult.currentPrice) {
+              logger.log('📄 [Fast Scraper] No price in Shopping API, fetching page for fresh price...');
+              freshPrice = await fetchFreshSalePrice(url, fetchImpl, logger);
+            } else {
+              logger.log(`💰 [Fast Scraper] Using Shopping API price: $${googleShoppingResult.currentPrice}`);
+            }
             
-            const freshPrice = await fetchFreshSalePrice(url, fetchImpl, logger);
+            // Use Shopping API price if we have it, otherwise use fresh price
+            const salePrice = googleShoppingResult.currentPrice || (freshPrice && freshPrice.salePrice);
+            const originalPrice = googleShoppingResult.originalPrice || (freshPrice && freshPrice.originalPrice);
             
-            if (freshPrice) {
-              // Combine Google Shopping data with fresh price
+            // We need at least a sale price to continue
+            if (salePrice) {
               const product = {
                 name: googleShoppingResult.name,
                 brand: googleShoppingResult.brand || null,
                 imageUrl: googleShoppingResult.imageUrl,
-                originalPrice: googleShoppingResult.originalPrice || freshPrice.originalPrice,
-                salePrice: freshPrice.salePrice,
+                originalPrice: originalPrice || salePrice,
+                salePrice: salePrice,
                 percentOff: 0,
                 url: url,
                 confidence: 90
@@ -75,27 +83,27 @@ export async function scrapeProduct(url, options = {}) {
               // Calculate percent off
               if (product.originalPrice && product.originalPrice > product.salePrice) {
                 product.percentOff = Math.round(((product.originalPrice - product.salePrice) / product.originalPrice) * 100);
-              } else if (!product.originalPrice) {
-                product.originalPrice = product.salePrice;
               }
               
-              testMetadata.phaseUsed = 'google-shopping-hybrid';
+              testMetadata.phaseUsed = 'google-shopping-api';
               testMetadata.imageExtraction.source = 'google-shopping';
               
-              logger.log(`✅ [Fast Scraper] Google Shopping hybrid success (confidence: ${product.confidence}%)`);
+              logger.log(`✅ [Fast Scraper] Google Shopping success (confidence: ${product.confidence}%)`);
               
               return {
                 success: true,
                 product: product,
                 meta: {
                   method: 'fast',
-                  phase: 'google-shopping-hybrid',
+                  phase: 'google-shopping-api',
                   confidence: product.confidence,
                   durationMs: Date.now() - startTime,
                   testMetadata: enableTestMetadata ? testMetadata : undefined
                 }
               };
             }
+            
+            logger.log('⚠️ [Fast Scraper] Google Shopping has no price data');
           }
           
           logger.log('⚠️ [Fast Scraper] Google Shopping incomplete, falling back to traditional methods...');
