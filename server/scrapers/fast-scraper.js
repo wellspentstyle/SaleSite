@@ -54,18 +54,13 @@ export async function scrapeProduct(url, options = {}) {
             // We got product info from Google Shopping!
             logger.log('✅ [Fast Scraper] Google Shopping found product data');
             
-            // Try to get fresh sale price from page, but don't fail if it doesn't work
-            let freshPrice = null;
-            if (!googleShoppingResult.currentPrice) {
-              logger.log('📄 [Fast Scraper] No price in Shopping API, fetching page for fresh price...');
-              freshPrice = await fetchFreshSalePrice(url, fetchImpl, logger);
-            } else {
-              logger.log(`💰 [Fast Scraper] Using Shopping API price: $${googleShoppingResult.currentPrice}`);
-            }
+            // Always try to get fresh sale price from page (Shopping API can be stale)
+            logger.log('📄 [Fast Scraper] Attempting to fetch fresh sale price from page...');
+            const freshPrice = await fetchFreshSalePrice(url, fetchImpl, logger);
             
-            // Use Shopping API price if we have it, otherwise use fresh price
-            const salePrice = googleShoppingResult.currentPrice || (freshPrice && freshPrice.salePrice);
-            const originalPrice = googleShoppingResult.originalPrice || (freshPrice && freshPrice.originalPrice);
+            // Prefer fresh price if available, fall back to Shopping API price
+            const salePrice = (freshPrice && freshPrice.salePrice) || googleShoppingResult.currentPrice;
+            const originalPrice = (freshPrice && freshPrice.originalPrice) || googleShoppingResult.originalPrice;
             
             // We need at least a sale price to continue
             if (salePrice) {
@@ -85,17 +80,18 @@ export async function scrapeProduct(url, options = {}) {
                 product.percentOff = Math.round(((product.originalPrice - product.salePrice) / product.originalPrice) * 100);
               }
               
-              testMetadata.phaseUsed = 'google-shopping-api';
+              testMetadata.phaseUsed = freshPrice ? 'google-shopping-hybrid' : 'google-shopping-api';
               testMetadata.imageExtraction.source = 'google-shopping';
               
-              logger.log(`✅ [Fast Scraper] Google Shopping success (confidence: ${product.confidence}%)`);
+              const priceSource = freshPrice ? 'fresh page data' : 'Shopping API';
+              logger.log(`✅ [Fast Scraper] Google Shopping success using ${priceSource} (confidence: ${product.confidence}%)`);
               
               return {
                 success: true,
                 product: product,
                 meta: {
                   method: 'fast',
-                  phase: 'google-shopping-api',
+                  phase: testMetadata.phaseUsed,
                   confidence: product.confidence,
                   durationMs: Date.now() - startTime,
                   testMetadata: enableTestMetadata ? testMetadata : undefined
