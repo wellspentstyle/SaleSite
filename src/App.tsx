@@ -8,6 +8,7 @@ import { AddBrands } from './pages/AddBrands';
 import { SyncGem } from './pages/SyncGem';
 import { GenerateAssets } from './pages/GenerateAssets';
 import { Freshness } from './pages/Freshness';
+import { SalesApprovals } from './pages/SalesApprovals';
 import { Toaster } from './components/ui/sonner';
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
           <Route index element={<Navigate to="/admin/picks" replace />} />
           <Route path="picks" element={<AddPicks />} />
           <Route path="picks/finalize" element={<FinalizePicks />} />
+          <Route path="sales-approvals" element={<SalesApprovals />} />
           <Route path="brands" element={<AddBrands />} />
           <Route path="assets" element={<GenerateAssets />} />
           <Route path="freshness" element={<Freshness />} />

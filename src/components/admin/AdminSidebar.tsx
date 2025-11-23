@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { Package, Tag, Image, Gem, RefreshCw } from 'lucide-react';
+import { Package, Tag, Image, Gem, RefreshCw, CheckSquare } from 'lucide-react';
 
 export function AdminSidebar() {
   const navItems = [
     { path: '/admin/picks', label: 'Add Picks', icon: Package },
+    { path: '/admin/sales-approvals', label: 'Sales Approvals', icon: CheckSquare },
     { path: '/admin/brands', label: 'Add Brands', icon: Tag },
     { path: '/admin/assets', label: 'Generate Assets', icon: Image },
     { path: '/admin/freshness', label: 'Freshness', icon: RefreshCw },
