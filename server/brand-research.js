@@ -120,7 +120,7 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
       console.log(`\n🔍 Researching brand: ${brandName}`);
 
       // ============================================
-      // PHASE 1: FIND OFFICIAL DOMAIN (UNCHANGED)
+      // PHASE 1: FIND OFFICIAL DOMAIN
       // ============================================
       console.log(`🌐 Phase 1: Finding official domain...`);
 
@@ -207,9 +207,13 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
       console.log(`🏢 Official domain: ${officialDomain}`);
 
       // ============================================
-      // PHASE 2: GOOGLE SHOPPING API (NEW!)
+      // PHASE 2: GOOGLE SHOPPING API (BROAD SEARCH)
       // ============================================
       console.log(`🛍️  Phase 2: Fetching products from Google Shopping...`);
+
+      // Note: Shopping API doesn't support site: operator, so we search broadly and filter
+      const shoppingQuery = `${brandName} women`;
+      console.log(`   Query: "${shoppingQuery}"`);
 
       const shoppingResponse = await fetch('https://google.serper.dev/shopping', {
         method: 'POST',
@@ -218,8 +222,8 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          q: `${brandName} women`,
-          num: 40, // Get more results for better data
+          q: shoppingQuery,
+          num: 40,
           location: 'United States'
         })
       });
@@ -236,20 +240,51 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
       const shoppingResults = shoppingData.shopping || [];
       console.log(`🛍️  Shopping API returned ${shoppingResults.length} products`);
 
-      // Filter to official domain only
-      const officialProducts = shoppingResults.filter(product => {
-        if (!product.link) return false;
-
-        try {
-          const productDomain = new URL(product.link).hostname.replace('www.', '').toLowerCase();
-          // Accept exact match OR subdomains
-          return productDomain === officialDomain || productDomain.endsWith('.' + officialDomain);
-        } catch (e) {
-          return false;
+      // ============================================
+      // SOURCE-BASED FILTERING (uses "source" field, not "link")
+      // ============================================
+      // Log which sources we found (for debugging)
+      const foundSources = {};
+      shoppingResults.forEach(product => {
+        if (product.source) {
+          const source = product.source.toLowerCase();
+          foundSources[source] = (foundSources[source] || 0) + 1;
         }
       });
 
+      console.log(`\n   📊 Sources found in Shopping results:`);
+      const sortedSources = Object.entries(foundSources)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      // Extract brand name from official domain (e.g., "everlane" from "everlane.com")
+      const domainBrand = officialDomain.split('.')[0].toLowerCase();
+
+      sortedSources.forEach(([source, count]) => {
+        const isMatch = source.toLowerCase().includes(domainBrand) || 
+                       domainBrand.includes(source.toLowerCase());
+        console.log(`      ${isMatch ? '✅' : '❌'} ${source}: ${count} products`);
+      });
+      console.log('');
+
+      // Filter to official source only (match by brand name)
+      const officialProducts = shoppingResults.filter(product => {
+        if (!product.source) return false;
+
+        const source = product.source.toLowerCase();
+        // Accept if source contains brand name or vice versa
+        return source.includes(domainBrand) || domainBrand.includes(source);
+      });
+
       console.log(`✅ Filtered to ${officialProducts.length} products from official domain`);
+
+      if (officialProducts.length === 0) {
+        console.warn(`⚠️  No products found from official domain!`);
+        console.warn(`   This could mean:`);
+        console.warn(`   - Brand doesn't sell directly on ${officialDomain}`);
+        console.warn(`   - Brand isn't in Google Shopping feed`);
+        console.warn(`   - Brand only sells through retailers`);
+      }
 
       // ============================================
       // PHASE 3: EXTRACT STRUCTURED DATA
@@ -264,7 +299,6 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
         // Extract price
         let price = null;
         if (item.price) {
-          // Handle various price formats: "$450", "450.00", "US$450"
           const priceMatch = String(item.price).match(/[\d,]+\.?\d*/);
           if (priceMatch) {
             price = parseFloat(priceMatch[0].replace(/,/g, ''));
@@ -291,7 +325,7 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
           name: title,
           price: price,
           url: item.link,
-          priceConfidence: 'high', // Shopping API has structured prices
+          priceConfidence: 'high',
           size: item.size || item.sizes,
           category: item.category
         });
@@ -418,7 +452,7 @@ Examples:
         console.log(`  No products found, using search fallback...`);
 
         const categorySearchQuery = `site:${officialDomain} shop collection`;
-        const categorySearchResponse = await fetch('https://google.serper.dev/search', {
+        const categoryResponse = await fetch('https://google.serper.dev/search', {
           method: 'POST',
           headers: {
             'X-API-KEY': serperApiKey,
@@ -427,8 +461,8 @@ Examples:
           body: JSON.stringify({ q: categorySearchQuery, num: 5 })
         });
 
-        if (categorySearchResponse.ok) {
-          const categoryData = await categorySearchResponse.json();
+        if (categoryResponse.ok) {
+          const categoryData = await categoryResponse.json();
           const searchResults = categoryData.organic || [];
           const contextText = searchResults.map(r => `${r.title} ${r.snippet}`).join(' ');
 
@@ -458,8 +492,8 @@ Return as comma-separated list. Default to "Clothing" if unclear.`
             temperature: 0.1
           });
 
-          const categoryResponseText = categoryCompletion.choices[0]?.message?.content?.trim() || '';
-          categories = categoryResponseText.split(',').map(c => c.trim()).filter(c => c);
+          const categoryResult = categoryCompletion.choices[0]?.message?.content?.trim() || '';
+          categories = categoryResult.split(',').map(c => c.trim()).filter(c => c);
         }
       }
 
@@ -474,7 +508,7 @@ Return as comma-separated list. Default to "Clothing" if unclear.`
       const finalCategory = categories.join(', ');
 
       // ============================================
-      // PHASE 6: SIZE EXTRACTION (IMPROVED!)
+      // PHASE 6: SIZE EXTRACTION
       // ============================================
       console.log(`📏 Phase 6: Extracting size information...`);
 
@@ -499,7 +533,6 @@ Return as comma-separated list. Default to "Clothing" if unclear.`
         }
 
         // Strategy 2: Fallback to size chart scraping if needed
-        // Only do this if we didn't find sizes OR found small range (< size 14)
         const maxSizeNum = finalMaxSize ? parseInt(finalMaxSize.match(/\d+/)?.[0]) : 0;
 
         if (!finalMaxSize || maxSizeNum < 14) {
@@ -523,7 +556,6 @@ Return as comma-separated list. Default to "Clothing" if unclear.`
               if (sizeResults.length > 0) {
                 console.log(`  Found ${sizeResults.length} size chart pages`);
 
-                // Try to fetch full page content
                 let sizeText = '';
 
                 try {
@@ -542,7 +574,6 @@ Return as comma-separated list. Default to "Clothing" if unclear.`
                   if (pageResponse.ok) {
                     const html = await pageResponse.text();
 
-                    // Extract text content
                     const textContent = html
                       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
                       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -552,7 +583,6 @@ Return as comma-separated list. Default to "Clothing" if unclear.`
                       .replace(/\s+/g, ' ')
                       .trim();
 
-                    // Find size-related content
                     const sizeKeywords = ['size chart', 'size guide', 'sizing', 'measurements', 'fit guide'];
                     const lines = textContent.split(/[.\n]/);
                     const relevantLines = lines.filter(line => {
@@ -570,7 +600,6 @@ Return as comma-separated list. Default to "Clothing" if unclear.`
                   console.log(`  ⚠️  Page fetch failed: ${fetchError.message}`);
                 }
 
-                // Fallback to snippets if page fetch failed
                 if (!sizeText) {
                   sizeText = sizeResults.map(r => `${r.title} ${r.snippet}`).join('\n');
                   console.log(`  Using search snippets`);
@@ -618,7 +647,6 @@ Return ONLY the size value.`
                   if (chartMaxSize && chartMaxSize.length > 0 && chartMaxSize.length < 20) {
                     const chartConverted = convertSizeToUS(chartMaxSize);
 
-                    // Use chart size if it's larger than what we found in products
                     const chartNum = parseInt(chartConverted.match(/\d+/)?.[0]) || 0;
                     if (chartNum > maxSizeNum) {
                       finalMaxSize = chartConverted;
@@ -749,7 +777,6 @@ ${JSON.stringify(diversityResults, null, 2)}`
 
       let brandDescription = '';
       try {
-        // Use product names to inform description
         const productContext = products.length > 0 
           ? products.slice(0, 10).map(p => p.name).join(', ')
           : 'Not available';
@@ -783,7 +810,6 @@ Write ONLY the description, no preamble.`
       // ============================================
       const brandUrl = `https://${officialDomain}`;
 
-      // Calculate overall data quality score
       const qualityScore = {
         priceRange: priceRangeMethod === 'shopping-api' ? 100 : 
                     priceRangeMethod === 'shopping-api-limited' ? 75 : 50,
