@@ -3375,6 +3375,12 @@ app.use((req, res) => {
 
 // Get all pending sales
 app.get('/api/pending-sales', (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
   try {
     const pending = getPendingSales();
     res.json({ success: true, sales: pending });
@@ -3384,10 +3390,82 @@ app.get('/api/pending-sales', (req, res) => {
   }
 });
 
-// Approve a pending sale (move to Airtable)
-app.post('/api/approve-sale/:id', async (req, res) => {
+// Check for duplicate sales in Airtable
+app.post('/api/check-duplicates/:id', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
   try {
     const { id } = req.params;
+    const pendingSales = getPendingSales();
+    const pendingSale = pendingSales.find(s => s.id === id);
+    
+    if (!pendingSale) {
+      return res.status(404).json({ success: false, error: 'Sale not found' });
+    }
+    
+    // Check for duplicates in Airtable
+    const normalizedCompany = pendingSale.company.toLowerCase().trim();
+    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    const filterFormula = `AND(
+      {StartDate} >= '${twoWeeksAgo}',
+      OR(
+        FIND(LOWER("${normalizedCompany}"), LOWER({OriginalCompanyName})),
+        FIND(LOWER({OriginalCompanyName}), LOWER("${normalizedCompany}"))
+      )
+    )`;
+    
+    const duplicatesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+    
+    const response = await fetch(duplicatesUrl, {
+      headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to check duplicates');
+    }
+    
+    const data = await response.json();
+    
+    // Filter for sales with similar discount percentage (within 5%)
+    const duplicates = data.records.filter(record => {
+      const recordPercent = record.fields.PercentOff;
+      return Math.abs(recordPercent - pendingSale.percentOff) <= 5;
+    }).map(record => ({
+      id: record.id,
+      company: record.fields.OriginalCompanyName,
+      percentOff: record.fields.PercentOff,
+      startDate: record.fields.StartDate,
+      endDate: record.fields.EndDate,
+      saleUrl: record.fields.SaleURL
+    }));
+    
+    res.json({ 
+      success: true, 
+      duplicates
+    });
+    
+  } catch (error) {
+    console.error('Error checking duplicates:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Approve a pending sale (move to Airtable)
+app.post('/api/approve-sale/:id', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { id } = req.params;
+    const { replaceSaleId } = req.body;
     const pendingSale = removePendingSale(id);
     
     if (!pendingSale) {
@@ -3395,6 +3473,25 @@ app.post('/api/approve-sale/:id', async (req, res) => {
     }
     
     console.log(`✅ Approving sale: ${pendingSale.company} ${pendingSale.percentOff}%`);
+    
+    // If replacing an existing sale, delete it first
+    if (replaceSaleId) {
+      console.log(`🔄 Replacing existing sale: ${replaceSaleId}`);
+      const deleteUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${replaceSaleId}`;
+      
+      const deleteResponse = await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`
+        }
+      });
+      
+      if (!deleteResponse.ok) {
+        console.error('⚠️  Failed to delete old sale, continuing with approval');
+      } else {
+        console.log('✅ Deleted old sale successfully');
+      }
+    }
     
     // Create Airtable record
     const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
@@ -3474,6 +3571,12 @@ app.post('/api/approve-sale/:id', async (req, res) => {
 
 // Reject a pending sale (delete it)
 app.post('/api/reject-sale/:id', (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
   try {
     const { id } = req.params;
     const pendingSale = removePendingSale(id);
@@ -3498,6 +3601,12 @@ app.post('/api/reject-sale/:id', (req, res) => {
 
 // Get approval settings
 app.get('/api/approval-settings', (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
   try {
     const settings = getApprovalSettings();
     res.json({ success: true, settings });
@@ -3509,6 +3618,12 @@ app.get('/api/approval-settings', (req, res) => {
 
 // Update approval settings
 app.post('/api/approval-settings', (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
   try {
     const { approvalsEnabled } = req.body;
     

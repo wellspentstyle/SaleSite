@@ -21,6 +21,15 @@ interface PendingSale {
   receivedAt: string;
 }
 
+interface DuplicateSale {
+  id: string;
+  company: string;
+  percentOff: number;
+  startDate: string;
+  endDate?: string;
+  saleUrl: string;
+}
+
 const API_BASE = '/api';
 
 export function SalesApprovals() {
@@ -29,6 +38,8 @@ export function SalesApprovals() {
   const [loading, setLoading] = useState(true);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [duplicates, setDuplicates] = useState<Record<string, DuplicateSale[]>>({});
+  const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -93,13 +104,11 @@ export function SalesApprovals() {
     }
   };
 
-  const handleApproveSale = async (id: string) => {
+  const handleCheckDuplicates = async (saleId: string) => {
     const auth = sessionStorage.getItem('adminAuth') || '';
     
     try {
-      setActionLoading(id);
-      
-      const response = await fetch(`${API_BASE}/approve-sale/${id}`, {
+      const response = await fetch(`${API_BASE}/check-duplicates/${saleId}`, {
         method: 'POST',
         headers: { 'auth': auth }
       });
@@ -107,7 +116,40 @@ export function SalesApprovals() {
       const data = await response.json();
       
       if (data.success) {
+        setDuplicates(prev => ({
+          ...prev,
+          [saleId]: data.duplicates
+        }));
+      }
+    } catch (error) {
+      console.error('Error checking duplicates:', error);
+    }
+  };
+
+  const handleApproveSale = async (id: string, replaceSaleId?: string) => {
+    const auth = sessionStorage.getItem('adminAuth') || '';
+    
+    try {
+      setActionLoading(id);
+      
+      const response = await fetch(`${API_BASE}/approve-sale/${id}`, {
+        method: 'POST',
+        headers: { 
+          'auth': auth,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ replaceSaleId })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
         setPendingSales(pendingSales.filter(s => s.id !== id));
+        setDuplicates(prev => {
+          const updated = { ...prev };
+          delete updated[id];
+          return updated;
+        });
       } else {
         alert(`Error approving sale: ${data.error}`);
       }
@@ -116,6 +158,17 @@ export function SalesApprovals() {
       alert('Error approving sale');
     } finally {
       setActionLoading(null);
+    }
+  };
+  
+  const handleToggleExpand = (saleId: string) => {
+    if (expandedSaleId === saleId) {
+      setExpandedSaleId(null);
+    } else {
+      setExpandedSaleId(saleId);
+      if (!duplicates[saleId]) {
+        handleCheckDuplicates(saleId);
+      }
     }
   };
 
@@ -214,9 +267,9 @@ export function SalesApprovals() {
           ) : (
             <div className="grid gap-4">
               {pendingSales.map(sale => (
-                <Card key={sale.id}>
+                <Card key={sale.id} className="cursor-pointer" onClick={() => handleToggleExpand(sale.id)}>
                   <CardContent className="pt-6">
-                    <div className="space-y-4">
+                    <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
                       {/* Sale Header */}
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
@@ -288,6 +341,39 @@ export function SalesApprovals() {
                         </div>
                       )}
 
+                      {/* Duplicate Warning */}
+                      {duplicates[sale.id] && duplicates[sale.id].length > 0 && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                          <p className="text-sm font-semibold text-yellow-800 mb-2">
+                            ⚠️ Potential Duplicates Found ({duplicates[sale.id].length})
+                          </p>
+                          <div className="space-y-2">
+                            {duplicates[sale.id].map(dup => (
+                              <div key={dup.id} className="bg-white rounded p-2 text-xs">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="font-medium">{dup.company} - {dup.percentOff}%</span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleApproveSale(sale.id, dup.id)}
+                                    disabled={actionLoading === sale.id}
+                                    style={{ height: '28px', fontSize: '11px' }}
+                                  >
+                                    Replace This
+                                  </Button>
+                                </div>
+                                <p className="text-muted-foreground">
+                                  Starts: {dup.startDate} {dup.endDate ? `| Ends: ${dup.endDate}` : ''}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Click "Replace This" to delete the old sale and add this new one, or use "Approve Anyway" to add both.
+                          </p>
+                        </div>
+                      )}
+
                       {/* Actions */}
                       <div className="flex gap-2 pt-2">
                         <Button
@@ -300,7 +386,7 @@ export function SalesApprovals() {
                           ) : (
                             <Check className="h-4 w-4 mr-2" />
                           )}
-                          Approve & Add to Airtable
+                          {duplicates[sale.id]?.length > 0 ? 'Approve Anyway' : 'Approve & Add to Airtable'}
                         </Button>
                         <Button
                           variant="outline"
