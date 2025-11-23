@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Loader2, ExternalLink, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { Input } from '../components/ui/input';
+import { Loader2, ExternalLink, ArrowLeft, AlertTriangle, Power, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -15,6 +16,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 
 const API_BASE = '/api';
 
@@ -27,6 +36,7 @@ interface Sale {
   picksCount: number;
   startDate?: string;
   endDate?: string;
+  promoCode?: string;
 }
 
 type View = 'sales-list' | 'url-entry';
@@ -55,6 +65,14 @@ export function PicksAdmin() {
     successRate: '',
     recommendation: '',
     urlsToScrape: []
+  });
+  
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [editForm, setEditForm] = useState({
+    percentOff: '',
+    promoCode: '',
+    endDate: ''
   });
 
   useEffect(() => {
@@ -93,6 +111,102 @@ export function PicksAdmin() {
     setCurrentView('sales-list');
     setSelectedSale(null);
     setUrls('');
+  };
+
+  const handleToggleActive = async (sale: Sale, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const newLiveStatus = sale.live === 'YES' ? 'NO' : 'YES';
+
+    setSales(prevSales => 
+      prevSales.map(s => 
+        s.id === sale.id ? { ...s, live: newLiveStatus } : s
+      )
+    );
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/sales/${sale.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'auth': auth
+        },
+        body: JSON.stringify({ live: newLiveStatus })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        setSales(prevSales => 
+          prevSales.map(s => 
+            s.id === sale.id ? { ...s, live: sale.live } : s
+          )
+        );
+        toast.error('Failed to update sale status');
+      } else {
+        toast.success(`Sale ${newLiveStatus === 'YES' ? 'activated' : 'deactivated'}`);
+      }
+    } catch (error) {
+      setSales(prevSales => 
+        prevSales.map(s => 
+          s.id === sale.id ? { ...s, live: sale.live } : s
+        )
+      );
+      toast.error('Failed to update sale status');
+    }
+  };
+
+  const handleOpenEditDialog = (sale: Sale, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSale(sale);
+    setEditForm({
+      percentOff: sale.percentOff.toString(),
+      promoCode: sale.promoCode || '',
+      endDate: sale.endDate || ''
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSale) return;
+    
+    if (!editForm.percentOff || isNaN(parseInt(editForm.percentOff))) {
+      toast.error('Please enter a valid discount percentage');
+      return;
+    }
+    
+    const percentOffValue = parseInt(editForm.percentOff);
+    if (percentOffValue < 0 || percentOffValue > 100) {
+      toast.error('Discount percentage must be between 0 and 100');
+      return;
+    }
+    
+    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/sales/${editingSale.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'auth': auth
+        },
+        body: JSON.stringify({
+          percentOff: percentOffValue,
+          promoCode: editForm.promoCode,
+          endDate: editForm.endDate
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Sale updated successfully');
+        setEditDialogOpen(false);
+        fetchSales();
+      } else {
+        toast.error(data.message || 'Failed to update sale');
+      }
+    } catch (error) {
+      toast.error('Failed to update sale');
+    }
   };
 
   const performScraping = async (urlList: string[]) => {
@@ -382,7 +496,7 @@ export function PicksAdmin() {
                     )}
                   </div>
                   
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm">
                       <span className="font-semibold" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                         {sale.percentOff}% Off
@@ -404,6 +518,35 @@ export function PicksAdmin() {
                         {new Date(sale.startDate).toLocaleDateString()} - {new Date(sale.endDate).toLocaleDateString()}
                       </p>
                     )}
+                    
+                    {sale.promoCode && (
+                      <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                        Code: <span className="font-mono">{sale.promoCode}</span>
+                      </p>
+                    )}
+                    
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => handleOpenEditDialog(sale, e)}
+                        className="flex-1"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant={sale.live === 'YES' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={(e) => handleToggleActive(sale, e)}
+                        className="flex-1"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        <Power className="h-3 w-3 mr-1" />
+                        {sale.live === 'YES' ? 'Deactivate' : 'Activate'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -483,6 +626,63 @@ export function PicksAdmin() {
           </form>
         </div>
       )}
+
+      {/* Edit Sale Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent style={{ fontFamily: 'DM Sans, sans-serif' }}>
+          <DialogHeader>
+            <DialogTitle>Edit Sale</DialogTitle>
+            <DialogDescription>
+              Update the details for {editingSale?.saleName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="percentOff">Discount Percentage</Label>
+              <Input
+                id="percentOff"
+                type="number"
+                min="0"
+                max="100"
+                value={editForm.percentOff}
+                onChange={(e) => setEditForm({ ...editForm, percentOff: e.target.value })}
+                placeholder="e.g. 20"
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="promoCode">Promo Code (Optional)</Label>
+              <Input
+                id="promoCode"
+                value={editForm.promoCode}
+                onChange={(e) => setEditForm({ ...editForm, promoCode: e.target.value })}
+                placeholder="e.g. SALE20"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="endDate">End Date (Optional)</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={editForm.endDate}
+                onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} style={{ backgroundColor: '#000', color: '#fff' }}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Protection Warning Modal */}
       <AlertDialog open={protectionWarning.show} onOpenChange={(open) => {

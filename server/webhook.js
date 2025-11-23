@@ -804,14 +804,36 @@ app.get('/admin/sales', async (req, res) => {
 app.patch('/admin/sales/:saleId', async (req, res) => {
   const { auth } = req.headers;
   const { saleId } = req.params;
-  const { percentOff } = req.body;
+  const { percentOff, live, promoCode, endDate } = req.body;
   
   if (auth !== ADMIN_PASSWORD) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   
-  if (!percentOff || isNaN(percentOff)) {
-    return res.status(400).json({ success: false, message: 'Valid percentOff is required' });
+  // Build fields object with only provided values
+  const fields = {};
+  
+  if (percentOff !== undefined) {
+    if (isNaN(percentOff)) {
+      return res.status(400).json({ success: false, message: 'Valid percentOff is required' });
+    }
+    fields.PercentOff = parseInt(percentOff);
+  }
+  
+  if (live !== undefined) {
+    fields.Live = live;
+  }
+  
+  if (promoCode !== undefined) {
+    fields.PromoCode = promoCode;
+  }
+  
+  if (endDate !== undefined) {
+    fields.EndDate = endDate;
+  }
+  
+  if (Object.keys(fields).length === 0) {
+    return res.status(400).json({ success: false, message: 'At least one field to update is required' });
   }
   
   try {
@@ -821,11 +843,7 @@ app.patch('/admin/sales/:saleId', async (req, res) => {
         'Authorization': `Bearer ${AIRTABLE_PAT}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        fields: {
-          PercentOff: parseInt(percentOff)
-        }
-      })
+      body: JSON.stringify({ fields })
     });
     
     if (!response.ok) {
@@ -835,7 +853,7 @@ app.patch('/admin/sales/:saleId', async (req, res) => {
     }
     
     const data = await response.json();
-    console.log(`✅ Updated sale ${saleId} with ${percentOff}% off`);
+    console.log(`✅ Updated sale ${saleId}:`, fields);
     
     res.json({ success: true, sale: data });
   } catch (error) {
