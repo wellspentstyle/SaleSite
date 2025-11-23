@@ -250,10 +250,15 @@ export function FinalizePicks() {
       isScrapingNow: false
     });
     
+    // Show completion notification (stays visible longer)
     if (successCount > 0) {
-      toast.success(`🎉 Scraping complete! ${successCount} successful, ${failureCount} failed`);
+      toast.success(`🎉 Scraping complete! ${successCount} successful, ${failureCount} failed`, {
+        duration: 6000, // Show for 6 seconds
+      });
     } else {
-      toast.error(`All ${failureCount} products failed to scrape`);
+      toast.error(`All ${failureCount} products failed to scrape`, {
+        duration: 6000,
+      });
     }
   };
 
@@ -916,8 +921,8 @@ export function FinalizePicks() {
 
         {picks.length === 0 && failedUrls.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-muted-foreground mb-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-              No picks to display. Go back and scrape some products.
+            <p className="text-muted-foreground mb-4" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '16px' }}>
+              We're still scraping away. Feel free to leave the page and come back later.
             </p>
             <button
               onClick={() => navigate('/admin/picks')}
@@ -1349,7 +1354,7 @@ export function FinalizePicks() {
                     Publishing...
                   </>
                 ) : (
-                  'Publish to Airtable'
+                  'Publish'
                 )}
               </button>
             </div>

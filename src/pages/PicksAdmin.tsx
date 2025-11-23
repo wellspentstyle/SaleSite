@@ -358,53 +358,10 @@ export function PicksAdmin() {
       return;
     }
 
-    const auth = sessionStorage.getItem('adminAuth');
     const urlList = urls.split('\n').filter(url => url.trim() !== '');
 
-    // Check ALL URLs for ultra-high protection stores
-    try {
-      let ultraHighStore = null;
-      
-      // Check each URL for protection level
-      for (const url of urlList) {
-        const checkResponse = await fetch(`${API_BASE}/admin/check-url-protection`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'auth': auth || ''
-          },
-          body: JSON.stringify({ url })
-        });
-
-        const checkData = await checkResponse.json();
-        
-        // If we find ANY ultra-high protection URL, show warning
-        if (checkData.success && checkData.protected && checkData.store.level === 'ultra-high') {
-          ultraHighStore = checkData.store;
-          break; // Stop checking once we find one ultra-high protection URL
-        }
-      }
-
-      // Show warning if any ultra-high protection URL was found
-      if (ultraHighStore) {
-        setProtectionWarning({
-          show: true,
-          store: ultraHighStore.store,
-          successRate: ultraHighStore.successRate,
-          recommendation: ultraHighStore.recommendation,
-          urlsToScrape: urlList
-        });
-        return;
-      }
-
-      // No warning needed, proceed with scraping
-      await performScraping(urlList);
-      
-    } catch (error) {
-      console.error('Error checking URL protection:', error);
-      // If check fails, just proceed with scraping
-      await performScraping(urlList);
-    }
+    // Proceed directly with scraping
+    await performScraping(urlList);
   };
 
   const handleProceedWithScraping = async () => {
