@@ -106,7 +106,7 @@ export function FeaturedSaleCard({ sale, onViewPicks }: FeaturedSaleCardProps) {
               variant="outline"
               size="sm"
               className="flex-1 h-10 text-sm"
-              style={{ fontFamily: 'DM Sans, sans-serif' }}
+              style={{ fontFamily: 'DM Sans, sans-serif', borderColor: '#a3a3a3' }}
               onClick={() => onViewPicks(sale)}
             >
               Our Faves
