@@ -36,6 +36,7 @@ export async function scrapeProduct(url, options = {}) {
       logger.log('⚡ [Orchestrator] Attempting fast scraper...');
       const result = await fastScrape(url, {
         openai,
+        serperApiKey: process.env.SERPER_API_KEY,
         fetchImpl: fetch,
         enableTestMetadata,
         logger

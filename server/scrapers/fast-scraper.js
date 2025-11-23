@@ -1,6 +1,12 @@
+// FAST SCRAPER WITH GOOGLE SHOPPING API
+// Primary: Google Shopping API for name, image, original price
+// Secondary: Page fetch for fresh sale price
+// Fallback: Existing JSON-LD and HTML extraction
+
 export async function scrapeProduct(url, options = {}) {
   const {
     openai,
+    serperApiKey = process.env.SERPER_API_KEY,
     fetchImpl = fetch,
     enableTestMetadata = false,
     logger = console
@@ -29,6 +35,68 @@ export async function scrapeProduct(url, options = {}) {
 
     logger.log(`🔍 [Fast Scraper] Scraping product: ${url}`);
 
+    // ============================================
+    // STEP 1: TRY GOOGLE SHOPPING API FIRST
+    // ============================================
+    if (serperApiKey) {
+      logger.log('🛍️ [Fast Scraper] Trying Google Shopping API...');
+      
+      const googleShoppingResult = await tryGoogleShopping(url, serperApiKey, logger);
+      
+      if (googleShoppingResult) {
+        // We got product info from Google Shopping!
+        logger.log('✅ [Fast Scraper] Google Shopping found product data');
+        
+        // Now fetch the page for fresh sale price
+        logger.log('📄 [Fast Scraper] Fetching page for fresh sale price...');
+        
+        const freshPrice = await fetchFreshSalePrice(url, fetchImpl, logger);
+        
+        if (freshPrice) {
+          // Combine Google Shopping data with fresh price
+          const product = {
+            name: googleShoppingResult.name,
+            brand: googleShoppingResult.brand || null,
+            imageUrl: googleShoppingResult.imageUrl,
+            originalPrice: googleShoppingResult.originalPrice || freshPrice.originalPrice,
+            salePrice: freshPrice.salePrice,
+            percentOff: 0,
+            url: url,
+            confidence: 90
+          };
+          
+          // Calculate percent off
+          if (product.originalPrice && product.originalPrice > product.salePrice) {
+            product.percentOff = Math.round(((product.originalPrice - product.salePrice) / product.originalPrice) * 100);
+          } else if (!product.originalPrice) {
+            product.originalPrice = product.salePrice;
+          }
+          
+          testMetadata.phaseUsed = 'google-shopping-hybrid';
+          testMetadata.imageExtraction.source = 'google-shopping';
+          
+          logger.log(`✅ [Fast Scraper] Google Shopping hybrid success (confidence: ${product.confidence}%)`);
+          
+          return {
+            success: true,
+            product: product,
+            meta: {
+              method: 'fast',
+              phase: 'google-shopping-hybrid',
+              confidence: product.confidence,
+              durationMs: Date.now() - startTime,
+              testMetadata: enableTestMetadata ? testMetadata : undefined
+            }
+          };
+        }
+      }
+      
+      logger.log('⚠️ [Fast Scraper] Google Shopping incomplete, falling back to traditional methods...');
+    }
+
+    // ============================================
+    // STEP 2: FALLBACK TO TRADITIONAL SCRAPING
+    // ============================================
     const response = await fetchImpl(url, {
       redirect: 'follow',
       timeout: 10000,
@@ -111,6 +179,253 @@ export async function scrapeProduct(url, options = {}) {
     };
   }
 }
+
+// ============================================
+// GOOGLE SHOPPING API FUNCTIONS
+// ============================================
+
+async function tryGoogleShopping(url, serperApiKey, logger) {
+  try {
+    // Search Google Shopping for this product URL
+    const searchResponse = await fetch('https://google.serper.dev/shopping', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': serperApiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: url,
+        num: 3 // Get top 3 results to find best match
+      })
+    });
+
+    if (!searchResponse.ok) {
+      logger.log(`⚠️ Google Shopping API error: ${searchResponse.status}`);
+      return null;
+    }
+
+    const data = await searchResponse.json();
+
+    if (!data.shopping_results || data.shopping_results.length === 0) {
+      logger.log('⚠️ No Google Shopping results found');
+      return null;
+    }
+
+    // Find the result that best matches our URL
+    const urlDomain = new URL(url).hostname.replace('www.', '');
+    let bestMatch = null;
+    
+    for (const result of data.shopping_results) {
+      // Check if the source matches the domain
+      if (result.link && result.link.includes(urlDomain)) {
+        bestMatch = result;
+        break;
+      }
+      // Or if source name matches
+      if (result.source && result.source.toLowerCase().includes(urlDomain.split('.')[0])) {
+        bestMatch = result;
+        break;
+      }
+    }
+
+    // If no exact match, use first result
+    if (!bestMatch) {
+      bestMatch = data.shopping_results[0];
+    }
+
+    // Extract product data
+    const product = {
+      name: bestMatch.title,
+      brand: extractBrandFromTitle(bestMatch.title),
+      imageUrl: bestMatch.imageUrl || bestMatch.thumbnail,
+      originalPrice: null,
+      currentPrice: null
+    };
+
+    // Parse prices
+    if (bestMatch.price) {
+      const priceStr = bestMatch.price.replace(/[^0-9.]/g, '');
+      product.currentPrice = parseFloat(priceStr);
+    }
+
+    // Check for original/compare price
+    if (bestMatch.extracted_price) {
+      product.currentPrice = bestMatch.extracted_price;
+    }
+
+    // Some Google Shopping results have old_price or extracted_old_price
+    if (bestMatch.old_price) {
+      const oldPriceStr = bestMatch.old_price.replace(/[^0-9.]/g, '');
+      product.originalPrice = parseFloat(oldPriceStr);
+    } else if (bestMatch.extracted_old_price) {
+      product.originalPrice = bestMatch.extracted_old_price;
+    }
+
+    // Validate we got minimum required data
+    if (!product.name || !product.imageUrl) {
+      logger.log('⚠️ Google Shopping result missing name or image');
+      return null;
+    }
+
+    logger.log(`✅ Google Shopping: ${product.name}`);
+    if (product.originalPrice) {
+      logger.log(`   Original: $${product.originalPrice}, Current: $${product.currentPrice}`);
+    } else {
+      logger.log(`   Price: $${product.currentPrice}`);
+    }
+
+    return product;
+
+  } catch (error) {
+    logger.log(`⚠️ Google Shopping error: ${error.message}`);
+    return null;
+  }
+}
+
+async function fetchFreshSalePrice(url, fetchImpl, logger) {
+  try {
+    const response = await fetchImpl(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      logger.log(`⚠️ Page fetch failed: ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+
+    let salePrice = null;
+    let originalPrice = null;
+
+    // Strategy 1: JSON-LD structured data
+    const jsonLdMatches = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
+    if (jsonLdMatches) {
+      for (const jsonLdScript of jsonLdMatches) {
+        try {
+          const jsonContent = jsonLdScript.match(/<script[^>]*>([\s\S]*?)<\/script>/i)?.[1];
+          if (!jsonContent) continue;
+
+          const data = JSON.parse(jsonContent);
+
+          if (data['@type'] === 'Product' || data['@type']?.includes?.('Product')) {
+            const offers = data.offers || data.Offers;
+            if (offers) {
+              const offerData = Array.isArray(offers) ? offers[0] : offers;
+              
+              if (offerData.price) {
+                salePrice = parseFloat(offerData.price);
+                logger.log(`💰 Fresh sale price from JSON-LD: $${salePrice}`);
+              }
+
+              if (offerData.highPrice || offerData.priceValidUntil) {
+                originalPrice = parseFloat(offerData.highPrice || offerData.price);
+              }
+
+              if (salePrice) break;
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+
+    // Strategy 2: Meta tags
+    if (!salePrice) {
+      const ogPriceMatch = html.match(/<meta[^>]*property="(?:og:price:amount|product:price:amount)"[^>]*content="([^"]+)"/i);
+      if (ogPriceMatch) {
+        salePrice = parseFloat(ogPriceMatch[1]);
+        logger.log(`💰 Fresh sale price from meta tag: $${salePrice}`);
+      }
+    }
+
+    // Strategy 3: Common price patterns in HTML
+    if (!salePrice) {
+      const pricePatterns = [
+        /<[^>]*class="[^"]*(?:sale-price|price-sale|final-price|current-price)[^"]*"[^>]*>\s*\$?\s*(\d+(?:\.\d{2})?)/i,
+        /<span[^>]*class="[^"]*price[^"]*"[^>]*>\s*\$?\s*(\d+(?:\.\d{2})?)/i,
+        /"price":\s*"?(\d+(?:\.\d{2})?)"/,
+        /"salePrice":\s*"?(\d+(?:\.\d{2})?)"/
+      ];
+
+      for (const pattern of pricePatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const price = parseFloat(match[1]);
+          if (price > 0 && price < 10000) {
+            salePrice = price;
+            logger.log(`💰 Fresh sale price from HTML pattern: $${salePrice}`);
+            break;
+          }
+        }
+      }
+    }
+
+    // Strategy 4: Look for original price
+    if (!originalPrice) {
+      const originalPricePatterns = [
+        /<[^>]*class="[^"]*(?:original-price|was-price|compare-at|price-original)[^"]*"[^>]*>\s*\$?\s*(\d+(?:\.\d{2})?)/i,
+        /"originalPrice":\s*"?(\d+(?:\.\d{2})?)"/,
+        /"compareAtPrice":\s*"?(\d+(?:\.\d{2})?)"/
+      ];
+
+      for (const pattern of originalPricePatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const price = parseFloat(match[1]);
+          if (price > 0 && price < 10000 && price > (salePrice || 0)) {
+            originalPrice = price;
+            logger.log(`💰 Original price from page: $${originalPrice}`);
+            break;
+          }
+        }
+      }
+    }
+
+    if (!salePrice) {
+      logger.log('⚠️ Could not extract fresh price from page');
+      return null;
+    }
+
+    return {
+      salePrice: salePrice,
+      originalPrice: originalPrice
+    };
+
+  } catch (error) {
+    logger.log(`⚠️ Fresh price fetch error: ${error.message}`);
+    return null;
+  }
+}
+
+function extractBrandFromTitle(title) {
+  // Remove common product descriptors and take first word/phrase as brand
+  const cleaned = title
+    .split(/[|–—-]/)[0] // Take everything before separators
+    .trim();
+  
+  // Common brand patterns
+  const brandMatch = cleaned.match(/^([A-Z][a-zA-Z&\s]+?)(?:\s+[A-Z][a-z]|\s+\d|\s*$)/);
+  if (brandMatch) {
+    return brandMatch[1].trim();
+  }
+  
+  // Fallback: first word if it's capitalized
+  const firstWord = cleaned.split(/\s+/)[0];
+  if (firstWord && /^[A-Z]/.test(firstWord)) {
+    return firstWord;
+  }
+  
+  return null;
+}
+
+// ============================================
+// EXISTING EXTRACTION FUNCTIONS (FALLBACK)
+// ============================================
 
 function validateUrl(url) {
   try {
@@ -345,268 +660,164 @@ async function extractWithAI(html, url, openai, testMetadata, logger, jsonLdResu
     logger.log(`🖼️  Pre-extracted twitter:image: ${preExtractedImage}`);
   }
 
-  let contentToSend;
-  let isJsonLd = false;
+  const relevantSections = extractRelevantSections(html);
+  logger.log(`📝 Extracted ${relevantSections.length} relevant HTML sections (${relevantSections.join('').length} chars)`);
 
-  if (jsonLdResult && jsonLdResult.rawJsonLd) {
-    contentToSend = JSON.stringify(jsonLdResult.rawJsonLd, null, 2);
-    isJsonLd = true;
-    logger.log(`📊 Sending JSON-LD to OpenAI (${contentToSend.length} chars)`);
-  } else {
-    const pricePatterns = [
-      /<[^>]*class="[^"]*price[^"]*"[^>]*>[\s\S]{0,500}<\/[^>]+>/gi,
-      /<[^>]*class="[^"]*product[^"]*"[^>]*>[\s\S]{0,1000}<\/[^>]+>/gi,
-      /<script type="application\/json"[^>]*>[\s\S]{0,5000}<\/script>/gi,
-      /<meta[^>]*property="og:(?:title|image|price)"[^>]*>/gi,
-      /<h1[^>]*>[\s\S]{0,200}<\/h1>/gi,
-      /<[^>]*itemprop=["'](?:price|name|image)["'][^>]*>/gi
-    ];
-
-    let extractedSnippets = [];
-    for (const pattern of pricePatterns) {
-      const matches = html.match(pattern);
-      if (matches) {
-        extractedSnippets.push(...matches);
-      }
-    }
-
-    contentToSend = extractedSnippets.length > 0
-      ? extractedSnippets.join('\n').substring(0, 50000)
-      : html.substring(0, 50000);
-
-    logger.log(`📝 Extracted ${extractedSnippets.length} relevant HTML sections (${contentToSend.length} chars)`);
+  if (relevantSections.join('').length === 0) {
+    throw new Error('No relevant HTML sections found for extraction');
   }
 
-  const systemPrompt = isJsonLd 
-    ? `You are a product data parser. Extract from JSON-LD (schema.org Product format) and return ONLY valid JSON.
+  let systemPrompt = `You are a product data extractor. Extract product information from HTML.
 
-PRICE EXTRACTION RULES:
-1. "offers.price" = CURRENT selling price (this is salePrice)
-2. "offers.highPrice" OR "offers.priceSpecification.price" = ORIGINAL/regular price (this is originalPrice)
-3. If BOTH exist and highPrice > price, then there's a discount
-4. If only ONE price exists, set originalPrice to null and percentOff to 0
-5. NEVER swap the prices - current price is ALWAYS the lower sale price
+Return a JSON object with:
+- name: Product name (string)
+- brand: Brand name if clearly visible (string or null)
+- imageUrl: Full URL to main product image (string)
+- originalPrice: Original/retail price before discount (number or null)
+- salePrice: Current discounted price (number, required)
 
-Return this structure:
-{
-  "name": "Product Name (without brand)",
-  "brand": "Brand Name",
-  "imageUrl": "https://...",
-  "originalPrice": 999.99,
-  "salePrice": 499.99,
-  "percentOff": 50,
-  "confidence": 90
-}
+Requirements:
+- Return ONLY valid JSON, no explanations
+- Prices must be numbers (e.g., 129.99, not "$129.99")
+- imageUrl must be a complete URL starting with http
+- If no discount/sale: set originalPrice to null and salePrice to current price
+- If originalPrice exists, it MUST be higher than salePrice`;
 
-Rules:
-- Remove brand from product name
-- confidence: 85-95 for JSON-LD
-- If no discount, originalPrice = null, percentOff = 0`
-    : `You are a product page parser. Extract data from HTML and return ONLY valid JSON.
-
-🚨 CRITICAL PRICE RULES (READ CAREFULLY):
-
-You MUST identify TWO prices if a sale is active:
-1. **ORIGINAL PRICE** = The HIGHER, crossed-out, or "was" price (what it cost before the sale)
-2. **SALE PRICE** = The LOWER, current, active price (what you pay now)
-
-ORIGINAL PRICE indicators:
-- Inside <s>, <del>, <strike> tags
-- Classes: "compare-price", "was-price", "original-price", "line-through", "strike-through"
-- Text near: "Was $", "Originally $", "Compare at $", "Regular price $", "Retail $"
-- In Shopify JSON: "compare_at_price" field (divide by 100 if in cents)
-- In structured data: "highPrice", "listPrice" in microdata/JSON-LD
-
-SALE PRICE indicators:
-- The prominent, active selling price
-- Usually larger font, red/highlighted
-- Classes: "sale-price", "current-price", "final-price"
-- In Shopify JSON: "price" field (divide by 100 if in cents)
-- In structured data: "price" in microdata/JSON-LD
-
-⚠️ VALIDATION CHECKS:
-1. originalPrice MUST be HIGHER than salePrice (if both exist)
-2. If you find two prices but they're equal, set originalPrice = null
-3. If you only find ONE price, set originalPrice = null, percentOff = 0
-4. NEVER return the same value for both prices
-5. For Shopify stores: "compare_at_price" is ALWAYS originalPrice, "price" is ALWAYS salePrice
-
-DEPARTMENT STORE SPECIFIC:
-- Nordstrom: Look for "OfferPrice" (sale) and "RetailPrice" (original) in JSON
-- Saks: Check for sale-price vs regular-price classes
-- Neiman Marcus: Look for "listPrice" vs "offerPrice"
-
-Return this structure:
-{
-  "name": "Product Name Only (no brand)",
-  "brand": "Actual Brand (not store name)",
-  "imageUrl": "Real product image URL",
-  "originalPrice": 435.00,
-  "salePrice": 131.00,
-  "percentOff": 70,
-  "confidence": 85
-}
-
-Confidence scoring:
-- 90-100: Prices in structured data (JSON, microdata) with clear original/sale distinction
-- 70-89: Prices in HTML with clear patterns (strikethrough, "was" text)
-- 50-69: Ambiguous or only one price found
-- Below 50: Highly uncertain, missing data
-
-NEVER use placeholder images. Return {"error": "..."} if you can't extract required data.`;
-
-  let userPrompt = contentToSend;
-  
-  if (isJsonLd) {
-    userPrompt = `Here is the JSON-LD structured product data:\n\n${contentToSend}`;
-    if (preExtractedImage) {
-      userPrompt += `\n\nNOTE: Pre-extracted image URL: ${preExtractedImage} - use this if JSON-LD image is missing.`;
-    }
-  } else {
-    if (preExtractedImage) {
-      userPrompt = `${contentToSend}\n\nNOTE: Pre-extracted image URL: ${preExtractedImage} - use this for imageUrl.`;
-    }
-  }
-  
-  if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
-    userPrompt += `\n\n✅ VERIFIED PRICES (use these exact values):
-- Sale Price (current price): $${deterministicResult.salePrice}
-- Original Price (was price): $${deterministicResult.originalPrice}
-- Percent Off: ${deterministicResult.percentOff}%
-- Source: ${deterministicResult.source}
-
-These were extracted from reliable structured data. Use these EXACT prices. Only extract name and image.`;
+  if (preExtractedImage) {
+    systemPrompt += `\n- Image already extracted: ${preExtractedImage}`;
   }
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      {
-        role: 'system',
-        content: systemPrompt
-      },
-      {
-        role: 'user',
-        content: userPrompt
-      }
-    ],
-    temperature: 0.1,
-  });
+  if (jsonLdResult?.rawJsonLd) {
+    systemPrompt += `\n- Use this JSON-LD data when available: ${JSON.stringify(jsonLdResult.rawJsonLd[0])}`;
+  }
 
-  const aiResponse = completion.choices[0].message.content.trim();
-  logger.log('🤖 AI Response:', aiResponse);
+  if (deterministicResult) {
+    systemPrompt += `\n- Confirmed prices from HTML: salePrice=$${deterministicResult.salePrice}, originalPrice=$${deterministicResult.originalPrice}`;
+  }
 
-  let productData;
   try {
-    const jsonString = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    productData = JSON.parse(jsonString);
-  } catch (parseError) {
-    throw new Error('Failed to parse AI response');
-  }
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Extract product data from this HTML:\n\n${relevantSections.join('\n\n---\n\n')}` }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.1,
+      max_tokens: 500
+    });
 
-  if (productData.error) {
-    throw new Error(productData.error);
-  }
+    const extracted = JSON.parse(completion.choices[0].message.content);
+    logger.log('🤖 AI Response:', extracted);
 
-  if (!productData.name || !productData.imageUrl || productData.salePrice === undefined) {
-    throw new Error('Missing required product fields');
-  }
-
-  const placeholderDomains = ['example.com', 'placeholder.com', 'via.placeholder.com', 'placehold.it', 'dummyimage.com'];
-  const imageUrl = productData.imageUrl.toLowerCase();
-  if (placeholderDomains.some(domain => imageUrl.includes(domain))) {
-    throw new Error('AI returned placeholder image URL');
-  }
-
-  let originalPrice, salePrice, percentOff = 0;
-  let confidence = productData.confidence ? parseInt(productData.confidence) : 50;
-  
-  if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
-    originalPrice = deterministicResult.originalPrice;
-    salePrice = deterministicResult.salePrice;
-    percentOff = deterministicResult.percentOff;
-    confidence = Math.max(confidence, 88);
-    logger.log(`✅ Using deterministic prices: $${salePrice} (was $${originalPrice})`);
-  } else {
-    originalPrice = productData.originalPrice !== null && productData.originalPrice !== undefined ? parseFloat(productData.originalPrice) : null;
-    salePrice = parseFloat(productData.salePrice);
-
-    if (isNaN(salePrice)) {
-      throw new Error('Invalid sale price');
+    if (extracted.error) {
+      throw new Error(extracted.error);
     }
 
-    if (originalPrice !== null) {
-      if (isNaN(originalPrice)) {
-        logger.log(`⚠️  Invalid originalPrice (${productData.originalPrice}), setting to null`);
-        originalPrice = null;
-        percentOff = 0;
-        confidence = Math.max(30, confidence - 20);
-      } else if (originalPrice <= salePrice) {
-        logger.log(`⚠️  Invalid: originalPrice ($${originalPrice}) <= salePrice ($${salePrice}). Setting originalPrice to null.`);
-        originalPrice = null;
-        percentOff = 0;
-        confidence = Math.max(30, confidence - 25);
-      } else if (originalPrice === salePrice) {
-        logger.log(`⚠️  Prices are equal ($${originalPrice}), no discount. Setting originalPrice to null.`);
-        originalPrice = null;
-        percentOff = 0;
-        confidence = Math.max(40, confidence - 15);
-      } else {
-        percentOff = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
-        
-        if (productData.percentOff && Math.abs(percentOff - productData.percentOff) > 2) {
-          logger.log(`⚠️  Percent off mismatch: AI said ${productData.percentOff}%, calculated ${percentOff}%`);
-          confidence = Math.max(40, confidence - 15);
+    let confidence = 75;
+    let name = extracted.name || null;
+    let imageUrl = preExtractedImage || extracted.imageUrl || null;
+    let salePrice = extracted.salePrice ? parseFloat(extracted.salePrice) : null;
+    let originalPrice = extracted.originalPrice ? parseFloat(extracted.originalPrice) : null;
+    let brand = extracted.brand || null;
+
+    if (jsonLdResult?.rawJsonLd?.[0]?.name) {
+      name = jsonLdResult.rawJsonLd[0].name;
+      confidence += 10;
+      testMetadata.confidenceAdjustments.push('+10: name from JSON-LD');
+    }
+
+    if (preExtractedImage) {
+      confidence += 5;
+      testMetadata.confidenceAdjustments.push('+5: image pre-extracted from meta tags');
+    }
+
+    if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
+      salePrice = deterministicResult.salePrice;
+      originalPrice = deterministicResult.originalPrice;
+      confidence = Math.max(confidence, 88);
+      logger.log(`✅ Using deterministic prices: $${salePrice} (was $${originalPrice})`);
+    } else {
+      if (originalPrice && salePrice && originalPrice > salePrice) {
+        const discountPercent = ((originalPrice - salePrice) / originalPrice) * 100;
+        if (discountPercent >= 10 && discountPercent <= 80) {
+          confidence += 3;
+          testMetadata.confidenceAdjustments.push('+3: discount looks reasonable');
         }
       }
     }
-  }
 
-  if (!deterministicResult) {
-    const priceVariants = [
-      `$${salePrice.toFixed(2)}`,
-      salePrice.toFixed(2),
-      String(Math.round(salePrice * 100)),
-      `${Math.floor(salePrice)}`,
-    ];
+    if (!name) throw new Error('Missing product name');
+    if (!imageUrl) throw new Error('Missing image URL');
+    if (!salePrice || isNaN(salePrice)) throw new Error('Missing or invalid sale price');
 
-    const matchedFormat = priceVariants.find(variant => html.includes(variant));
-    const foundInHtml = matchedFormat !== undefined;
-
-    testMetadata.priceValidation.foundInHtml = foundInHtml;
-
-    if (!foundInHtml) {
-      logger.log(`⚠️  Sale price $${salePrice} not found in HTML, possible hallucination`);
-      confidence = Math.max(30, confidence - 20);
-      testMetadata.confidenceAdjustments.push({
-        reason: 'price_not_found_in_html',
-        adjustment: -20
-      });
+    if (salePrice <= 0 || salePrice > 50000) {
+      throw new Error(`Sale price out of reasonable range: $${salePrice}`);
     }
+
+    if (originalPrice !== null) {
+      if (isNaN(originalPrice) || originalPrice <= 0 || originalPrice > 50000) {
+        logger.log(`⚠️  Invalid original price ($${originalPrice}), setting to null`);
+        originalPrice = null;
+      } else if (originalPrice <= salePrice) {
+        logger.log(`⚠️  Original price not higher than sale price, setting to null`);
+        originalPrice = null;
+      }
+    }
+
+    const percentOff = originalPrice ? Math.round(((originalPrice - salePrice) / originalPrice) * 100) : 0;
+
+    testMetadata.phaseUsed = 'ai-extraction';
+    testMetadata.priceValidation.foundInHtml = !!deterministicResult;
+
+    logger.log(`✅ Extracted with AI (confidence: ${confidence}):`, { name, brand, salePrice, originalPrice, percentOff });
+
+    return {
+      name,
+      brand,
+      imageUrl,
+      originalPrice,
+      salePrice,
+      percentOff,
+      url,
+      confidence
+    };
+
+  } catch (error) {
+    if (error.message?.includes('filtered') || error.response?.data?.error?.code === 'content_filter') {
+      logger.log('⚠️  AI content filter triggered, likely a false positive');
+    }
+    throw new Error(`AI extraction failed: ${error.message}`);
+  }
+}
+
+function extractRelevantSections(html) {
+  const sections = [];
+  
+  const productInfoRegex = /<div[^>]*(?:class|id)=["'][^"']*(?:product|item|details)[^"']*["'][^>]*>([\s\S]{50,2000}?)<\/div>/gi;
+  let match;
+  while ((match = productInfoRegex.exec(html)) !== null && sections.length < 5) {
+    sections.push(cleanHtml(match[1]));
   }
 
-  if (confidence < 50) {
-    throw new Error(`Low confidence (${confidence}%) - data may be inaccurate`);
+  const metaTags = [];
+  const metaRegex = /<meta[^>]*(?:property|name)=["'](?:og:|twitter:|product:)[^"']*["'][^>]*content=["']([^"']+)["'][^>]*>/gi;
+  while ((match = metaRegex.exec(html)) !== null) {
+    metaTags.push(match[0]);
+  }
+  if (metaTags.length > 0) {
+    sections.push(metaTags.join('\n'));
   }
 
-  logger.log(`✅ Extracted product (confidence: ${confidence}%):`, { 
-    name: productData.name, 
-    brand: productData.brand, 
-    salePrice, 
-    originalPrice, 
-    percentOff 
-  });
+  return sections;
+}
 
-  testMetadata.phaseUsed = 'ai-extraction';
-
-  return {
-    name: productData.name,
-    brand: productData.brand || null,
-    imageUrl: productData.imageUrl,
-    originalPrice: originalPrice,
-    salePrice: salePrice,
-    percentOff: percentOff,
-    url: url,
-    confidence: confidence
-  };
+function cleanHtml(html) {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
