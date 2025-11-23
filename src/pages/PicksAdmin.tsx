@@ -85,6 +85,7 @@ export function PicksAdmin() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const cancelScrapingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [editForm, setEditForm] = useState({
     percentOff: '',
     promoCode: '',
@@ -332,6 +333,9 @@ export function PicksAdmin() {
 
     const scrapedProducts: any[] = [];
     const failures: any[] = [];
+    
+    // Create and store AbortController
+    abortControllerRef.current = new AbortController();
 
     try {
       // Use streaming endpoint with POST body
@@ -341,7 +345,8 @@ export function PicksAdmin() {
           'Content-Type': 'application/json',
           'auth': auth || ''
         },
-        body: JSON.stringify({ urls: urlList })
+        body: JSON.stringify({ urls: urlList }),
+        signal: abortControllerRef.current.signal
       });
 
       if (!response.ok) {
@@ -355,6 +360,9 @@ export function PicksAdmin() {
         throw new Error('No response body');
       }
 
+      let buffer = '';
+      let currentEvent = '';
+
       while (true) {
         const { done, value } = await reader.read();
         
@@ -366,42 +374,46 @@ export function PicksAdmin() {
           break;
         }
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        // Add new chunk to buffer
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process complete lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.substring(7).trim();
+          } else if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.substring(6));
-              const eventLine = lines[lines.indexOf(line) - 1];
-              const eventType = eventLine?.startsWith('event: ') 
-                ? eventLine.substring(7).trim() 
-                : null;
 
-              if (eventType === 'start') {
+              if (currentEvent === 'start') {
                 toast.info(`Scraping ${data.total} products...`);
-              } else if (eventType === 'scraping') {
+              } else if (currentEvent === 'scraping') {
                 toast.info(`Scraping ${data.progress.current}/${data.progress.total}...`, {
                   duration: 1000
                 });
-              } else if (eventType === 'success') {
+              } else if (currentEvent === 'success') {
                 scrapedProducts.push({
                   ...data.product,
                   confidence: data.confidence,
                   extractionMethod: data.extractionMethod
                 });
                 toast.success(`Scraped: ${data.product.name}`);
-              } else if (eventType === 'error' || eventType === 'skip') {
+              } else if (currentEvent === 'error' || currentEvent === 'skip') {
                 failures.push({
                   url: data.url,
                   error: data.error
                 });
-                if (eventType === 'error') {
+                if (currentEvent === 'error') {
                   toast.error(`Failed: ${data.error}`);
                 }
-              } else if (eventType === 'complete') {
+              } else if (currentEvent === 'complete') {
                 toast.success(`Complete: ${data.successCount} succeeded, ${data.failureCount} failed`);
               }
+              
+              currentEvent = '';
             } catch (e) {
               // Ignore parse errors
             }
@@ -409,16 +421,18 @@ export function PicksAdmin() {
         }
       }
 
-      // Navigate to finalize page with collected results
-      navigate('/admin/picks/finalize', {
-        state: {
-          scrapedProducts,
-          selectedSaleId: selectedSale?.id,
-          saleName: selectedSale?.saleName,
-          salePercentOff: selectedSale?.percentOff,
-          failures
-        }
-      });
+      // Only navigate if not cancelled
+      if (!cancelScrapingRef.current) {
+        navigate('/admin/picks/finalize', {
+          state: {
+            scrapedProducts,
+            selectedSaleId: selectedSale?.id,
+            saleName: selectedSale?.saleName,
+            salePercentOff: selectedSale?.percentOff,
+            failures
+          }
+        });
+      }
 
     } catch (error: any) {
       if (!cancelScrapingRef.current) {
@@ -428,11 +442,15 @@ export function PicksAdmin() {
     } finally {
       setIsLoading(false);
       cancelScrapingRef.current = false;
+      abortControllerRef.current = null;
     }
   };
 
   const handleCancelScraping = () => {
     cancelScrapingRef.current = true;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
   };
 
   const handleScrapePicks = async (e: React.FormEvent) => {
@@ -502,7 +520,7 @@ export function PicksAdmin() {
     await performScraping(protectionWarning.urlsToScrape);
   };
 
-  const handleCancelScraping = () => {
+  const handleCancelProtectionWarning = () => {
     setProtectionWarning({
       show: false,
       store: '',
@@ -1115,7 +1133,7 @@ export function PicksAdmin() {
 
       {/* Protection Warning Modal */}
       <AlertDialog open={protectionWarning.show} onOpenChange={(open) => {
-        if (!open) handleCancelScraping();
+        if (!open) handleCancelProtectionWarning();
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1140,7 +1158,7 @@ export function PicksAdmin() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelScraping} style={{ fontFamily: 'DM Sans, sans-serif' }}>
+            <AlertDialogCancel onClick={handleCancelProtectionWarning} style={{ fontFamily: 'DM Sans, sans-serif' }}>
               Manual Entry
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleProceedWithScraping} style={{ fontFamily: 'DM Sans, sans-serif' }}>
