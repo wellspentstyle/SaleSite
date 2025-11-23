@@ -2683,8 +2683,8 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
     const subject = emailData.headers?.subject || emailData.subject || 'No subject';
     
     // Log the incoming email for debugging
-    console.log('Email from:', from);
-    console.log('Subject:', subject);
+    console.log('📧 Email from:', from);
+    console.log('📧 Subject:', subject);
     
     // Extract email content (try both plain and HTML)
     const emailContent = emailData.plain || emailData.html || emailData.text || emailData.body || '';
@@ -2695,7 +2695,22 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
     }
     
     // Check if this is a Gem login email
-    if (from.includes('gem.app') || subject.toLowerCase().includes('log in to gem')) {
+    // More flexible matching: from gem.app OR subject contains login/log-in related keywords
+    const subjectLower = subject.toLowerCase();
+    const isGemEmail = from.includes('gem.app') || 
+                       subjectLower.includes('gem') ||
+                       (subjectLower.includes('log') && subjectLower.includes('in')) ||
+                       subjectLower.includes('login');
+    
+    console.log('🔍 Gem email check:', {
+      fromIncludesGem: from.includes('gem.app'),
+      subjectIncludesGem: subjectLower.includes('gem'),
+      subjectHasLogIn: subjectLower.includes('log') && subjectLower.includes('in'),
+      subjectHasLogin: subjectLower.includes('login'),
+      isGemEmail
+    });
+    
+    if (isGemEmail) {
       console.log('🔐 Detected Gem login email');
       console.log('📧 Email content preview:', emailContent.substring(0, 500));
       
