@@ -109,6 +109,13 @@ export async function scrapeWithProxy(url, options = {}) {
     // AI extraction with enhanced prompt for department stores
     const systemPrompt = `You are a product page parser extracting from HTML fetched via proxy. This HTML is from a department store (Nordstrom, Saks, etc.) that was accessed through a residential proxy to bypass bot detection.
 
+🚨 CRITICAL JSON FORMAT RULES:
+- Return ONLY valid, parseable JSON
+- NO comments, NO explanatory text, NO code blocks
+- NO placeholder URLs (example.com, placeholder.com, etc.)
+- Extract REAL image URLs from og:image, twitter:image, or <img> tags
+- If you cannot find real data, return {"error": "reason"}
+
 🚨 CRITICAL PRICE RULES:
 
 You MUST identify TWO prices if a sale is active:
@@ -131,11 +138,11 @@ DEPARTMENT STORE SPECIFIC PATTERNS:
 - Saks: data-test="product-price" (sale), regular price in strikethrough nearby
 - Neiman Marcus: class*="price-sale", class*="price-regular"
 
-Return this structure:
+Return ONLY this exact JSON structure (no comments, no extra text):
 {
   "name": "Product Name (no brand)",
   "brand": "Actual Brand",
-  "imageUrl": "Real product image URL",
+  "imageUrl": "https://real-domain.com/actual-image.jpg",
   "originalPrice": 435.00,
   "salePrice": 131.00,
   "percentOff": 70,
@@ -150,8 +157,9 @@ Confidence scoring:
 
 ⚠️ VALIDATION:
 - originalPrice MUST be > salePrice (if both exist)
-- NEVER use placeholder images
-- Return {"error": "..."} if required data missing`;
+- imageUrl MUST be a real URL from the page (check og:image, twitter:image, or <img> tags)
+- Return {"error": "..."} if required data missing
+- Your response must be valid JSON that JSON.parse() can process`;
 
     let userPrompt = contentToSend;
     if (preExtractedImage) {
@@ -178,9 +186,24 @@ Confidence scoring:
 
     let productData;
     try {
-      const jsonString = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      // Clean the AI response
+      let jsonString = aiResponse
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+      
+      // Remove comments only (carefully avoid breaking URLs)
+      // Only match // when it appears after whitespace or at start of line (not after :)
+      jsonString = jsonString
+        .replace(/\s+\/\/[^\n]*/g, '') // Remove // comments (with leading whitespace)
+        .replace(/^\/\/[^\n]*/gm, '') // Remove // comments at start of line
+        .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
+        .replace(/,(\s*[}\]])/g, '$1'); // Remove trailing commas
+      
       productData = JSON.parse(jsonString);
     } catch (parseError) {
+      logger.error('❌ Failed to parse AI response:', parseError.message);
+      logger.error('Raw AI response:', aiResponse);
       throw new Error('Failed to parse AI response');
     }
 
