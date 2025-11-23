@@ -18,6 +18,46 @@ function isDepartmentStore(url) {
   return departmentStores.some(store => hostname.includes(store));
 }
 
+// Determine final errorType from multiple scraper results
+// Logic: RETRYABLE if any scraper had RETRYABLE error (temp issue, worth trying other URLs)
+//        BLOCKING only if ALL scrapers had BLOCKING errors (site blocks us completely)
+//        FATAL if all scrapers had FATAL errors (this specific URL is broken)
+function determineErrorType(...results) {
+  const errorTypes = results
+    .filter(r => !r.success)
+    .map(r => r.errorType || 'UNKNOWN')
+    .filter(t => t !== 'UNKNOWN');
+  
+  if (errorTypes.length === 0) {
+    return 'UNKNOWN';
+  }
+  
+  // If ANY scraper had a RETRYABLE error, consider the whole thing RETRYABLE
+  // This allows other URLs from the same domain to be attempted
+  if (errorTypes.includes('RETRYABLE')) {
+    return 'RETRYABLE';
+  }
+  
+  // If ANY scraper had a FATAL error but not all, also RETRYABLE
+  // (one scraper's fatal error doesn't mean the domain is blocked)
+  if (errorTypes.includes('FATAL') && errorTypes.includes('BLOCKING')) {
+    return 'RETRYABLE';
+  }
+  
+  // Only return BLOCKING if ALL scrapers returned BLOCKING
+  if (errorTypes.every(t => t === 'BLOCKING')) {
+    return 'BLOCKING';
+  }
+  
+  // Only return FATAL if ALL scrapers returned FATAL
+  if (errorTypes.every(t => t === 'FATAL')) {
+    return 'FATAL';
+  }
+  
+  // Default to RETRYABLE to give other URLs a chance
+  return 'RETRYABLE';
+}
+
 export async function scrapeProduct(url, options = {}) {
   const {
     openai,
@@ -221,9 +261,11 @@ export async function scrapeProduct(url, options = {}) {
       }
 
       logger.log('❌ [Orchestrator] All scrapers failed');
+      const finalErrorType = determineErrorType(fastResult, proxyResult, playwrightResult);
       return {
         success: false,
         error: `All scrapers failed. Fast: ${fastResult.error}, Proxy: ${proxyResult.error}, Playwright: ${playwrightResult.error}`,
+        errorType: finalErrorType,
         meta: {
           extractionMethod: 'none',
           confidence: 0,
@@ -234,9 +276,11 @@ export async function scrapeProduct(url, options = {}) {
     }
 
     logger.log('❌ [Orchestrator] Fast and proxy scrapers failed');
+    const finalErrorType = determineErrorType(fastResult, proxyResult);
     return {
       success: false,
       error: `Both scrapers failed. Fast: ${fastResult.error}, Proxy: ${proxyResult.error}`,
+      errorType: finalErrorType,
       meta: {
         extractionMethod: 'none',
         confidence: 0,
@@ -268,9 +312,11 @@ export async function scrapeProduct(url, options = {}) {
     }
 
     logger.log('❌ [Orchestrator] Both scrapers failed');
+    const finalErrorType = determineErrorType(fastResult, playwrightResult);
     return {
       success: false,
       error: `Both scrapers failed. Fast: ${fastResult.error}, Playwright: ${playwrightResult.error}`,
+      errorType: finalErrorType,
       meta: {
         extractionMethod: 'none',
         confidence: 0,
