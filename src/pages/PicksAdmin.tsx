@@ -328,8 +328,13 @@ export function PicksAdmin() {
     setIsLoading(true);
     const auth = sessionStorage.getItem('adminAuth');
 
+    const scrapedProducts: any[] = [];
+    const failures: any[] = [];
+    let isCancelled = false;
+
     try {
-      const response = await fetch(`${API_BASE}/admin/scrape-product`, {
+      // Use streaming endpoint with POST body
+      const response = await fetch(`${API_BASE}/admin/scrape-product-stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -338,34 +343,88 @@ export function PicksAdmin() {
         body: JSON.stringify({ urls: urlList })
       });
 
-      const data = await response.json();
-      
-      if (data.success) {
-        const successes = data.successes || [];
-        const failures = data.failures || [];
-        
-        const scrapedProducts = successes.map((s: any) => ({
-          ...s.product,
-          confidence: s.confidence,
-          extractionMethod: s.extractionMethod
-        }));
-        
-        navigate('/admin/picks/finalize', {
-          state: {
-            scrapedProducts,
-            selectedSaleId: selectedSale?.id,
-            saleName: selectedSale?.saleName,
-            salePercentOff: selectedSale?.percentOff,
-            failures
-          }
-        });
-      } else {
-        toast.error('An error occurred while scraping. Please try again.');
-        setIsLoading(false);
+      if (!response.ok) {
+        throw new Error('Failed to start scraping');
       }
-    } catch (error) {
-      console.error('Scraping error:', error);
-      toast.error('An error occurred while scraping. Please try again.');
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done || isCancelled) {
+          if (isCancelled) {
+            reader.cancel();
+            toast.info('Scraping cancelled');
+          }
+          break;
+        }
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+              const eventLine = lines[lines.indexOf(line) - 1];
+              const eventType = eventLine?.startsWith('event: ') 
+                ? eventLine.substring(7).trim() 
+                : null;
+
+              if (eventType === 'start') {
+                toast.info(`Scraping ${data.total} products...`);
+              } else if (eventType === 'scraping') {
+                toast.info(`Scraping ${data.progress.current}/${data.progress.total}...`, {
+                  duration: 1000
+                });
+              } else if (eventType === 'success') {
+                scrapedProducts.push({
+                  ...data.product,
+                  confidence: data.confidence,
+                  extractionMethod: data.extractionMethod
+                });
+                toast.success(`Scraped: ${data.product.name}`);
+              } else if (eventType === 'error' || eventType === 'skip') {
+                failures.push({
+                  url: data.url,
+                  error: data.error
+                });
+                if (eventType === 'error') {
+                  toast.error(`Failed: ${data.error}`);
+                }
+              } else if (eventType === 'complete') {
+                toast.success(`Complete: ${data.successCount} succeeded, ${data.failureCount} failed`);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+
+      // Navigate to finalize page with collected results
+      navigate('/admin/picks/finalize', {
+        state: {
+          scrapedProducts,
+          selectedSaleId: selectedSale?.id,
+          saleName: selectedSale?.saleName,
+          salePercentOff: selectedSale?.percentOff,
+          failures
+        }
+      });
+
+    } catch (error: any) {
+      if (!isCancelled) {
+        console.error('Scraping error:', error);
+        toast.error('An error occurred while scraping. Please try again.');
+      }
+    } finally {
       setIsLoading(false);
     }
   };

@@ -1874,6 +1874,136 @@ function extractDomain(url) {
   }
 }
 
+// Streaming version of scrape-product that sends results as they're scraped
+app.post('/admin/scrape-product-stream', async (req, res) => {
+  const { auth } = req.headers;
+  const { url, urls, test } = req.body;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  const urlsToScrape = urls || (url ? [url] : []);
+  
+  if (!urlsToScrape || urlsToScrape.length === 0) {
+    return res.status(400).json({ success: false, message: 'URL or URLs array is required' });
+  }
+  
+  // Setup SSE
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  
+  const sendEvent = (event, data) => {
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+  
+  try {
+    console.log(`🔍 Streaming scrape of ${urlsToScrape.length} product(s)`);
+    
+    const failedDomains = new Set();
+    let successCount = 0;
+    let failureCount = 0;
+    
+    // Send initial event
+    sendEvent('start', { total: urlsToScrape.length });
+    
+    for (let i = 0; i < urlsToScrape.length; i++) {
+      const productUrl = urlsToScrape[i];
+      const domain = extractDomain(productUrl);
+      
+      // Check if client disconnected
+      if (req.destroyed) {
+        console.log('  ⚠️  Client disconnected, stopping scrape');
+        break;
+      }
+      
+      // Skip if domain already failed
+      if (failedDomains.has(domain)) {
+        console.log(`  ⏩ Skipping ${productUrl} (domain ${domain} already failed)`);
+        failureCount++;
+        sendEvent('skip', {
+          index: i,
+          url: productUrl,
+          error: `Skipped - domain ${domain} failed on previous URL`,
+          progress: { current: i + 1, total: urlsToScrape.length }
+        });
+        continue;
+      }
+      
+      try {
+        console.log(`  → ${productUrl}`);
+        sendEvent('scraping', {
+          index: i,
+          url: productUrl,
+          progress: { current: i + 1, total: urlsToScrape.length }
+        });
+        
+        const result = await scrapeProduct(productUrl, {
+          openai,
+          enableTestMetadata: test || false,
+          logger: console
+        });
+        
+        if (!result.success) {
+          const errorMsg = result.error || 'Could not extract product data';
+          console.error(`  ❌ Failed: ${errorMsg}`);
+          
+          failedDomains.add(domain);
+          failureCount++;
+          
+          sendEvent('error', {
+            index: i,
+            url: productUrl,
+            error: errorMsg,
+            progress: { current: i + 1, total: urlsToScrape.length }
+          });
+        } else {
+          console.log(`  ✅ Success via ${result.meta.extractionMethod} (confidence: ${result.meta.confidence}%)`);
+          successCount++;
+          
+          sendEvent('success', {
+            index: i,
+            url: productUrl,
+            product: result.product,
+            extractionMethod: result.meta.extractionMethod,
+            confidence: result.meta.confidence,
+            progress: { current: i + 1, total: urlsToScrape.length }
+          });
+        }
+      } catch (error) {
+        console.error(`  ❌ Error scraping ${productUrl}:`, error.message);
+        
+        failedDomains.add(domain);
+        failureCount++;
+        
+        sendEvent('error', {
+          index: i,
+          url: productUrl,
+          error: error.message,
+          progress: { current: i + 1, total: urlsToScrape.length }
+        });
+      }
+    }
+    
+    console.log(`\n📊 Stream complete: ${successCount} succeeded, ${failureCount} failed`);
+    
+    sendEvent('complete', {
+      successCount,
+      failureCount,
+      total: urlsToScrape.length
+    });
+    
+    res.end();
+    
+  } catch (error) {
+    console.error('❌ Streaming scrape error:', error);
+    sendEvent('error', { error: error.message });
+    res.end();
+  }
+});
+
 // Scrape product data from URL(s) using intelligent orchestrator (fast scraper + Playwright fallback)
 app.post('/admin/scrape-product', async (req, res) => {
   const { auth } = req.headers;
