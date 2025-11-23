@@ -1222,19 +1222,14 @@ app.post('/admin/picks', async (req, res) => {
     console.log(`📦 Sale company: ${companyIds.length > 0 ? companyIds[0] : 'None'}`);
     
     // Create records for each pick
-    // Note: ShopMyURL and PercentOff are computed fields in Airtable, don't send them
+    // Note: ShopMyURL, PercentOff, and Company are computed fields in Airtable, don't send them
     const records = picks.map(pick => {
       const fields = {
         ProductURL: cleanUrl(pick.url), // Clean URL to remove tracking parameters
         ProductName: pick.name,
         ImageURL: pick.imageUrl,
-        SaleID: [saleId] // Link to Sales table
+        SaleID: [saleId] // Link to Sales table (Company will be auto-populated via lookup)
       };
-      
-      // Link to Company if available from the sale
-      if (companyIds.length > 0) {
-        fields.Company = companyIds; // Link to Companies table
-      }
       
       // Add brand if available
       if (pick.brand) {
@@ -1349,15 +1344,10 @@ app.post('/admin/manual-picks', async (req, res) => {
         ProductURL: cleanUrl(pick.url),
         ProductName: pick.name,
         ImageURL: pick.imageUrl,
-        SaleID: [saleId],
+        SaleID: [saleId], // Company will be auto-populated via lookup
         EntryType: 'manual',
         Confidence: 100 // Manual entries always 100% confidence
       };
-      
-      // Link to Company if available from the sale
-      if (companyIds.length > 0) {
-        fields.Company = companyIds;
-      }
       
       // Add brand if provided
       if (pick.brand) {
