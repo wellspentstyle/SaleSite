@@ -1,0 +1,248 @@
+#!/usr/bin/env node
+
+/**
+ * Email Extraction System Diagnostics
+ * 
+ * Checks if all components are properly configured.
+ * Run with: node diagnostics.js
+ */
+
+import fetch from 'node-fetch';
+
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m',
+  cyan: '\x1b[36m',
+  dim: '\x1b[2m'
+};
+
+const checks = [];
+
+function check(name, status, message = '') {
+  const icon = status === 'pass' ? '✅' : status === 'warn' ? '⚠️' : '❌';
+  const color = status === 'pass' ? colors.green : status === 'warn' ? colors.yellow : colors.red;
+  
+  console.log(`${icon} ${color}${name}${colors.reset}`);
+  if (message) {
+    console.log(`   ${colors.dim}${message}${colors.reset}`);
+  }
+  
+  checks.push({ name, status, message });
+}
+
+async function runDiagnostics() {
+  console.log(`${colors.bright}${colors.cyan}╔════════════════════════════════════════════════════════╗${colors.reset}`);
+  console.log(`${colors.bright}${colors.cyan}║     Email Extraction System Diagnostics v1.0           ║${colors.reset}`);
+  console.log(`${colors.bright}${colors.cyan}╚════════════════════════════════════════════════════════╝${colors.reset}\n`);
+  
+  // Check 1: Environment Variables
+  console.log(`${colors.bright}🔐 Environment Variables${colors.reset}`);
+  console.log(`${colors.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  
+  if (process.env.ADMIN_PASSWORD) {
+    check('ADMIN_PASSWORD', 'pass', 'Set');
+  } else {
+    check('ADMIN_PASSWORD', 'fail', 'Not set - required for admin endpoints');
+  }
+  
+  if (process.env.CLOUDMAIL_SECRET) {
+    check('CLOUDMAIL_SECRET', 'pass', 'Set - webhook authentication enabled');
+  } else {
+    check('CLOUDMAIL_SECRET', 'warn', 'Not set - webhook is UNPROTECTED');
+  }
+  
+  if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY) {
+    check('OpenAI API Key', 'pass', 'Set');
+  } else {
+    check('OpenAI API Key', 'fail', 'Not set - AI extraction will fail');
+  }
+  
+  if (process.env.AIRTABLE_PAT) {
+    check('AIRTABLE_PAT', 'pass', 'Set');
+  } else {
+    check('AIRTABLE_PAT', 'fail', 'Not set - cannot save to Airtable');
+  }
+  
+  if (process.env.AIRTABLE_BASE_ID) {
+    check('AIRTABLE_BASE_ID', 'pass', `Set (${process.env.AIRTABLE_BASE_ID.substring(0, 8)}...)`);
+  } else {
+    check('AIRTABLE_BASE_ID', 'fail', 'Not set - cannot access Airtable');
+  }
+  
+  console.log('');
+  
+  // Check 2: Server Connectivity
+  console.log(`${colors.bright}🌐 Server Connectivity${colors.reset}`);
+  console.log(`${colors.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  
+  const serverUrl = process.env.API_URL || 'http://localhost:3001';
+  
+  try {
+    const healthResponse = await fetch(`${serverUrl}/health`, { timeout: 5000 });
+    if (healthResponse.ok) {
+      check('Server Health', 'pass', `Server running at ${serverUrl}`);
+    } else {
+      check('Server Health', 'fail', `Server returned ${healthResponse.status}`);
+    }
+  } catch (error) {
+    check('Server Health', 'fail', `Cannot connect to ${serverUrl} - ${error.message}`);
+  }
+  
+  console.log('');
+  
+  // Check 3: AI API Connectivity
+  console.log(`${colors.bright}🤖 AI API Connectivity${colors.reset}`);
+  console.log(`${colors.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+  const baseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || 'https://api.openai.com/v1';
+  
+  if (apiKey) {
+    try {
+      const aiResponse = await fetch(`${baseUrl}/models`, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        },
+        timeout: 10000
+      });
+      
+      if (aiResponse.ok) {
+        check('OpenAI API', 'pass', 'Connection successful');
+      } else if (aiResponse.status === 401) {
+        check('OpenAI API', 'fail', 'Invalid API key');
+      } else {
+        check('OpenAI API', 'fail', `API returned ${aiResponse.status}`);
+      }
+    } catch (error) {
+      check('OpenAI API', 'fail', `Cannot connect - ${error.message}`);
+    }
+  } else {
+    check('OpenAI API', 'fail', 'No API key configured');
+  }
+  
+  console.log('');
+  
+  // Check 4: Airtable Connectivity
+  console.log(`${colors.bright}📊 Airtable Connectivity${colors.reset}`);
+  console.log(`${colors.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  
+  if (process.env.AIRTABLE_PAT && process.env.AIRTABLE_BASE_ID) {
+    try {
+      const airtableUrl = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Sales?maxRecords=1`;
+      const airtableResponse = await fetch(airtableUrl, {
+        headers: {
+          'Authorization': `Bearer ${process.env.AIRTABLE_PAT}`
+        },
+        timeout: 10000
+      });
+      
+      if (airtableResponse.ok) {
+        const data = await airtableResponse.json();
+        check('Airtable Connection', 'pass', `Connected to base (${data.records?.length || 0} sample records)`);
+      } else if (airtableResponse.status === 401) {
+        check('Airtable Connection', 'fail', 'Invalid PAT token');
+      } else if (airtableResponse.status === 404) {
+        check('Airtable Connection', 'fail', 'Base or table not found');
+      } else {
+        check('Airtable Connection', 'fail', `API returned ${airtableResponse.status}`);
+      }
+    } catch (error) {
+      check('Airtable Connection', 'fail', `Cannot connect - ${error.message}`);
+    }
+  } else {
+    check('Airtable Connection', 'fail', 'Missing AIRTABLE_PAT or AIRTABLE_BASE_ID');
+  }
+  
+  console.log('');
+  
+  // Check 5: Webhook Endpoint
+  console.log(`${colors.bright}📬 Webhook Endpoint${colors.reset}`);
+  console.log(`${colors.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  
+  try {
+    const webhookUrl = `${serverUrl}/webhook/agentmail`;
+    const testPayload = {
+      envelope: { from: 'test@example.com' },
+      headers: { subject: 'Test' },
+      plain: 'Test content'
+    };
+    
+    // Send test webhook (expect 401 if auth is enabled, 200 otherwise)
+    const webhookResponse = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(testPayload),
+      timeout: 5000
+    });
+    
+    if (webhookResponse.status === 401) {
+      check('Webhook Endpoint', 'pass', 'Endpoint accessible - auth required (secure)');
+    } else if (webhookResponse.status === 200) {
+      check('Webhook Endpoint', 'warn', 'Endpoint accessible - no auth (INSECURE!)');
+    } else {
+      check('Webhook Endpoint', 'warn', `Endpoint returned ${webhookResponse.status}`);
+    }
+  } catch (error) {
+    check('Webhook Endpoint', 'fail', `Cannot reach webhook - ${error.message}`);
+  }
+  
+  console.log('');
+  
+  // Summary
+  console.log(`${colors.bright}📋 Summary${colors.reset}`);
+  console.log(`${colors.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  
+  const passed = checks.filter(c => c.status === 'pass').length;
+  const warnings = checks.filter(c => c.status === 'warn').length;
+  const failed = checks.filter(c => c.status === 'fail').length;
+  const total = checks.length;
+  
+  console.log(`Total Checks: ${total}`);
+  console.log(`${colors.green}✅ Passed: ${passed}${colors.reset}`);
+  console.log(`${colors.yellow}⚠️  Warnings: ${warnings}${colors.reset}`);
+  console.log(`${colors.red}❌ Failed: ${failed}${colors.reset}`);
+  
+  console.log('');
+  
+  if (failed === 0 && warnings === 0) {
+    console.log(`${colors.green}${colors.bright}🎉 All systems operational!${colors.reset}`);
+    console.log(`${colors.dim}You're ready to process sale emails.${colors.reset}`);
+  } else if (failed === 0) {
+    console.log(`${colors.yellow}${colors.bright}⚠️  System mostly operational with warnings${colors.reset}`);
+    console.log(`${colors.dim}Review warnings above and address if needed.${colors.reset}`);
+  } else {
+    console.log(`${colors.red}${colors.bright}❌ System not ready - fix failed checks${colors.reset}`);
+    console.log(`${colors.dim}Review failed checks above before processing emails.${colors.reset}`);
+  }
+  
+  console.log('');
+  
+  // Next steps
+  console.log(`${colors.bright}🚀 Next Steps${colors.reset}`);
+  console.log(`${colors.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  
+  if (failed > 0) {
+    console.log(`1. Fix the failed checks above`);
+    console.log(`2. Run diagnostics again: node diagnostics.js`);
+  } else {
+    console.log(`1. Run test suite: node test-email-extraction.js`);
+    console.log(`2. Start monitoring: node email-monitor.js`);
+    console.log(`3. Test real emails: node analyze-rejection.js <email-file.txt>`);
+  }
+  
+  console.log('');
+  
+  // Exit with appropriate code
+  process.exit(failed > 0 ? 1 : 0);
+}
+
+// Run diagnostics
+runDiagnostics().catch(error => {
+  console.error(`${colors.red}❌ Diagnostic error:${colors.reset}`, error.message);
+  process.exit(1);
+});

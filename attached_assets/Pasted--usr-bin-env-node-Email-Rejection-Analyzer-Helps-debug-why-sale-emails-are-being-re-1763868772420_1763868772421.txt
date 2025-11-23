@@ -1,0 +1,274 @@
+#!/usr/bin/env node
+
+/**
+ * Email Rejection Analyzer
+ * 
+ * Helps debug why sale emails are being rejected by the AI.
+ * Analyzes email content and shows what the AI sees.
+ * 
+ * Run with: node analyze-rejection.js <email-file.txt>
+ * 
+ * Or provide email content via stdin:
+ * cat email.txt | node analyze-rejection.js
+ */
+
+import OpenAI from 'openai';
+import fs from 'fs';
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
+
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  dim: '\x1b[2m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m',
+  gray: '\x1b[90m'
+};
+
+// Read email content
+async function readEmailContent() {
+  const args = process.argv.slice(2);
+  
+  if (args.length > 0) {
+    // Read from file
+    const filepath = args[0];
+    if (!fs.existsSync(filepath)) {
+      console.error(`${colors.red}Error: File not found: ${filepath}${colors.reset}`);
+      process.exit(1);
+    }
+    return fs.readFileSync(filepath, 'utf-8');
+  } else if (!process.stdin.isTTY) {
+    // Read from stdin
+    const chunks = [];
+    for await (const chunk of process.stdin) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks).toString('utf-8');
+  } else {
+    console.error(`${colors.red}Error: No email content provided${colors.reset}`);
+    console.log('Usage:');
+    console.log('  node analyze-rejection.js <email-file.txt>');
+    console.log('  cat email.txt | node analyze-rejection.js');
+    process.exit(1);
+  }
+}
+
+// Extract metadata from email
+function extractMetadata(emailContent) {
+  const lines = emailContent.split('\n');
+  
+  let from = 'Unknown';
+  let subject = 'Unknown';
+  let body = emailContent;
+  
+  // Try to extract From: and Subject: headers if present
+  const fromMatch = emailContent.match(/^From:\s*(.+)$/m);
+  const subjectMatch = emailContent.match(/^Subject:\s*(.+)$/m);
+  
+  if (fromMatch) {
+    from = fromMatch[1].trim();
+  }
+  
+  if (subjectMatch) {
+    subject = subjectMatch[1].trim();
+  }
+  
+  // Remove headers from body if they exist
+  if (fromMatch || subjectMatch) {
+    const headerEndIndex = emailContent.search(/\n\n/);
+    if (headerEndIndex > 0) {
+      body = emailContent.substring(headerEndIndex + 2);
+    }
+  }
+  
+  return { from, subject, body };
+}
+
+// Analyze with AI
+async function analyzeWithAI(from, subject, body) {
+  console.log(`${colors.cyan}🤖 Analyzing with AI...${colors.reset}\n`);
+  
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `You are a sales email parser. Extract sale information from TIME-LIMITED PROMOTIONAL SALES ONLY.
+
+REJECT these types of emails (return {"error": "Not a promotional sale email"}):
+- Welcome emails with first-order discounts (e.g., "Welcome! Get 10% off")
+- New customer signup bonuses
+- Newsletter/marketing emails without time-limited sales
+- Referral program emails
+- Account verification emails
+- Emails with keywords: "welcome", "thanks for signing up", "verify account", "first order"
+
+ACCEPT these types of emails:
+- Flash sales with deadlines (e.g., "48-hour sale", "Weekend only")
+- Seasonal sales (e.g., "Holiday Sale - 30% off until Dec 25")
+- Clearance/End-of-season sales
+- Event sales (e.g., "Black Friday Sale")
+
+Return this JSON structure for VALID PROMOTIONAL SALES:
+{
+  "company": "Brand Name (as it appears in email)",
+  "percentOff": 30,
+  "saleUrl": "https://example.com/sale",
+  "discountCode": "CODE123",
+  "startDate": "2025-11-22",
+  "endDate": "2025-11-25",
+  "confidence": 85,
+  "reasoning": "Brief explanation of why this is/isn't a promotional sale"
+}
+
+Confidence scoring:
+- 90-100: Very clear promotional sale with explicit dates and terms
+- 75-89: Clear sale but missing some details (like end date)
+- 60-74: Likely a sale but ambiguous wording
+- Below 60: Questionable - likely welcome email or unclear offer
+
+Rules:
+- company: Extract exact brand name from email
+- percentOff: Extract percentage as number (estimate if range like "up to 30%", use midpoint)
+- saleUrl: Main shopping/sale link (prefer link labeled "Shop Sale" over homepage)
+- discountCode: Only if explicitly mentioned (use null if auto-applied at checkout)
+- startDate: Use today's date (2025-11-22) in YYYY-MM-DD format
+- endDate: Extract if mentioned, otherwise null
+- confidence: 1-100 based on clarity
+- reasoning: Brief explanation of your decision
+
+Return ONLY valid JSON, no markdown formatting.`
+      },
+      {
+        role: 'user',
+        content: `Email from: ${from}
+Subject: ${subject}
+
+Content:
+${body.substring(0, 4000)}`
+      }
+    ],
+    temperature: 0.1,
+  });
+  
+  return completion.choices[0].message.content.trim();
+}
+
+// Display analysis
+function displayAnalysis(from, subject, body, aiResponse) {
+  console.log(`${colors.bright}${colors.blue}╔════════════════════════════════════════════════════════╗${colors.reset}`);
+  console.log(`${colors.bright}${colors.blue}║           Email Rejection Analysis Report              ║${colors.reset}`);
+  console.log(`${colors.bright}${colors.blue}╚════════════════════════════════════════════════════════╝${colors.reset}\n`);
+  
+  // Email metadata
+  console.log(`${colors.bright}📧 Email Metadata${colors.reset}`);
+  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  console.log(`From: ${colors.cyan}${from}${colors.reset}`);
+  console.log(`Subject: ${colors.cyan}${subject}${colors.reset}`);
+  console.log(`Body Length: ${body.length} characters\n`);
+  
+  // Body preview
+  console.log(`${colors.bright}📄 Email Body Preview${colors.reset}`);
+  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  console.log(`${colors.dim}${body.substring(0, 300)}...${colors.reset}\n`);
+  
+  // Parse AI response
+  let data;
+  try {
+    const jsonString = aiResponse
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
+    data = JSON.parse(jsonString);
+  } catch (error) {
+    console.log(`${colors.red}❌ Failed to parse AI response${colors.reset}`);
+    console.log(`${colors.dim}Raw response:${colors.reset}`);
+    console.log(aiResponse);
+    return;
+  }
+  
+  // AI Analysis
+  console.log(`${colors.bright}🤖 AI Analysis${colors.reset}`);
+  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  
+  if (data.error) {
+    console.log(`${colors.red}❌ REJECTED${colors.reset}`);
+    console.log(`Reason: ${colors.yellow}${data.error}${colors.reset}`);
+  } else {
+    const confidenceColor = data.confidence >= 80 ? colors.green :
+                           data.confidence >= 60 ? colors.yellow : colors.red;
+    const wouldPass = data.confidence >= 60;
+    const statusIcon = wouldPass ? '✅' : '❌';
+    const statusText = wouldPass ? 'WOULD PASS' : 'WOULD FAIL';
+    const statusColor = wouldPass ? colors.green : colors.red;
+    
+    console.log(`${statusColor}${statusIcon} ${statusText}${colors.reset}`);
+    console.log(`Confidence: ${confidenceColor}${data.confidence}%${colors.reset}`);
+    console.log(`\nExtracted Data:`);
+    console.log(`  Company: ${colors.bright}${data.company}${colors.reset}`);
+    console.log(`  Discount: ${colors.bright}${data.percentOff}%${colors.reset}`);
+    console.log(`  Code: ${data.discountCode || colors.dim + 'None' + colors.reset}`);
+    console.log(`  Dates: ${data.startDate} → ${data.endDate || colors.dim + 'None' + colors.reset}`);
+    console.log(`  URL: ${colors.dim}${data.saleUrl}${colors.reset}`);
+  }
+  
+  if (data.reasoning) {
+    console.log(`\n${colors.bright}Reasoning:${colors.reset}`);
+    console.log(`${colors.dim}${data.reasoning}${colors.reset}`);
+  }
+  
+  // Recommendations
+  console.log(`\n${colors.bright}💡 Recommendations${colors.reset}`);
+  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  
+  if (data.error) {
+    console.log(`${colors.yellow}This email was correctly rejected.${colors.reset}`);
+    console.log(`It appears to be a ${data.error.toLowerCase()}.`);
+  } else if (data.confidence < 60) {
+    console.log(`${colors.yellow}This email would be rejected due to low confidence.${colors.reset}`);
+    console.log(`\nTo improve detection:`);
+    console.log(`1. Ensure the email has clear sale dates`);
+    console.log(`2. Make sure discount is prominently displayed`);
+    console.log(`3. Include clear "Shop Sale" links`);
+    console.log(`4. Avoid welcome/signup language`);
+  } else if (data.confidence < 75) {
+    console.log(`${colors.green}This email would pass, but confidence is moderate.${colors.reset}`);
+    console.log(`\nTo improve confidence:`);
+    console.log(`1. Include explicit end dates`);
+    console.log(`2. Use clear sale terminology (Flash Sale, Weekend Sale, etc.)`);
+    console.log(`3. Provide discount codes prominently`);
+  } else {
+    console.log(`${colors.green}✅ This is a strong promotional sale email!${colors.reset}`);
+    console.log(`The AI successfully detected all key components.`);
+  }
+  
+  console.log('');
+}
+
+// Main
+async function main() {
+  try {
+    console.log(`${colors.cyan}📊 Email Rejection Analyzer${colors.reset}\n`);
+    
+    const emailContent = await readEmailContent();
+    const { from, subject, body } = extractMetadata(emailContent);
+    
+    const aiResponse = await analyzeWithAI(from, subject, body);
+    
+    displayAnalysis(from, subject, body, aiResponse);
+    
+  } catch (error) {
+    console.error(`${colors.red}❌ Error:${colors.reset}`, error.message);
+    console.error(error.stack);
+    process.exit(1);
+  }
+}
+
+main();
