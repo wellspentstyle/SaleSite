@@ -795,19 +795,29 @@ ${JSON.stringify(diversityResults, null, 2)}`
 
         const descriptionResponse = await anthropic.messages.create({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 180,
+          max_tokens: 200,
           messages: [{
             role: 'user',
-            content: `Write a concise 1-2 sentence brand description for ${brandName} (~60 words). The audience is a smart shopper who knows similar brands. The description should: (1) position the brand relative to others they'd know, (2) describe design philosophy in specific terms (fabrics, cuts, details), not vague words like "elevated" or "timeless".
+            content: `Write a 2-sentence brand description for ${brandName}. The audience is a smart, savvy shopper who actively seeks out new brands and likely already shops at similar labels—they're discerning, know quality when they see it, and are turned off by generic marketing speak or jargon. The description should: (1) position the brand in relation to other brands this shopper would know, highlighting what makes it different or fill a gap, (2) communicate the brand's design philosophy or point of view in a way that feels specific and informed—mention actual details like fabrication choices, signature silhouettes, or a recognizable aesthetic POV, not vague words like "elevated," "timeless," or "effortless."
 
 Context:
-- Type: Brand
 - Categories: ${finalCategory || 'Fashion'}
 - Price Range: ${priceRange || 'Not available'}
 - Values: ${valuesData.values || 'None'}
 - Sample Products: ${productContext}
 
-Write ONLY the description, no preamble.`
+Examples:
+Tibi: If you've ever wished The Row had a personality or that Lemaire came in colors, Tibi is probably already in your cart. Amy Smilovic designs clothes that respect your intelligence—pieces with enough edge to feel special but enough restraint to work with everything you already own.
+
+Toteme: If you're drawn to Scandinavian minimalism but find COS too mall-adjacent and The Row too expensive, Toteme is the answer you didn't know you needed. Elin Kling and Karl Lindman design clothes where every proportion feels considered—the kind of pieces that look deceptively simple until you try them on and realize the cut is doing all the work.
+
+Khaite: For when you want clothes that feel like fashion without the performance anxiety of actually wearing "fashion." Catherine Holstein takes classic American sportswear codes—the cashmere sweater, the perfect jean, the white shirt—and tweaks them just enough that you look like you have a secret.
+
+Rachel Comey: If you love the idea of artsy Brooklyn but want clothes that actually work in your life, Rachel Comey has been doing this longer and better than anyone else. She's a master of the unexpected detail—a twisted seam, an asymmetric hem, a print that somehow reads as neutral—so you get to feel interesting without looking like you're trying.
+
+Dries Van Noten: If you're bored of minimalism and ready for pattern, color, and textile obsession at the highest level, Dries is in a league of his own. He's a master of making florals, jacquards, and unexpected combinations feel sophisticated and wearable—clothes for people who trust their own taste and want pieces that reveal more every time you look at them.
+
+Write ONLY the 2-sentence description for ${brandName}, no preamble.`
           }]
         });
 
