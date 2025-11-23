@@ -1913,12 +1913,6 @@ app.post('/admin/scrape-product-stream', async (req, res) => {
       const productUrl = urlsToScrape[i];
       const domain = extractDomain(productUrl);
       
-      // Check if client disconnected
-      if (req.destroyed) {
-        console.log('  ⚠️  Client disconnected, stopping scrape');
-        break;
-      }
-      
       // Skip if domain already failed
       if (failedDomains.has(domain)) {
         console.log(`  ⏩ Skipping ${productUrl} (domain ${domain} already failed)`);
