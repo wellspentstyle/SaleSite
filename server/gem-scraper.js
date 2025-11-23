@@ -111,8 +111,10 @@ export async function scrapeGemItems(magicLink, options = {}) {
   logger.log('📍 Last synced item ID:', marker.lastItemId || 'none (first run)');
 
   let browser;
+  let page;
+  
   try {
-    // Try to find Chromium executable (different paths in dev vs production)
+    // Try to find Chromium executable
     let chromiumPath = null;
     try {
       chromiumPath = execSync('which chromium', { encoding: 'utf-8' }).trim();
@@ -130,7 +132,8 @@ export async function scrapeGemItems(magicLink, options = {}) {
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--disable-blink-features=AutomationControlled'
       ]
     };
     
@@ -142,48 +145,220 @@ export async function scrapeGemItems(magicLink, options = {}) {
     browser = await chromium.launch(launchOptions);
 
     const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 },
+      locale: 'en-US',
+      timezoneId: 'America/New_York'
     });
 
-    const page = await context.newPage();
+    page = await context.newPage();
 
-    logger.log('🔐 Authenticating with magic link...');
-    await page.goto(magicLink, { waitUntil: 'networkidle', timeout: 30000 });
-
-    logger.log('📱 Navigating to saved items...');
-    await page.waitForTimeout(2000);
+    // IMPROVED: Better magic link authentication with verification
+    logger.log('🔐 Navigating to magic link...');
+    logger.log(`🔗 Magic link: ${magicLink.substring(0, 50)}...`);
     
-    await page.goto('https://gem.app/my-gems', { waitUntil: 'networkidle', timeout: 30000 });
+    try {
+      const response = await page.goto(magicLink, { 
+        waitUntil: 'networkidle', 
+        timeout: 45000 
+      });
+      
+      logger.log(`📊 Response status: ${response.status()}`);
+      logger.log(`📍 Current URL after magic link: ${page.url()}`);
+      
+      // Take screenshot for debugging
+      await page.screenshot({ path: '/tmp/gem-auth-1-after-link.png', fullPage: true });
+      logger.log('📸 Screenshot saved: /tmp/gem-auth-1-after-link.png');
+      
+    } catch (navError) {
+      logger.error(`❌ Failed to navigate to magic link: ${navError.message}`);
+      throw new Error(`Magic link navigation failed: ${navError.message}`);
+    }
 
-    logger.log('⏳ Waiting for items to load...');
-    await page.waitForTimeout(3000);
+    // IMPROVED: Wait for authentication to complete and verify success with polling
+    logger.log('⏳ Waiting for authentication to complete...');
+    
+    // Poll for authentication indicators with timeout
+    const maxAuthWaitMs = 15000; // 15 seconds total
+    const pollIntervalMs = 1000; // Check every 1 second
+    const startTime = Date.now();
+    let isAuthenticated = false;
+    let authIndicator = null;
+    
+    while (Date.now() - startTime < maxAuthWaitMs) {
+      const currentUrl = page.url();
+      logger.log(`📍 Polling auth... Current URL: ${currentUrl}`);
+      
+      // Check if we're authenticated by looking for signs of logged-in state
+      const authCheck = await page.evaluate(() => {
+        // Check for common auth indicators
+        const hasUserMenu = document.querySelector('[data-testid="user-menu"]') !== null;
+        const hasProfileLink = document.querySelector('a[href*="/profile"]') !== null;
+        const hasMyGemsLink = document.querySelector('a[href*="/my-gems"]') !== null;
+        
+        // Check for logout button using standard DOM methods
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const hasLogoutButton = buttons.some(btn => 
+          btn.textContent.toLowerCase().includes('log out') || 
+          btn.textContent.toLowerCase().includes('logout')
+        );
+        
+        // Check if we're NOT on login page
+        const notOnLoginPage = !window.location.href.includes('/login') && 
+                               !window.location.href.includes('/requestEmailLogIn');
+        
+        // Return which indicator we found
+        let indicator = null;
+        if (hasUserMenu) indicator = 'user-menu';
+        else if (hasProfileLink) indicator = 'profile-link';
+        else if (hasMyGemsLink) indicator = 'my-gems-link';
+        else if (hasLogoutButton) indicator = 'logout-button';
+        
+        return {
+          authenticated: (hasUserMenu || hasProfileLink || hasMyGemsLink || hasLogoutButton) && notOnLoginPage,
+          indicator: indicator,
+          notOnLoginPage: notOnLoginPage
+        };
+      });
+      
+      if (authCheck.authenticated) {
+        isAuthenticated = true;
+        authIndicator = authCheck.indicator;
+        logger.log(`✅ Authentication detected via: ${authIndicator}`);
+        break;
+      }
+      
+      // If we're still on login page, keep waiting
+      if (!authCheck.notOnLoginPage) {
+        logger.log('⏳ Still on login page, waiting...');
+      } else {
+        logger.log('⏳ Redirected but no auth indicators yet, waiting...');
+      }
+      
+      await page.waitForTimeout(pollIntervalMs);
+    }
+    
+    const currentUrl = page.url();
+    logger.log(`📍 Final URL after auth wait: ${currentUrl}`);
+    logger.log(`🔐 Authentication check: ${isAuthenticated ? 'SUCCESS' : 'FAILED'}`);
+    
+    if (!isAuthenticated) {
+      // Take screenshot of failure state
+      await page.screenshot({ path: '/tmp/gem-auth-2-failed.png', fullPage: true });
+      logger.log('📸 Failed auth screenshot: /tmp/gem-auth-2-failed.png');
+      
+      // Get page title and any error messages
+      const title = await page.title();
+      const errorText = await page.evaluate(() => {
+        const errorEl = document.querySelector('[class*="error"]') || 
+                       document.querySelector('[role="alert"]');
+        return errorEl ? errorEl.textContent : null;
+      });
+      
+      logger.error(`❌ Authentication failed after ${maxAuthWaitMs/1000}s. Page title: "${title}"`);
+      if (errorText) {
+        logger.error(`❌ Error message: ${errorText}`);
+      }
+      
+      throw new Error('Magic link authentication failed - not logged in after using link');
+    }
+    
+    logger.log('✅ Successfully authenticated!');
+    await page.screenshot({ path: '/tmp/gem-auth-3-success.png', fullPage: true });
+    logger.log('📸 Success screenshot: /tmp/gem-auth-3-success.png');
+
+    // IMPROVED: Navigate to saved items with better error handling
+    logger.log('📱 Navigating to my-gems page...');
+    
+    try {
+      await page.goto('https://gem.app/my-gems', { 
+        waitUntil: 'domcontentloaded', 
+        timeout: 30000 
+      });
+      
+      logger.log(`📍 Current URL: ${page.url()}`);
+      
+      // Wait for items to load
+      logger.log('⏳ Waiting for items to load...');
+      
+      // Try multiple selectors that might indicate items are loaded
+      const itemsLoaded = await Promise.race([
+        page.waitForSelector('[data-testid="gem-card"]', { timeout: 10000 }).then(() => true),
+        page.waitForSelector('.gem-card', { timeout: 10000 }).then(() => true),
+        page.waitForSelector('article', { timeout: 10000 }).then(() => true),
+        page.waitForTimeout(10000).then(() => false)
+      ]);
+      
+      if (!itemsLoaded) {
+        logger.log('⚠️  No item selectors found, but continuing anyway...');
+      } else {
+        logger.log('✅ Items loaded successfully');
+      }
+      
+      await page.screenshot({ path: '/tmp/gem-items-page.png', fullPage: true });
+      logger.log('📸 Items page screenshot: /tmp/gem-items-page.png');
+      
+    } catch (navError) {
+      logger.error(`❌ Failed to navigate to my-gems: ${navError.message}`);
+      await page.screenshot({ path: '/tmp/gem-nav-error.png', fullPage: true });
+      throw new Error(`Navigation to my-gems failed: ${navError.message}`);
+    }
 
     logger.log('🔍 Extracting saved items...');
 
     const items = await page.evaluate((lastItemId) => {
       const results = [];
-      const itemCards = document.querySelectorAll('[data-testid="gem-card"], .gem-card, article, [class*="card"], [class*="item"]');
+      
+      // Try multiple selectors for item cards
+      const selectors = [
+        '[data-testid="gem-card"]',
+        '.gem-card',
+        'article',
+        '[class*="card"]',
+        '[class*="item"]',
+        '[class*="product"]'
+      ];
+      
+      let itemCards = [];
+      for (const selector of selectors) {
+        itemCards = document.querySelectorAll(selector);
+        if (itemCards.length > 0) {
+          console.log(`Found ${itemCards.length} items with selector: ${selector}`);
+          break;
+        }
+      }
+      
+      if (itemCards.length === 0) {
+        console.log('No item cards found on page');
+        return results;
+      }
 
       for (const card of itemCards) {
         try {
+          // Find link
           const linkElement = card.querySelector('a[href*="http"]') || card.querySelector('a');
           if (!linkElement) continue;
 
           const url = linkElement.href;
           if (!url || url.includes('gem.app')) continue;
 
+          // Find image
           const imgElement = card.querySelector('img');
           const imageUrl = imgElement?.src || '';
 
+          // Get all text content
           const textContent = card.innerText || '';
           const lines = textContent.split('\n').map(l => l.trim()).filter(l => l);
 
+          // Extract price
           const priceMatch = textContent.match(/\$[\d,]+(?:\.\d{2})?/);
           const price = priceMatch ? parseFloat(priceMatch[0].replace(/[$,]/g, '')) : null;
 
+          // Extract size
           const sizeMatch = textContent.match(/size[:\s]*([^\n]+)/i);
           const size = sizeMatch ? sizeMatch[1].trim() : null;
 
+          // Extract name and brand
           let name = '';
           let brand = '';
 
@@ -200,12 +375,16 @@ export async function scrapeGemItems(magicLink, options = {}) {
             }
           }
 
+          // Extract marketplace
           const urlObj = new URL(url);
           const marketplace = urlObj.hostname.replace(/^www\./, '');
 
+          // Create unique item ID
           const itemId = url + '||' + (name || 'unnamed');
 
+          // Stop if we've reached the last synced item
           if (itemId === lastItemId) {
+            console.log('Reached last synced item, stopping');
             return results;
           }
 
@@ -231,6 +410,17 @@ export async function scrapeGemItems(magicLink, options = {}) {
 
     logger.log(`✅ Extracted ${items.length} items from page`);
 
+    if (items.length === 0) {
+      logger.log('⚠️  No items found on page. This could mean:');
+      logger.log('   1. You have no saved items in Gem');
+      logger.log('   2. The page structure changed');
+      logger.log('   3. Items failed to load');
+      
+      // Get page HTML for debugging
+      const bodyText = await page.evaluate(() => document.body.innerText);
+      logger.log('📄 Page text preview:', bodyText.substring(0, 500));
+    }
+
     await browser.close();
 
     const itemsToSave = items.slice(0, maxItems);
@@ -252,6 +442,21 @@ export async function scrapeGemItems(magicLink, options = {}) {
 
   } catch (error) {
     logger.error('❌ Gem scraper error:', error.message);
+    logger.error('Stack trace:', error.stack);
+    
+    // Try to get current page state for debugging
+    if (page) {
+      try {
+        const url = page.url();
+        const title = await page.title();
+        logger.error(`❌ Error occurred at URL: ${url}`);
+        logger.error(`❌ Page title: ${title}`);
+        await page.screenshot({ path: '/tmp/gem-error-state.png', fullPage: true });
+        logger.error('📸 Error state screenshot: /tmp/gem-error-state.png');
+      } catch (debugError) {
+        logger.error('⚠️  Could not capture debug info:', debugError.message);
+      }
+    }
     
     if (browser) {
       await browser.close();
