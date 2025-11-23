@@ -444,7 +444,10 @@ export function ManualPickEntry() {
                 Saving...
               </>
             ) : (
-              `Save ${picks.length} Pick(s)`
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save
+              </>
             )}
           </Button>
         </div>

@@ -579,6 +579,7 @@ export function PicksAdmin() {
                   className="border bg-white cursor-pointer transition-all hover:shadow-md"
                   style={{ 
                     padding: '20px', 
+                    paddingRight: '60px',
                     borderRadius: '4px',
                     borderColor: '#e5e7eb',
                     position: 'relative'
@@ -590,20 +591,70 @@ export function PicksAdmin() {
                     e.currentTarget.style.borderColor = '#e5e7eb';
                   }}
                 >
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="mb-3">
                     <h3 
                       style={{ 
                         fontFamily: 'DM Sans, sans-serif', 
                         fontWeight: 600, 
-                        fontSize: '16px',
-                        flex: 1
+                        fontSize: '16px'
                       }}
                     >
                       {sale.saleName}
                     </h3>
+                  </div>
+                  
+                  <div 
+                    style={{ 
+                      position: 'absolute', 
+                      top: '20px', 
+                      right: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      alignItems: 'center'
+                    }}
+                  >
                     {sale.saleUrl && (
-                      <ExternalLink className="h-4 w-4 text-muted-foreground ml-2 flex-shrink-0" />
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" style={{ color: '#6b7280' }} />
                     )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditDialog(sale, e);
+                      }}
+                      style={{ 
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        color: '#6b7280'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#374151'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (sale.live === 'YES') {
+                          setDeactivateSale(sale);
+                        } else {
+                          handleToggleActive(sale, e);
+                        }
+                      }}
+                      style={{ 
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        color: '#6b7280'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#374151'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
+                    >
+                      {sale.live === 'YES' ? <X className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                    </button>
                   </div>
                   
                   <div className="space-y-2">
@@ -634,55 +685,6 @@ export function PicksAdmin() {
                         Code: <span className="font-mono">{sale.promoCode}</span>
                       </p>
                     )}
-                    
-                    <div 
-                      style={{ 
-                        position: 'absolute', 
-                        bottom: '20px', 
-                        right: '20px',
-                        display: 'flex',
-                        gap: '12px'
-                      }}
-                    >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenEditDialog(sale, e);
-                        }}
-                        style={{ 
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          color: '#6b7280'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#374151'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (sale.live === 'YES') {
-                            setDeactivateSale(sale);
-                          } else {
-                            handleToggleActive(sale, e);
-                          }
-                        }}
-                        style={{ 
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          color: '#6b7280'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#374151'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
-                      >
-                        {sale.live === 'YES' ? <X className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                      </button>
-                    </div>
                   </div>
                 </div>
               ))}
