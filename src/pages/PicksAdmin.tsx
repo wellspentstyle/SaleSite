@@ -653,7 +653,7 @@ export function PicksAdmin() {
             </div>
           )}
         </>
-      ) : (
+      ) : currentView === 'url-entry' ? (
         <div className="border border-border bg-white" style={{ padding: '32px', borderRadius: '4px' }}>
           <div className="mb-6">
             <Button
