@@ -1196,11 +1196,12 @@ Requirements:
         continue;
       }
       
-      // URL validation - must be from official domain
+      // URL validation - must be from official domain or subdomain
       try {
         const urlObj = new URL(product.url);
         const urlDomain = urlObj.hostname.replace('www.', '');
-        if (urlDomain === officialDomain) {
+        // Accept exact match OR subdomains (e.g., uk.stinegoya.com for stinegoya.com)
+        if (urlDomain === officialDomain || urlDomain.endsWith('.' + officialDomain)) {
           validatedProducts.push(product);
           console.log(`✅ ${product.priceConfidence || 'unknown'} confidence: "${product.name}" - $${product.price}`);
         } else {
