@@ -31,6 +31,15 @@ export function FeaturedSaleCard({ sale, onViewPicks }: FeaturedSaleCardProps) {
     return daysUntilEnd > 0 && daysUntilEnd <= 3 && isActiveNow();
   };
 
+  const isComingSoon = () => {
+    if (!sale.startDate) return false;
+    const now = new Date();
+    const start = new Date(sale.startDate);
+    const daysUntilStart = (start.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    
+    return daysUntilStart > 0 && daysUntilStart <= 7;
+  };
+
   return (
     <div className="border border-border hover:border-foreground transition-colors bg-white h-full flex flex-col overflow-hidden">
       {/* Featured Image */}
@@ -54,6 +63,11 @@ export function FeaturedSaleCard({ sale, onViewPicks }: FeaturedSaleCardProps) {
               </span>
             </div>
             <div className="flex gap-2">
+              {isComingSoon() && (
+                <Badge variant="warning" className="text-xs px-2.5 py-1">
+                  Coming Soon
+                </Badge>
+              )}
               {isEndingSoon() && (
                 <Badge variant="destructive" className="text-xs px-2.5 py-1">
                   Ending Soon
