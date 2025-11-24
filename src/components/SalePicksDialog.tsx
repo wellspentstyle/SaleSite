@@ -27,11 +27,6 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
           <DialogTitle style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '32px' }}>
             Our Faves from {sale.brandName}
           </DialogTitle>
-          {sale.companyType === 'Brand' && sale.description && (
-            <DialogDescription style={{ fontFamily: 'Crimson Pro, serif', fontSize: '16px', lineHeight: '1.6', marginTop: '8px' }}>
-              {sale.description}
-            </DialogDescription>
-          )}
         </DialogHeader>
         
         {sale.discountCode && (
