@@ -5,11 +5,22 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const getSiteUrl = () => {
+  if (process.env.REPLIT_DEPLOYMENT) {
+    return 'https://www.wellspentstyle.com';
+  }
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  }
+  return 'http://localhost:5000';
+};
+
 export default defineConfig({
   plugins: [react()],
   define: {
     'import.meta.env.VITE_AIRTABLE_PAT': JSON.stringify(process.env.AIRTABLE_PAT),
     'import.meta.env.VITE_AIRTABLE_BASE_ID': JSON.stringify(process.env.AIRTABLE_BASE_ID),
+    'import.meta.env.VITE_SITE_URL': JSON.stringify(getSiteUrl()),
   },
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
