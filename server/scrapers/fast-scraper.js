@@ -1,157 +1,128 @@
-// FAST SCRAPER WITH GOOGLE SHOPPING API
-// Primary: Google Shopping API for name, image, original price
-// Secondary: Page fetch for fresh sale price
-// Fallback: Existing JSON-LD and HTML extraction
+// SIMPLIFIED PRODUCT SCRAPER
+// Flow: AI URL inference → Google Shopping → JSON-LD → AI extraction
 
 export async function scrapeProduct(url, options = {}) {
   const {
     openai,
-    serperApiKey = process.env.SERPER_API_KEY,
     scraperApiKey = process.env.SCRAPER_API_KEY,
     fetchImpl = fetch,
     enableTestMetadata = false,
-    maxRetries = 3,
     logger = console,
-    shouldAutofillBrand = () => true // Default to always auto-fill
+    shouldAutofillBrand = () => true
   } = options;
 
   if (!openai) {
-    const error = new Error('OpenAI client is required');
-    error.errorType = 'FATAL';
-    throw error;
+    throw createError('OpenAI client is required', 'FATAL');
   }
 
   const startTime = Date.now();
   const testMetadata = {
     phaseUsed: null,
-    priceValidation: {
-      foundInHtml: false,
-      checkedFormats: []
-    },
-    imageExtraction: {
-      source: null,
-      preExtracted: false
-    },
-    confidenceAdjustments: [],
     retryCount: 0
   };
 
-  // Wrap the entire scraping logic in retry mechanism
   return await retryWithBackoff(
     async () => {
       try {
         validateUrl(url);
-
-        logger.log(`🔍 [Fast Scraper] Scraping product: ${url}`);
+        logger.log(`🔍 [Scraper] Starting: ${url}`);
 
         // ============================================
-        // STEP 1: TRY GOOGLE SHOPPING API FIRST
+        // STEP 1: AI INFERS PRODUCT INFO FROM URL
         // ============================================
-        if (serperApiKey) {
-          logger.log('🛍️ [Fast Scraper] Trying Google Shopping API...');
+        const urlInfo = await inferProductFromUrl(url, openai, logger);
+        logger.log(`🤖 [AI] Inferred: "${urlInfo.productName}" ${urlInfo.color ? `(${urlInfo.color})` : ''}`);
 
-          const googleShoppingResult = await tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperApiKey);
+        // ============================================
+        // STEP 2: TRY GOOGLE SHOPPING
+        // ============================================
+        if (scraperApiKey && urlInfo.productName) {
+          const googleResult = await tryGoogleShopping(
+            url, 
+            urlInfo, 
+            scraperApiKey, 
+            fetchImpl, 
+            logger
+          );
 
-          if (googleShoppingResult) {
-            // We got product info from Google Shopping!
-            logger.log('✅ [Fast Scraper] Google Shopping found product data');
+          if (googleResult) {
+            testMetadata.phaseUsed = 'google-shopping';
 
-            // Always try to get fresh sale price from page (Shopping API can be stale)
-            // Wrap in try-catch to prevent captcha/bot detection from failing the whole scrape
-            let freshPrice = null;
-            try {
-              logger.log('📄 [Fast Scraper] Attempting to fetch fresh sale price from page...');
-              freshPrice = await fetchFreshSalePrice(url, fetchImpl, logger);
-            } catch (error) {
-              logger.log(`⚠️ [Fast Scraper] Fresh price fetch failed: ${error.message}, using Shopping API data`);
+            const product = {
+              name: googleResult.name,
+              brand: shouldAutofillBrand(url) ? googleResult.brand : null,
+              imageUrl: googleResult.imageUrl,
+              originalPrice: googleResult.originalPrice || googleResult.currentPrice,
+              salePrice: googleResult.currentPrice,
+              percentOff: 0,
+              color: urlInfo.color || null,
+              url: url,
+              confidence: 90
+            };
+
+            if (product.originalPrice && product.originalPrice > product.salePrice) {
+              product.percentOff = Math.round(
+                ((product.originalPrice - product.salePrice) / product.originalPrice) * 100
+              );
             }
 
-            // Prefer fresh price if available, fall back to Shopping API price
-            const salePrice = (freshPrice && freshPrice.salePrice) || googleShoppingResult.currentPrice;
-            const originalPrice = (freshPrice && freshPrice.originalPrice) || googleShoppingResult.originalPrice;
+            logger.log(`✅ [Google Shopping] Success (confidence: ${product.confidence}%)`);
 
-            // We need at least a sale price to continue
-            if (salePrice) {
-              const product = {
-                name: googleShoppingResult.name,
-                brand: shouldAutofillBrand(url) ? (googleShoppingResult.brand || null) : null,
-                imageUrl: googleShoppingResult.imageUrl,
-                originalPrice: originalPrice || salePrice,
-                salePrice: salePrice,
-                percentOff: 0,
-                url: url,
-                confidence: 90
-              };
-
-              // Calculate percent off
-              if (product.originalPrice && product.originalPrice > product.salePrice) {
-                product.percentOff = Math.round(((product.originalPrice - product.salePrice) / product.originalPrice) * 100);
+            return {
+              success: true,
+              product,
+              meta: {
+                method: 'simplified',
+                phase: testMetadata.phaseUsed,
+                confidence: product.confidence,
+                durationMs: Date.now() - startTime,
+                testMetadata: enableTestMetadata ? testMetadata : undefined
               }
-
-              testMetadata.phaseUsed = freshPrice ? 'google-shopping-hybrid' : 'google-shopping-api';
-              testMetadata.imageExtraction.source = 'google-shopping';
-
-              const priceSource = freshPrice ? 'fresh page data' : 'Shopping API';
-              logger.log(`✅ [Fast Scraper] Google Shopping success using ${priceSource} (confidence: ${product.confidence}%)`);
-
-              return {
-                success: true,
-                product: product,
-                meta: {
-                  method: 'fast',
-                  phase: testMetadata.phaseUsed,
-                  confidence: product.confidence,
-                  durationMs: Date.now() - startTime,
-                  testMetadata: enableTestMetadata ? testMetadata : undefined
-                }
-              };
-            }
-
-            logger.log('⚠️ [Fast Scraper] Google Shopping has no price data');
-          } else {
-            logger.log('⚠️ [Fast Scraper] Google Shopping failed or returned no results');
+            };
           }
-
-          logger.log('⚠️ [Fast Scraper] Google Shopping incomplete, falling back to traditional methods...');
         }
 
         // ============================================
-        // STEP 2: FALLBACK TO TRADITIONAL SCRAPING
+        // STEP 3: FALLBACK - FETCH PAGE HTML
         // ============================================
+        logger.log('📄 [Scraper] Fetching page HTML...');
+
         const response = await fetchImpl(url, {
           redirect: 'follow',
           timeout: 10000,
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
           }
         });
 
-        // Check for error status codes and classify
         if (!response.ok) {
-          const errorType = classifyHttpError(response.status);
-          const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
-          error.statusCode = response.status;
-          error.errorType = errorType;
-          throw error;
+          throw createError(
+            `HTTP ${response.status}: ${response.statusText}`,
+            classifyHttpError(response.status),
+            response.status
+          );
         }
 
         const html = await response.text();
-        logger.log(`📄 [Fast Scraper] Fetched HTML: ${html.length} characters`);
+        logger.log(`📄 [Scraper] Fetched ${html.length} characters`);
 
-        const jsonLdResult = await extractFromJsonLd(html, url, testMetadata, logger);
-        if (jsonLdResult && jsonLdResult.complete) {
+        // ============================================
+        // STEP 4: TRY JSON-LD EXTRACTION
+        // ============================================
+        const jsonLdResult = await extractFromJsonLd(html, url, logger);
+
+        if (jsonLdResult?.complete) {
+          // Add color from URL inference
+          jsonLdResult.color = urlInfo.color || null;
+          testMetadata.phaseUsed = 'json-ld';
+
           return {
             success: true,
             product: jsonLdResult,
             meta: {
-              method: 'fast',
-              phase: 'json-ld',
+              method: 'simplified',
+              phase: testMetadata.phaseUsed,
               confidence: jsonLdResult.confidence,
               durationMs: Date.now() - startTime,
               testMetadata: enableTestMetadata ? testMetadata : undefined
@@ -159,36 +130,28 @@ export async function scrapeProduct(url, options = {}) {
           };
         }
 
-        if (jsonLdResult && !jsonLdResult.complete) {
-          logger.log('📊 Found partial JSON-LD data, using it for AI extraction...');
-        } else {
-          logger.log('⚠️  No JSON-LD data found, trying deterministic HTML extraction...');
-        }
+        // ============================================
+        // STEP 5: FINAL FALLBACK - AI EXTRACTION
+        // ============================================
+        logger.log('🤖 [AI] Using AI extraction...');
 
-        const deterministicResult = await extractFromHtmlDeterministic(html, url, testMetadata, logger);
-        if (deterministicResult && deterministicResult.complete) {
-          return {
-            success: true,
-            product: deterministicResult,
-            meta: {
-              method: 'fast',
-              phase: 'html-deterministic',
-              confidence: deterministicResult.confidence,
-              durationMs: Date.now() - startTime,
-              testMetadata: enableTestMetadata ? testMetadata : undefined
-            }
-          };
-        }
+        const aiResult = await extractWithAI(
+          html, 
+          url, 
+          openai, 
+          logger, 
+          jsonLdResult,
+          urlInfo.color
+        );
 
-        logger.log('⚠️  Deterministic extraction incomplete, falling back to AI...');
-        const aiResult = await extractWithAI(html, url, openai, testMetadata, logger, jsonLdResult, deterministicResult);
+        testMetadata.phaseUsed = 'ai-extraction';
 
         return {
           success: true,
           product: aiResult,
           meta: {
-            method: 'fast',
-            phase: 'ai-extraction',
+            method: 'simplified',
+            phase: testMetadata.phaseUsed,
             confidence: aiResult.confidence,
             durationMs: Date.now() - startTime,
             testMetadata: enableTestMetadata ? testMetadata : undefined
@@ -196,24 +159,23 @@ export async function scrapeProduct(url, options = {}) {
         };
 
       } catch (error) {
-        // Add error classification to the error object
         if (!error.errorType) {
           error.errorType = classifyError(error);
         }
         throw error;
       }
     },
-    maxRetries,
+    3, // maxRetries
     logger,
     testMetadata
   ).catch(error => {
-    logger.error('❌ [Fast Scraper] Error:', error.message);
+    logger.error('❌ [Scraper] Error:', error.message);
     return {
       success: false,
       error: error.message,
       errorType: error.errorType || 'UNKNOWN',
       meta: {
-        method: 'fast',
+        method: 'simplified',
         phase: 'error',
         confidence: 0,
         durationMs: Date.now() - startTime,
@@ -225,78 +187,98 @@ export async function scrapeProduct(url, options = {}) {
 }
 
 // ============================================
-// RETRY LOGIC AND ERROR CLASSIFICATION
+// UTILITY FUNCTIONS
 // ============================================
 
+function createError(message, errorType = 'FATAL', statusCode = null) {
+  const error = new Error(message);
+  error.errorType = errorType;
+  if (statusCode) error.statusCode = statusCode;
+  return error;
+}
+
+function validateUrl(url) {
+  try {
+    const urlObj = new URL(url);
+
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      throw createError('Invalid URL protocol', 'FATAL');
+    }
+
+    const hostname = urlObj.hostname.toLowerCase();
+
+    // Block localhost and private IPs
+    const blockedHosts = ['localhost', 'localhost.localdomain', '0.0.0.0'];
+    if (blockedHosts.includes(hostname)) {
+      throw createError('Private URLs not allowed', 'FATAL');
+    }
+
+    // Block private IPv4 ranges
+    const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const ipMatch = hostname.match(ipv4Pattern);
+    if (ipMatch) {
+      const [, a, b, c, d] = ipMatch.map(Number);
+      const isPrivate = a === 10 || 
+                       a === 127 || 
+                       (a === 172 && b >= 16 && b <= 31) || 
+                       (a === 192 && b === 168) || 
+                       (a === 169 && b === 254);
+
+      if (isPrivate) {
+        throw createError('Private URLs not allowed', 'FATAL');
+      }
+    }
+
+    // Block private IPv6
+    if (hostname.includes(':') && 
+        (hostname === '::1' || hostname.startsWith('fe80:') || hostname.startsWith('::ffff:127'))) {
+      throw createError('Private URLs not allowed', 'FATAL');
+    }
+
+  } catch (e) {
+    if (e.errorType) throw e;
+    throw createError('Invalid URL format', 'FATAL');
+  }
+}
+
 function classifyHttpError(statusCode) {
-  // Server errors - retryable
-  if ([500, 502, 503, 504].includes(statusCode)) {
-    return 'RETRYABLE';
-  }
-
-  // Authentication/blocking errors - skip domain
-  if ([401, 403, 429].includes(statusCode)) {
-    return 'BLOCKING';
-  }
-
-  // Not found - fatal for this URL only
-  if (statusCode === 404) {
-    return 'FATAL';
-  }
-
-  // Client errors - fatal
-  if (statusCode >= 400 && statusCode < 500) {
-    return 'FATAL';
-  }
-
-  // Unknown - treat as retryable
+  if ([500, 502, 503, 504].includes(statusCode)) return 'RETRYABLE'; // Server errors
+  if ([401, 403, 429].includes(statusCode)) return 'BLOCKING';       // Auth/blocking
+  if (statusCode === 404) return 'FATAL';                             // Not found
+  if (statusCode >= 400 && statusCode < 500) return 'FATAL';          // Client errors
   return 'RETRYABLE';
 }
 
 function classifyError(error) {
-  // Check if it's an HTTP error with status code
-  if (error.statusCode) {
-    return classifyHttpError(error.statusCode);
-  }
+  if (error.statusCode) return classifyHttpError(error.statusCode);
 
-  const errorMsg = error.message?.toLowerCase() || '';
+  const msg = error.message?.toLowerCase() || '';
 
-  // Network timeout errors - retryable
-  if (errorMsg.includes('timeout') || errorMsg.includes('timed out')) {
+  // Network issues - retryable
+  if (msg.includes('timeout') || 
+      msg.includes('econnreset') || 
+      msg.includes('econnrefused') ||
+      msg.includes('network') ||
+      msg.includes('socket hang up')) {
     return 'RETRYABLE';
   }
 
-  // Connection errors - retryable
-  if (errorMsg.includes('econnreset') || 
-      errorMsg.includes('econnrefused') || 
-      errorMsg.includes('network') ||
-      errorMsg.includes('socket hang up')) {
-    return 'RETRYABLE';
-  }
-
-  // Blocking/access errors
-  if (errorMsg.includes('cloudflare') ||
-      errorMsg.includes('access denied') ||
-      errorMsg.includes('forbidden') ||
-      errorMsg.includes('rate limit') ||
-      errorMsg.includes('captcha') ||
-      errorMsg.includes('bot detection')) {
+  // Blocking
+  if (msg.includes('cloudflare') ||
+      msg.includes('access denied') ||
+      msg.includes('rate limit') ||
+      msg.includes('captcha')) {
     return 'BLOCKING';
   }
 
-  // Invalid URL or data errors - fatal
-  if (errorMsg.includes('invalid url') ||
-      errorMsg.includes('missing required') ||
-      errorMsg.includes('placeholder image')) {
+  // Fatal
+  if (msg.includes('invalid url') ||
+      msg.includes('missing required') ||
+      msg.includes('placeholder image')) {
     return 'FATAL';
   }
 
-  // Default: treat as retryable (give it a chance)
-  return 'RETRYABLE';
-}
-
-async function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return 'RETRYABLE'; // Default: give it a chance
 }
 
 async function retryWithBackoff(fn, maxRetries, logger, testMetadata) {
@@ -304,462 +286,164 @@ async function retryWithBackoff(fn, maxRetries, logger, testMetadata) {
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      if (attempt > 0) {
-        testMetadata.retryCount = attempt;
-      }
+      if (attempt > 0) testMetadata.retryCount = attempt;
       return await fn();
     } catch (error) {
       lastError = error;
       const errorType = error.errorType || classifyError(error);
 
       // Don't retry blocking or fatal errors
-      if (errorType === 'BLOCKING') {
-        logger.log(`🚫 [Fast Scraper] Blocking error detected, not retrying: ${error.message}`);
-        error.errorType = 'BLOCKING';
-        throw error;
-      }
-
-      if (errorType === 'FATAL') {
-        logger.log(`❌ [Fast Scraper] Fatal error, not retrying: ${error.message}`);
-        error.errorType = 'FATAL';
-        throw error;
-      }
-
-      // If this is the last attempt, throw the error
-      if (attempt === maxRetries - 1) {
-        logger.log(`❌ [Fast Scraper] All ${maxRetries} attempts failed`);
+      if (errorType === 'BLOCKING' || errorType === 'FATAL') {
+        logger.log(`🚫 [Scraper] ${errorType} error, not retrying: ${error.message}`);
         error.errorType = errorType;
         throw error;
       }
 
-      // Calculate backoff delay: 2s, 4s, 8s
-      const delay = Math.pow(2, attempt + 1) * 1000;
-      logger.log(`⚠️  [Fast Scraper] Attempt ${attempt + 1}/${maxRetries} failed (${errorType}), retrying in ${delay}ms...`);
-      logger.log(`   Error: ${error.message}`);
+      // Last attempt - throw error
+      if (attempt === maxRetries - 1) {
+        logger.log(`❌ [Scraper] All ${maxRetries} attempts failed`);
+        error.errorType = errorType;
+        throw error;
+      }
 
-      await sleep(delay);
+      // Exponential backoff: 2s, 4s, 8s
+      const delay = Math.pow(2, attempt + 1) * 1000;
+      logger.log(`⚠️  [Scraper] Attempt ${attempt + 1}/${maxRetries} failed, retrying in ${delay}ms...`);
+
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
-  // Should never reach here, but just in case
   lastError.errorType = classifyError(lastError);
   throw lastError;
 }
 
 // ============================================
-// INTELLIGENT URL PARSING FOR GOOGLE SHOPPING
+// STEP 1: AI URL INFERENCE
 // ============================================
 
-function extractProductInfoFromUrl(url) {
+async function inferProductFromUrl(url, openai, logger) {
+  const urlObj = new URL(url);
+  const domain = urlObj.hostname.replace('www.', '');
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `You are a product URL parser. Extract the product name and color from the URL.
+
+Return ONLY valid JSON:
+{
+  "productName": "Product Name (no brand, no store name)",
+  "color": "Color name or null"
+}
+
+Rules:
+- Extract product name from URL path or query parameters
+- Remove brand names, store names, SKUs, and IDs
+- Extract color if present (e.g., "Black", "Navy", "Red")
+- Set color to null if not found
+- Be concise - product name should be 2-6 words`
+      },
+      {
+        role: 'user',
+        content: `URL: ${url}\n\nExtract the product name and color.`
+      }
+    ],
+    temperature: 0.1,
+  });
+
+  const response = completion.choices[0].message.content.trim();
+  const cleanJson = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
   try {
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname.replace('www.', '');
-    const pathname = urlObj.pathname;
-    const searchParams = urlObj.searchParams;
-
-    let productName = null;
-    let productId = null;
-
-    // PRIORITY 1: Check query parameters for product name (often most accurate!)
-    const nameParams = ['searchText', 'q', 'query', 'search', 'keyword', 'name', 'title', 'text'];
-    for (const param of nameParams) {
-      const value = searchParams.get(param);
-      if (value && value.length > 2) {
-        productName = decodeURIComponent(value)
-          .replace(/[+]/g, ' ')
-          .replace(/%20/g, ' ')
-          .trim();
-        break;
-      }
-    }
-
-    // PRIORITY 2: Check query parameters for product ID
-    const idParams = ['id', 'productid', 'pid', 'itemid', 'sku', 'productcode', 'ID'];
-    for (const param of idParams) {
-      const value = searchParams.get(param);
-      if (value && /^\d{6,}$/.test(value)) {
-        productId = value;
-        break;
-      }
-    }
-
-    // PRIORITY 3: Extract from URL path (only if not found in params)
-    if (!productName || !productId) {
-      // Split path into segments
-      const segments = pathname.split('/').filter(s => s.length > 0);
-
-      // Remove common non-product segments
-      const skipSegments = ['shop', 'product', 'products', 'p', 's', 'pd', 'item', 'items', 'browse'];
-      const relevantSegments = segments.filter(s => !skipSegments.includes(s.toLowerCase()));
-
-      // Look for product ID patterns in path
-      if (!productId) {
-        const idPatterns = [
-          /prod(\d{6,})/i,           // prod123456
-          /^(\d{6,})$/,              // Just numbers
-          /p-(\d{6,})/i,             // p-123456
-          /item[_-]?(\d{6,})/i,      // item-123456
-          /sku[_-]?(\d{6,})/i,       // sku-123456
-        ];
-
-        for (const segment of relevantSegments) {
-          for (const pattern of idPatterns) {
-            const match = segment.match(pattern);
-            if (match) {
-              productId = match[1];
-              break;
-            }
-          }
-          if (productId) break;
-        }
-      }
-
-      // Extract product name from path (only if not found in params)
-      if (!productName) {
-        // Find the longest segment that looks like a product name
-        let bestNameSegment = null;
-        let maxWords = 0;
-
-        for (const segment of relevantSegments) {
-          // Skip if it's just numbers (likely an ID)
-          if (/^\d+$/.test(segment)) continue;
-
-          // Special handling for .html/.htm files with product info
-          // Pattern: product-name-12345678.html or product-name-prod12345.html
-          if (/\.(html|htm)$/i.test(segment)) {
-            // Try to extract product name before the ID
-            const withoutExt = segment.replace(/\.(html|htm)$/i, '');
-
-            // Pattern 1: product-name-12345678 (name followed by long number)
-            const match1 = withoutExt.match(/^(.+?)-(\d{6,})$/);
-            if (match1) {
-              const name = match1[1].replace(/-/g, ' ');
-              const words = name.split(/\s+/).filter(w => w.length > 2);
-              if (words.length > maxWords) {
-                maxWords = words.length;
-                bestNameSegment = match1[1];
-                if (!productId) productId = match1[2]; // Also grab the product ID
-              }
-              continue;
-            }
-
-            // Pattern 2: product-name-prod12345 (name followed by prod+number)
-            const match2 = withoutExt.match(/^(.+?)-prod(\d+)$/i);
-            if (match2) {
-              const name = match2[1].replace(/-/g, ' ');
-              const words = name.split(/\s+/).filter(w => w.length > 2);
-              if (words.length > maxWords) {
-                maxWords = words.length;
-                bestNameSegment = match2[1];
-                if (!productId) productId = match2[2]; // Also grab the product ID
-              }
-              continue;
-            }
-
-            // If no pattern match, skip .html files entirely
-            continue;
-          }
-
-          // Skip other file extensions like product.do, browse.jsp, etc.
-          if (/\.(do|jsp|php|aspx)$/i.test(segment)) continue;
-
-          // Count word-like parts (separated by dashes/underscores)
-          const words = segment.split(/[-_]/).filter(w => w.length > 2);
-
-          if (words.length > maxWords) {
-            maxWords = words.length;
-            bestNameSegment = segment;
-          }
-        }
-
-        if (bestNameSegment) {
-          // Clean up the slug: replace dashes/underscores with spaces, decode URI
-          productName = decodeURIComponent(bestNameSegment)
-            .replace(/[-_]/g, ' ')
-            .replace(/\+/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          // Remove common suffixes
-          productName = productName
-            .replace(/\s+(reviews?|ratings?|specs?|details?)$/i, '')
-            .trim();
-        }
-      }
-    }
-
+    const data = JSON.parse(cleanJson);
     return {
-      domain,
-      productName,
-      productId,
-      fullPath: pathname
+      productName: data.productName || null,
+      color: data.color || null,
+      domain
     };
-
-  } catch (error) {
+  } catch (e) {
+    logger.log(`⚠️  [AI] Failed to parse URL inference response, using domain only`);
     return {
-      domain: null,
       productName: null,
-      productId: null,
-      fullPath: null
+      color: null,
+      domain
     };
   }
 }
 
 // ============================================
-// EXTRACT META TAGS FOR PRODUCT INFO
+// STEP 2: GOOGLE SHOPPING
 // ============================================
 
-async function extractMetaTags(url, fetchImpl, logger, scraperApiKey) {
-  // If no ScraperAPI key, skip meta tag extraction
-  if (!scraperApiKey) {
-    logger.log('⏭️  [Meta Tags] No ScraperAPI key, skipping meta tag extraction');
+async function tryGoogleShopping(url, urlInfo, scraperApiKey, fetchImpl, logger) {
+  if (!urlInfo.productName) {
+    logger.log('⚠️  [Google Shopping] No product name from AI, skipping');
     return null;
   }
 
   try {
-    logger.log('🏷️  [Meta Tags] Fetching via ScraperAPI (bypasses DataDome/bot protection)...');
+    // Build search query: "product name" color domain
+    const query = `${urlInfo.productName} ${urlInfo.color || ''} ${urlInfo.domain}`.trim();
+    logger.log(`🔍 [Google Shopping] Query: "${query}"`);
 
-    // Use ScraperAPI to bypass bot protection (DataDome, Cloudflare, etc.)
+    // Google Shopping URL (udm=28 = Shopping results)
+    const googleUrl = `https://www.google.com/search?udm=28&q=${encodeURIComponent(query)}`;
+
+    // Use ScraperAPI with JS rendering
     const scraperUrl = new URL('http://api.scraperapi.com/');
     scraperUrl.searchParams.set('api_key', scraperApiKey);
-    scraperUrl.searchParams.set('url', url);
-    scraperUrl.searchParams.set('render', 'false'); // Fast mode, no JS rendering
+    scraperUrl.searchParams.set('url', googleUrl);
+    scraperUrl.searchParams.set('render', 'true');
+    scraperUrl.searchParams.set('wait_for', '3000');
 
     const response = await fetchImpl(scraperUrl.toString(), {
-      method: 'GET',
-      signal: AbortSignal.timeout(5000) // 5-second timeout
+      signal: AbortSignal.timeout(30000)
     });
 
     if (!response.ok) {
-      logger.log(`⚠️  [Meta Tags] ScraperAPI error: ${response.status}`);
+      logger.log(`⚠️  [Google Shopping] API error: ${response.status}`);
       return null;
     }
 
     const html = await response.text();
+    logger.log(`📄 [Google Shopping] Got ${html.length} chars`);
 
-    // Check if we actually got content
-    if (html.length < 100) {
-      logger.log(`⚠️  [Meta Tags] Response too short (${html.length} bytes)`);
+    // Parse products from HTML
+    const products = parseGoogleShoppingHtml(html, logger);
+
+    if (!products || products.length === 0) {
+      logger.log('⚠️  [Google Shopping] No results found');
       return null;
     }
 
-    // Extract og:title (most reliable for full product name)
-    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
+    logger.log(`✅ [Google Shopping] Found ${products.length} products`);
 
-    let productName = null;
-    if (ogTitleMatch) {
-      productName = ogTitleMatch[1]
-        .replace(/\s*\|\s*.+$/, '')  // Remove " | Store Name"
-        .replace(/\s*-\s*.+$/, '')   // Remove " - Store Name"
-        .replace(/\s*–\s*.+$/, '')   // Remove " – Store Name"
-        .trim();
+    // Find best match (prefer domain match)
+    let bestMatch = products.find(p => p.link?.includes(urlInfo.domain));
 
-      logger.log(`✅ [Meta Tags] Extracted product name: "${productName}"`);
-    }
-
-    // Also extract og:image as backup
-    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
-
-    const imageUrl = ogImageMatch ? ogImageMatch[1] : null;
-
-    if (imageUrl) {
-      logger.log(`✅ [Meta Tags] Extracted image URL`);
-    }
-
-    // Return what we found (even if partial)
-    if (productName || imageUrl) {
-      return {
-        productName,
-        imageUrl
-      };
-    }
-
-    logger.log(`⚠️  [Meta Tags] No og: tags found in HTML`);
-    return null;
-
-  } catch (error) {
-    // Don't let meta tag extraction failure block the whole scrape
-    if (error.name === 'AbortError' || error.message.includes('timeout')) {
-      logger.log(`⚠️  [Meta Tags] Timeout after 5 seconds, continuing without meta tags`);
+    if (!bestMatch) {
+      bestMatch = products[0]; // Use first result
+      logger.log(`⚠️  [Google Shopping] No domain match, using first result`);
     } else {
-      logger.log(`⚠️  [Meta Tags] Error: ${error.message}`);
-    }
-    return null;
-  }
-}
-
-// ============================================
-// GOOGLE SHOPPING API FUNCTIONS
-// ============================================
-
-async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperApiKey) {
-  const urlObj = new URL(url);
-  const urlDomain = urlObj.hostname.replace('www.', '');
-
-  // Step 1: Try to extract product info from meta tags via ScraperAPI
-  const metaData = await extractMetaTags(url, fetchImpl, logger, scraperApiKey);
-
-  // Step 2: Extract product info from URL as fallback
-  const urlInfo = extractProductInfoFromUrl(url);
-
-  logger.log('📝 Extracted product info:');
-  logger.log(`   Meta tags: ${metaData?.productName ? `"${metaData.productName}"` : 'none'}`);
-  logger.log(`   URL query params: ${urlInfo.productName && !metaData?.productName ? `"${urlInfo.productName}"` : 'n/a'}`);
-  logger.log(`   URL slug: ${urlInfo.productName && metaData?.productName ? `"${urlInfo.productName}" (not used)` : 'n/a'}`);
-  logger.log(`   Product ID: ${urlInfo.productId || 'none'}`);
-  logger.log(`   Domain: ${urlInfo.domain}`);
-
-  // Step 3: Build multiple query strategies (most specific first)
-  const queries = [];
-
-  // Strategy 1: Meta og:title (BEST - exact product name with quotes)
-  if (metaData?.productName) {
-    queries.push({
-      query: `${metaData.productName} ${urlDomain}`,
-      source: 'meta-tags-exact',
-      useQuotes: true
-    });
-  }
-
-  // Strategy 2: URL query param name (GOOD - user's search term, fuzzy match)
-  if (urlInfo.productName && !metaData?.productName) {
-    queries.push({
-      query: `${urlInfo.productName} ${urlDomain}`,
-      source: 'url-query-param',
-      useQuotes: false
-    });
-  }
-
-  // Strategy 3: Product ID + domain (for sites with SKUs in URL)
-  if (urlInfo.productId) {
-    queries.push({
-      query: `${urlInfo.productId} ${urlDomain}`,
-      source: 'product-id',
-      useQuotes: false
-    });
-  }
-
-  // Strategy 4: Last resort - generic product search on domain
-  queries.push({
-    query: `product ${urlDomain}`,
-    source: 'generic-fallback',
-    useQuotes: false
-  });
-
-  if (queries.length === 1) {
-    logger.log('⚠️  Could not extract specific product info, using generic search');
-  }
-
-  if (!scraperApiKey) {
-    logger.log('❌ [Google Shopping] No ScraperAPI key, skipping Google Shopping scrape');
-    return null;
-  }
-
-  try {
-    for (let i = 0; i < queries.length; i++) {
-      const { query, source } = queries[i];
-
-      logger.log(`🔍 [Google Shopping] Strategy ${i + 1}/${queries.length}: ${source}`);
-      logger.log(`   Query: "${query}"`);
-
-      // Build Google Shopping URL with udm=28 (Shopping Graph - the new index)
-      const googleShoppingUrl = `https://www.google.com/search?udm=28&q=${encodeURIComponent(query)}`;
-      logger.log(`   URL: ${googleShoppingUrl}`);
-
-      // Use ScraperAPI with JS rendering enabled
-      const scraperUrl = new URL('http://api.scraperapi.com/');
-      scraperUrl.searchParams.set('api_key', scraperApiKey);
-      scraperUrl.searchParams.set('url', googleShoppingUrl);
-      scraperUrl.searchParams.set('render', 'true');      // Enable JS rendering
-      scraperUrl.searchParams.set('wait_for', '3000');    // Wait 3 seconds for content
-      
-      logger.log(`   ScraperAPI: Rendering with JS (3s wait)`);
-
-      const searchResponse = await fetchImpl(scraperUrl.toString(), {
-        signal: AbortSignal.timeout(30000)  // Increase to 30 seconds for rendering
-      });
-
-      if (!searchResponse.ok) {
-        logger.log(`⚠️  [Google Shopping] ScraperAPI error: ${searchResponse.status}`);
-        continue;
-      }
-
-      const html = await searchResponse.text();
-      logger.log(`   Got HTML: ${html.length} chars`);
-
-      // Parse product data from Google Shopping HTML
-      const products = parseGoogleShoppingResults(html, logger);
-
-      if (!products || products.length === 0) {
-        logger.log(`⚠️  [Google Shopping] No results found in HTML`);
-        continue;
-      }
-
-      logger.log(`✅ [Google Shopping] Found ${products.length} results`);
-      
-      // DEBUG: Log all products to see what we got
-      logger.log(`   DEBUG: Products parsed:`);
-      products.forEach((p, idx) => {
-        logger.log(`     [${idx}] Title: ${p.title || 'MISSING'}, Link: ${p.link?.substring(0, 50) || 'MISSING'}..., Price: $${p.currentPrice || 'MISSING'}`);
-      });
-
-      // Find the result that best matches our domain
-      let bestMatch = null;
-
-      for (const result of products) {
-        if (result.link && result.link.includes(urlDomain)) {
-          bestMatch = result;
-          logger.log(`✅ [Google Shopping] Found exact domain match`);
-          logger.log(`   Match details: Title="${bestMatch.title}", Image=${bestMatch.imageUrl ? 'YES' : 'NO'}, Price=$${bestMatch.currentPrice}`);
-          break;
-        }
-        if (result.source && result.source.toLowerCase().includes(urlDomain.split('.')[0])) {
-          bestMatch = result;
-          logger.log(`✅ [Google Shopping] Found source name match: ${result.source}`);
-          break;
-        }
-      }
-
-      // If no domain match but we have results from meta tag query, use first result
-      if (!bestMatch && i === 0 && products.length > 0 && metaData?.productName) {
-        bestMatch = products[0];
-        logger.log(`⚠️  [Google Shopping] Using first result (meta tag match, different retailer)`);
-      }
-
-      if (!bestMatch) {
-        logger.log(`⚠️  [Google Shopping] Results found but none from ${urlDomain}`);
-        continue;
-      }
-
-      // Build product object
-      const product = {
-        name: bestMatch.title,
-        brand: shouldAutofillBrand(url) ? extractBrandFromTitle(bestMatch.title) : null,
-        imageUrl: metaData?.imageUrl || bestMatch.imageUrl,
-        originalPrice: bestMatch.originalPrice || null,
-        currentPrice: bestMatch.currentPrice || null
-      };
-
-      // Validate we got minimum required data
-      if (!product.name || !product.imageUrl) {
-        logger.log('⚠️  [Google Shopping] Result missing name or image');
-        continue;
-      }
-
-      logger.log(`✅ [Google Shopping] Product: ${product.name}`);
-      if (product.originalPrice) {
-        logger.log(`   Original: $${product.originalPrice}, Current: $${product.currentPrice}`);
-      } else if (product.currentPrice) {
-        logger.log(`   Price: $${product.currentPrice}`);
-      }
-
-      return product;
+      logger.log(`✅ [Google Shopping] Found domain match`);
     }
 
-    logger.log('❌ [Google Shopping] All query strategies failed');
-    return null;
+    // Validate minimum data
+    if (!bestMatch.title || !bestMatch.currentPrice) {
+      logger.log('⚠️  [Google Shopping] Result missing required data');
+      return null;
+    }
+
+    return {
+      name: bestMatch.title,
+      brand: extractBrandFromTitle(bestMatch.title),
+      imageUrl: bestMatch.imageUrl,
+      originalPrice: bestMatch.originalPrice,
+      currentPrice: bestMatch.currentPrice
+    };
 
   } catch (error) {
     logger.log(`❌ [Google Shopping] Error: ${error.message}`);
@@ -767,351 +451,108 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
   }
 }
 
-// Parse Google Shopping HTML results (after JS rendering)
-function parseGoogleShoppingResults(html, logger) {
+function parseGoogleShoppingHtml(html, logger) {
+  const products = [];
+
   try {
-    const products = [];
-    
-    // After JS rendering, Google Shopping has cleaner structure
-    // Strategy 1: Extract all prices
+    // Extract prices
     const priceRegex = /\$([0-9,]+(?:\.\d{2})?)/g;
     const prices = [];
     let match;
-    
+
     while ((match = priceRegex.exec(html)) !== null) {
       const price = parseFloat(match[1].replace(/,/g, ''));
-      if (price > 0 && price < 100000) {
-        prices.push(price);
-      }
+      if (price > 0 && price < 100000) prices.push(price);
     }
-    
-    // Strategy 2: Extract all product titles (h3/h4 tags)
+
+    // Extract titles (h3/h4 tags)
     const titleRegex = /<h[34][^>]*>([^<]+)<\/h[34]>/gi;
     const titles = [];
-    
+
     while ((match = titleRegex.exec(html)) !== null) {
       const title = match[1].trim();
-      if (title.length > 5 && !title.includes('Google') && !title.includes('Shopping')) {
-        titles.push(title);
-      }
+      if (title.length > 5 && !title.includes('Google')) titles.push(title);
     }
-    
-    // Strategy 3: Extract product links (decode Google Shopping redirects)
+
+    // Extract links
     const linkRegex = /href="(https?:\/\/[^"]+)"/gi;
     const links = [];
-    
+
     while ((match = linkRegex.exec(html)) !== null) {
       let link = match[1];
-      
-      // Decode Google Shopping redirect URLs like: https://www.google.com/url?url=https://example.com
+
+      // Decode Google redirects
       if (link.includes('google.com/url?')) {
         try {
           const urlParams = new URL(link).searchParams;
-          const decodedUrl = urlParams.get('url') || urlParams.get('q');
-          if (decodedUrl) {
-            link = decodedUrl;
-          }
+          link = urlParams.get('url') || urlParams.get('q') || link;
         } catch (e) {
-          continue; // Skip invalid URLs
+          continue;
         }
       }
-      
-      // Filter out Google's internal URLs but keep decoded product links
+
       if (!link.includes('google.com') && !link.includes('gstatic.com')) {
         links.push(link);
       }
     }
-    
-    // Strategy 4: Try to extract images
+
+    // Extract images
     const imageRegex = /<img[^>]*src="(https?:\/\/[^"]+)"[^>]*>/gi;
     const images = [];
-    
+
     while ((match = imageRegex.exec(html)) !== null) {
       const img = match[1];
       if (!img.includes('gstatic.com') && !img.includes('google.com')) {
         images.push(img);
       }
     }
-    
-    // Combine the data - match titles with prices and links
+
+    // Combine data
     const minLength = Math.min(titles.length, prices.length, links.length);
-    
+
     for (let i = 0; i < minLength; i++) {
       products.push({
         title: titles[i],
         currentPrice: prices[i],
-        link: links[i],
-        imageUrl: images[i] || null,
         originalPrice: null,
-        source: extractDomainFromUrl(links[i])
+        link: links[i],
+        imageUrl: images[i] || null
       });
     }
-    
-    // Strategy 5: Also check for JSON-LD structured data
-    const jsonLdMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-    if (jsonLdMatches) {
-      for (const jsonLdScript of jsonLdMatches) {
-        try {
-          const jsonContent = jsonLdScript.match(/<script[^>]*>([\s\S]*?)<\/script>/i)?.[1];
-          if (!jsonContent) continue;
-          
-          const data = JSON.parse(jsonContent);
-          
-          if (data['@type'] === 'ItemList' && data.itemListElement) {
-            for (const item of data.itemListElement) {
-              if (item.item && item.item.name) {
-                products.push({
-                  title: item.item.name,
-                  link: item.item.url || '',
-                  currentPrice: item.item.offers?.price ? parseFloat(item.item.offers.price) : null,
-                  originalPrice: item.item.offers?.highPrice ? parseFloat(item.item.offers.highPrice) : null,
-                  imageUrl: item.item.image || null,
-                  source: extractDomainFromUrl(item.item.url || '')
-                });
-              }
-            }
-          }
-        } catch (e) {
-          // Skip invalid JSON
-        }
-      }
-    }
 
-    logger.log(`   Parsed ${products.length} products from rendered HTML`);
-    
-    // Deduplicate by link
-    const uniqueProducts = [];
-    const seenLinks = new Set();
-    
-    for (const product of products) {
-      if (product.link && !seenLinks.has(product.link)) {
-        seenLinks.add(product.link);
-        uniqueProducts.push(product);
-      }
-    }
-    
-    logger.log(`   After deduplication: ${uniqueProducts.length} unique products`);
-    return uniqueProducts;
-    
+    logger.log(`   Parsed ${products.length} products`);
+    return products;
+
   } catch (error) {
     logger.log(`⚠️  Error parsing Google Shopping HTML: ${error.message}`);
     return [];
   }
 }
 
-function extractDomainFromUrl(url) {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.hostname.replace('www.', '');
-  } catch {
-    return '';
-  }
-}
-
-async function fetchFreshSalePrice(url, fetchImpl, logger) {
-  try {
-    const response = await fetchImpl(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-      },
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (!response.ok) {
-      logger.log(`⚠️ Page fetch failed: ${response.status}`);
-      return null;
-    }
-
-    const html = await response.text();
-
-    let salePrice = null;
-    let originalPrice = null;
-
-    // Strategy 1: JSON-LD structured data
-    const jsonLdMatches = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
-    if (jsonLdMatches) {
-      for (const jsonLdScript of jsonLdMatches) {
-        try {
-          const jsonContent = jsonLdScript.match(/<script[^>]*>([\s\S]*?)<\/script>/i)?.[1];
-          if (!jsonContent) continue;
-
-          const data = JSON.parse(jsonContent);
-
-          if (data['@type'] === 'Product' || data['@type']?.includes?.('Product')) {
-            const offers = data.offers || data.Offers;
-            if (offers) {
-              const offerData = Array.isArray(offers) ? offers[0] : offers;
-
-              if (offerData.price) {
-                salePrice = parseFloat(offerData.price);
-                logger.log(`💰 Fresh sale price from JSON-LD: $${salePrice}`);
-              }
-
-              if (offerData.highPrice || offerData.priceValidUntil) {
-                originalPrice = parseFloat(offerData.highPrice || offerData.price);
-              }
-
-              if (salePrice) break;
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-
-    // Strategy 2: Meta tags
-    if (!salePrice) {
-      const ogPriceMatch = html.match(/<meta[^>]*property="(?:og:price:amount|product:price:amount)"[^>]*content="([^"]+)"/i);
-      if (ogPriceMatch) {
-        salePrice = parseFloat(ogPriceMatch[1]);
-        logger.log(`💰 Fresh sale price from meta tag: $${salePrice}`);
-      }
-    }
-
-    // Strategy 3: Common price patterns in HTML
-    if (!salePrice) {
-      const pricePatterns = [
-        /<[^>]*class="[^"]*(?:sale-price|price-sale|final-price|current-price)[^"]*"[^>]*>\s*\$?\s*(\d+(?:\.\d{2})?)/i,
-        /<span[^>]*class="[^"]*price[^"]*"[^>]*>\s*\$?\s*(\d+(?:\.\d{2})?)/i,
-        /"price":\s*"?(\d+(?:\.\d{2})?)"/,
-        /"salePrice":\s*"?(\d+(?:\.\d{2})?)"/
-      ];
-
-      for (const pattern of pricePatterns) {
-        const match = html.match(pattern);
-        if (match) {
-          const price = parseFloat(match[1]);
-          if (price > 0 && price < 10000) {
-            salePrice = price;
-            logger.log(`💰 Fresh sale price from HTML pattern: $${salePrice}`);
-            break;
-          }
-        }
-      }
-    }
-
-    // Strategy 4: Look for original price
-    if (!originalPrice) {
-      const originalPricePatterns = [
-        /<[^>]*class="[^"]*(?:original-price|was-price|compare-at|price-original)[^"]*"[^>]*>\s*\$?\s*(\d+(?:\.\d{2})?)/i,
-        /"originalPrice":\s*"?(\d+(?:\.\d{2})?)"/,
-        /"compareAtPrice":\s*"?(\d+(?:\.\d{2})?)"/
-      ];
-
-      for (const pattern of originalPricePatterns) {
-        const match = html.match(pattern);
-        if (match) {
-          const price = parseFloat(match[1]);
-          if (price > 0 && price < 10000 && price > (salePrice || 0)) {
-            originalPrice = price;
-            logger.log(`💰 Original price from page: $${originalPrice}`);
-            break;
-          }
-        }
-      }
-    }
-
-    if (!salePrice) {
-      logger.log('⚠️ Could not extract fresh price from page');
-      return null;
-    }
-
-    return {
-      salePrice: salePrice,
-      originalPrice: originalPrice
-    };
-
-  } catch (error) {
-    logger.log(`⚠️ Fresh price fetch error: ${error.message}`);
-    return null;
-  }
-}
-
 function extractBrandFromTitle(title) {
-  // Remove common product descriptors and take first word/phrase as brand
-  const cleaned = title
-    .split(/[|–—-]/)[0] // Take everything before separators
-    .trim();
-
-  // Common brand patterns
+  const cleaned = title.split(/[|–—-]/)[0].trim();
   const brandMatch = cleaned.match(/^([A-Z][a-zA-Z&\s]+?)(?:\s+[A-Z][a-z]|\s+\d|\s*$)/);
-  if (brandMatch) {
-    return brandMatch[1].trim();
-  }
+  if (brandMatch) return brandMatch[1].trim();
 
-  // Fallback: first word if it's capitalized
   const firstWord = cleaned.split(/\s+/)[0];
-  if (firstWord && /^[A-Z]/.test(firstWord)) {
-    return firstWord;
-  }
+  if (firstWord && /^[A-Z]/.test(firstWord)) return firstWord;
 
   return null;
 }
 
 // ============================================
-// EXISTING EXTRACTION FUNCTIONS (FALLBACK)
+// STEP 4: JSON-LD EXTRACTION
 // ============================================
 
-function validateUrl(url) {
-  try {
-    const urlObj = new URL(url);
-
-    if (!['http:', 'https:'].includes(urlObj.protocol)) {
-      const error = new Error('Invalid URL protocol');
-      error.errorType = 'FATAL';
-      throw error;
-    }
-
-    const hostname = urlObj.hostname.toLowerCase();
-
-    const blockedHosts = ['localhost', 'localhost.localdomain', '0.0.0.0'];
-    if (blockedHosts.includes(hostname)) {
-      const error = new Error('Private URLs not allowed');
-      error.errorType = 'FATAL';
-      throw error;
-    }
-
-    const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-    const ipMatch = hostname.match(ipv4Pattern);
-    if (ipMatch) {
-      const [, a, b, c, d] = ipMatch.map(Number);
-      if (a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254)) {
-        const error = new Error('Private URLs not allowed');
-        error.errorType = 'FATAL';
-        throw error;
-      }
-    }
-
-    if (hostname.includes(':')) {
-      if (hostname === '::1' || hostname.startsWith('fe80:') || hostname.startsWith('::ffff:127')) {
-        const error = new Error('Private URLs not allowed');
-        error.errorType = 'FATAL';
-        throw error;
-      }
-    }
-
-  } catch (e) {
-    if (e.message.includes('not allowed') || e.message.includes('protocol')) {
-      if (!e.errorType) e.errorType = 'FATAL';
-      throw e;
-    }
-    const error = new Error('Invalid URL format');
-    error.errorType = 'FATAL';
-    throw error;
-  }
-}
-
-async function extractFromJsonLd(html, url, testMetadata, logger) {
+async function extractFromJsonLd(html, url, logger) {
   const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
 
   if (!jsonLdMatch || jsonLdMatch.length === 0) {
+    logger.log('⚠️  [JSON-LD] No structured data found');
     return null;
   }
 
-  logger.log(`📊 Found ${jsonLdMatch.length} JSON-LD scripts, trying structured data extraction...`);
-
-  let allJsonLdData = [];
+  logger.log(`📊 [JSON-LD] Found ${jsonLdMatch.length} scripts`);
 
   for (const scriptTag of jsonLdMatch) {
     try {
@@ -1127,10 +568,9 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
 
       for (const item of items) {
         if (item['@type'] === 'Product' || item['@type']?.includes?.('Product')) {
-          allJsonLdData.push(item);
-
           const name = item.name;
 
+          // Extract image
           let imageUrl = null;
           if (Array.isArray(item.image)) {
             const first = item.image[0];
@@ -1141,15 +581,13 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
             imageUrl = item.image;
           }
 
-          if (imageUrl && !imageUrl.startsWith('http')) {
-            imageUrl = null;
-          }
+          if (imageUrl && !imageUrl.startsWith('http')) imageUrl = null;
 
+          // Extract prices
           const offers = Array.isArray(item.offers) ? item.offers[0] : item.offers;
           if (offers) {
             const currentPrice = parseFloat(offers.price);
-            const comparePrice = offers.highPrice ? parseFloat(offers.highPrice) : 
-                                 offers.priceSpecification?.price ? parseFloat(offers.priceSpecification.price) : null;
+            const comparePrice = offers.highPrice ? parseFloat(offers.highPrice) : null;
 
             if (name && imageUrl && !isNaN(currentPrice)) {
               let salePrice, originalPrice;
@@ -1157,21 +595,16 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
               if (comparePrice && comparePrice > currentPrice) {
                 salePrice = currentPrice;
                 originalPrice = comparePrice;
-              } else if (comparePrice && comparePrice < currentPrice) {
-                salePrice = comparePrice;
-                originalPrice = currentPrice;
-                logger.log(`⚠️  Unusual: offers.price > highPrice, swapping them`);
               } else {
                 salePrice = currentPrice;
                 originalPrice = null;
               }
 
-              const percentOff = originalPrice ? Math.round(((originalPrice - salePrice) / originalPrice) * 100) : 0;
+              const percentOff = originalPrice 
+                ? Math.round(((originalPrice - salePrice) / originalPrice) * 100) 
+                : 0;
 
-              logger.log('✅ Extracted from JSON-LD (confidence: 95):', { name, salePrice, originalPrice });
-
-              testMetadata.phaseUsed = 'json-ld';
-              testMetadata.imageExtraction.source = 'json-ld';
+              logger.log(`✅ [JSON-LD] Extracted product (confidence: 95%)`);
 
               return {
                 name,
@@ -1187,215 +620,84 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
           }
         }
       }
-    } catch (parseError) {
-      continue;
-    }
-  }
-
-  if (allJsonLdData.length > 0) {
-    logger.log(`📊 Found ${allJsonLdData.length} JSON-LD product objects (incomplete data, will use for AI)`);
-    return {
-      rawJsonLd: allJsonLdData,
-      complete: false
-    };
-  }
-
-  return null;
-}
-
-async function extractFromHtmlDeterministic(html, url, testMetadata, logger) {
-  logger.log('🔬 Starting deterministic HTML extraction...');
-
-  let foundPrices = {
-    salePrice: null,
-    originalPrice: null,
-    source: null
-  };
-
-  const shopifyJsonMatch = html.match(/<script[^>]*type=["']application\/json["'][^>]*data-product-json[^>]*>([\s\S]*?)<\/script>/i);
-  if (shopifyJsonMatch) {
-    try {
-      const productData = JSON.parse(shopifyJsonMatch[1]);
-      if (productData.price && productData.compare_at_price) {
-        foundPrices.salePrice = productData.price / 100;
-        foundPrices.originalPrice = productData.compare_at_price / 100;
-        foundPrices.source = 'shopify-json';
-        logger.log(`💰 Found Shopify JSON prices: $${foundPrices.salePrice} (was $${foundPrices.originalPrice})`);
-      } else if (productData.variants && Array.isArray(productData.variants) && productData.variants.length > 0) {
-        const firstVariant = productData.variants[0];
-        if (firstVariant.price && firstVariant.compare_at_price) {
-          foundPrices.salePrice = firstVariant.price / 100;
-          foundPrices.originalPrice = firstVariant.compare_at_price / 100;
-          foundPrices.source = 'shopify-json-variant';
-          logger.log(`💰 Found Shopify variant prices: $${foundPrices.salePrice} (was $${foundPrices.originalPrice})`);
-        }
-      }
     } catch (e) {
-      logger.log('⚠️  Failed to parse Shopify JSON:', e.message);
+      continue; // Skip invalid JSON
     }
   }
 
-  if (!foundPrices.source) {
-    const microdataPattern = /<[^>]*itemprop=["']price["'][^>]*content=["']([^"']+)["'][^>]*>/gi;
-    const comparePricePattern = /<[^>]*itemprop=["'](?:highPrice|listPrice)["'][^>]*content=["']([^"']+)["'][^>]*>/gi;
-
-    const priceMatches = [...html.matchAll(microdataPattern)];
-    const compareMatches = [...html.matchAll(comparePricePattern)];
-
-    if (priceMatches.length > 0) {
-      const currentPrice = parseFloat(priceMatches[0][1]);
-      const comparePrice = compareMatches.length > 0 ? parseFloat(compareMatches[0][1]) : null;
-
-      if (!isNaN(currentPrice)) {
-        if (comparePrice && comparePrice > currentPrice) {
-          foundPrices.salePrice = currentPrice;
-          foundPrices.originalPrice = comparePrice;
-          foundPrices.source = 'microdata';
-          logger.log(`💰 Found microdata prices: $${currentPrice} (was $${comparePrice})`);
-        }
-      }
-    }
-  }
-
-  if (foundPrices.source && foundPrices.salePrice && foundPrices.originalPrice > foundPrices.salePrice) {
-    const percentOff = Math.round(((foundPrices.originalPrice - foundPrices.salePrice) / foundPrices.originalPrice) * 100);
-
-    testMetadata.phaseUsed = 'html-deterministic';
-    testMetadata.priceValidation.foundInHtml = true;
-    testMetadata.priceValidation.checkedFormats.push(foundPrices.source);
-
-    return {
-      originalPrice: foundPrices.originalPrice,
-      salePrice: foundPrices.salePrice,
-      percentOff: percentOff,
-      source: foundPrices.source,
-      complete: false,
-      confidence: 88
-    };
-  }
-
-  logger.log('⚠️  No deterministic prices found');
-  return null;
+  logger.log('⚠️  [JSON-LD] Found Product schema but incomplete data');
+  return { complete: false };
 }
 
-async function extractWithAI(html, url, openai, testMetadata, logger, jsonLdResult = null, deterministicResult = null) {
+// ============================================
+// STEP 5: AI EXTRACTION
+// ============================================
+
+async function extractWithAI(html, url, openai, logger, jsonLdResult = null, inferredColor = null) {
+  // Pre-extract og:image
   let preExtractedImage = null;
   const ogImageMatch = html.match(/<meta[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["']/i);
-  const twitterImageMatch = html.match(/<meta[^>]*(?:property|name)=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']twitter:image["']/i);
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["']/i);
 
-  if (ogImageMatch && ogImageMatch[1] && ogImageMatch[1].startsWith('http')) {
+  if (ogImageMatch?.[1]?.startsWith('http')) {
     preExtractedImage = ogImageMatch[1];
-    testMetadata.imageExtraction.preExtracted = true;
-    testMetadata.imageExtraction.source = 'og:image';
-    logger.log(`🖼️  Pre-extracted og:image: ${preExtractedImage}`);
-  } else if (twitterImageMatch && twitterImageMatch[1] && twitterImageMatch[1].startsWith('http')) {
-    preExtractedImage = twitterImageMatch[1];
-    testMetadata.imageExtraction.preExtracted = true;
-    testMetadata.imageExtraction.source = 'twitter:image';
-    logger.log(`🖼️  Pre-extracted twitter:image: ${preExtractedImage}`);
+    logger.log(`🖼️  [AI] Pre-extracted og:image`);
   }
 
+  // Prepare content for AI
   let contentToSend;
   let isJsonLd = false;
 
-  if (jsonLdResult && jsonLdResult.rawJsonLd) {
-    contentToSend = JSON.stringify(jsonLdResult.rawJsonLd, null, 2);
+  if (jsonLdResult && !jsonLdResult.complete) {
+    // We have partial JSON-LD data
+    contentToSend = JSON.stringify(jsonLdResult, null, 2);
     isJsonLd = true;
-    logger.log(`📊 Sending JSON-LD to OpenAI (${contentToSend.length} chars)`);
+    logger.log(`📊 [AI] Using partial JSON-LD data`);
   } else {
+    // Extract relevant HTML snippets
     const pricePatterns = [
       /<[^>]*class="[^"]*price[^"]*"[^>]*>[\s\S]{0,500}<\/[^>]+>/gi,
       /<[^>]*class="[^"]*product[^"]*"[^>]*>[\s\S]{0,1000}<\/[^>]+>/gi,
       /<script type="application\/json"[^>]*>[\s\S]{0,5000}<\/script>/gi,
-      /<meta[^>]*property="og:(?:title|image|price)"[^>]*>/gi,
-      /<h1[^>]*>[\s\S]{0,200}<\/h1>/gi,
-      /<[^>]*itemprop=["'](?:price|name|image)["'][^>]*>/gi
+      /<meta[^>]*property="og:[^"]*"[^>]*>/gi,
+      /<h1[^>]*>[\s\S]{0,200}<\/h1>/gi
     ];
 
-    let extractedSnippets = [];
+    let snippets = [];
     for (const pattern of pricePatterns) {
       const matches = html.match(pattern);
-      if (matches) {
-        extractedSnippets.push(...matches);
-      }
+      if (matches) snippets.push(...matches);
     }
 
-    contentToSend = extractedSnippets.length > 0
-      ? extractedSnippets.join('\n').substring(0, 50000)
+    contentToSend = snippets.length > 0
+      ? snippets.join('\n').substring(0, 50000)
       : html.substring(0, 50000);
 
-    logger.log(`📝 Extracted ${extractedSnippets.length} relevant HTML sections (${contentToSend.length} chars)`);
+    logger.log(`📝 [AI] Extracted ${snippets.length} HTML sections`);
   }
 
-  const systemPrompt = isJsonLd 
-    ? `You are a product data parser. Extract from JSON-LD (schema.org Product format) and return ONLY valid JSON.
+  const systemPrompt = `You are a product page parser. Extract data and return ONLY valid JSON.
 
-PRICE EXTRACTION RULES:
-1. "offers.price" = CURRENT selling price (this is salePrice)
-2. "offers.highPrice" OR "offers.priceSpecification.price" = ORIGINAL/regular price (this is originalPrice)
-3. If BOTH exist and highPrice > price, then there's a discount
-4. If only ONE price exists, set originalPrice to null and percentOff to 0
-5. NEVER swap the prices - current price is ALWAYS the lower sale price
-
-Return this structure:
-{
-  "name": "Product Name (without brand)",
-  "brand": "Brand Name",
-  "imageUrl": "https://...",
-  "originalPrice": 999.99,
-  "salePrice": 499.99,
-  "percentOff": 50,
-  "color": "Black",
-  "confidence": 90
-}
-
-Rules:
-- Remove brand from product name
-- Extract color if present in product name or attributes (e.g., "Black", "Navy Blue", "Red")
-- If no color found, set color to null
-- confidence: 85-95 for JSON-LD
-- If no discount, originalPrice = null, percentOff = 0`
-    : `You are a product page parser. Extract data from HTML and return ONLY valid JSON.
-
-🚨 CRITICAL PRICE RULES (READ CAREFULLY):
-
-You MUST identify TWO prices if a sale is active:
-1. **ORIGINAL PRICE** = The HIGHER, crossed-out, or "was" price (what it cost before the sale)
-2. **SALE PRICE** = The LOWER, current, active price (what you pay now)
+CRITICAL PRICE RULES:
+1. **ORIGINAL PRICE** = Higher, crossed-out, or "was" price (before sale)
+2. **SALE PRICE** = Lower, current, active price (what you pay now)
 
 ORIGINAL PRICE indicators:
-- Inside <s>, <del>, <strike> tags
-- Classes: "compare-price", "was-price", "original-price", "line-through", "strike-through"
-- Text near: "Was $", "Originally $", "Compare at $", "Regular price $", "Retail $"
-- In Shopify JSON: "compare_at_price" field (divide by 100 if in cents)
-- In structured data: "highPrice", "listPrice" in microdata/JSON-LD
+- <s>, <del>, <strike> tags
+- Classes: "compare-price", "was-price", "original-price"
+- Text: "Was $", "Originally $", "Compare at $"
+- Shopify JSON: "compare_at_price" (divide by 100)
 
 SALE PRICE indicators:
-- The prominent, active selling price
-- Usually larger font, red/highlighted
+- Prominent, active price
 - Classes: "sale-price", "current-price", "final-price"
-- In Shopify JSON: "price" field (divide by 100 if in cents)
-- In structured data: "price" in microdata/JSON-LD
-
-⚠️ VALIDATION CHECKS:
-1. originalPrice MUST be HIGHER than salePrice (if both exist)
-2. If you find two prices but they're equal, set originalPrice = null
-3. If you only find ONE price, set originalPrice = null, percentOff = 0
-4. NEVER return the same value for both prices
-5. For Shopify stores: "compare_at_price" is ALWAYS originalPrice, "price" is ALWAYS salePrice
-
-DEPARTMENT STORE SPECIFIC:
-- Nordstrom: Look for "OfferPrice" (sale) and "RetailPrice" (original) in JSON
-- Saks: Check for sale-price vs regular-price classes
-- Neiman Marcus: Look for "listPrice" vs "offerPrice"
+- Shopify JSON: "price" (divide by 100)
 
 Return this structure:
 {
-  "name": "Product Name Only (no brand)",
-  "brand": "Actual Brand (not store name)",
-  "imageUrl": "Real product image URL",
+  "name": "Product Name (no brand, no store)",
+  "brand": "Brand Name",
+  "imageUrl": "https://...",
   "originalPrice": 435.00,
   "salePrice": 131.00,
   "percentOff": 70,
@@ -1403,183 +705,93 @@ Return this structure:
   "confidence": 85
 }
 
-Color extraction:
-- Look for color in product name, color selectors, attributes, or variant data
-- Examples: "Black", "Navy Blue", "Cognac", "Ivory"
-- If no color found, set to null
-
-Confidence scoring:
-- 90-100: Prices in structured data (JSON, microdata) with clear original/sale distinction
-- 70-89: Prices in HTML with clear patterns (strikethrough, "was" text)
-- 50-69: Ambiguous or only one price found
-- Below 50: Highly uncertain, missing data
-
-NEVER use placeholder images. Return {"error": "..."} if you can't extract required data.`;
+Rules:
+- If only ONE price exists: originalPrice = null, percentOff = 0
+- originalPrice MUST be > salePrice (if both exist)
+- Extract color from product name or selectors
+- confidence: 90+ for structured data, 70-89 for HTML patterns
+- Return {"error": "..."} if missing required data
+- NEVER use placeholder images`;
 
   let userPrompt = contentToSend;
-
-  if (isJsonLd) {
-    userPrompt = `Here is the JSON-LD structured product data:\n\n${contentToSend}`;
-    if (preExtractedImage) {
-      userPrompt += `\n\nNOTE: Pre-extracted image URL: ${preExtractedImage} - use this if JSON-LD image is missing.`;
-    }
-  } else {
-    if (preExtractedImage) {
-      userPrompt = `${contentToSend}\n\nNOTE: Pre-extracted image URL: ${preExtractedImage} - use this for imageUrl.`;
-    }
+  if (preExtractedImage) {
+    userPrompt += `\n\nPre-extracted og:image: ${preExtractedImage}`;
   }
-
-  if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
-    userPrompt += `\n\n✅ VERIFIED PRICES (use these exact values):
-- Sale Price (current price): $${deterministicResult.salePrice}
-- Original Price (was price): $${deterministicResult.originalPrice}
-- Percent Off: ${deterministicResult.percentOff}%
-- Source: ${deterministicResult.source}
-
-These were extracted from reliable structured data. Use these EXACT prices. Only extract name and image.`;
+  if (inferredColor) {
+    userPrompt += `\n\nInferred color from URL: ${inferredColor}`;
   }
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
-      {
-        role: 'system',
-        content: systemPrompt
-      },
-      {
-        role: 'user',
-        content: userPrompt
-      }
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
     ],
     temperature: 0.1,
   });
 
   const aiResponse = completion.choices[0].message.content.trim();
-  logger.log('🤖 AI Response:', aiResponse);
+  const cleanJson = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
   let productData;
   try {
-    const jsonString = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    productData = JSON.parse(jsonString);
-  } catch (parseError) {
-    const error = new Error('Failed to parse AI response');
-    error.errorType = 'FATAL';
-    throw error;
+    productData = JSON.parse(cleanJson);
+  } catch (e) {
+    throw createError('Failed to parse AI response', 'FATAL');
   }
 
   if (productData.error) {
-    const error = new Error(productData.error);
-    error.errorType = 'FATAL';
-    throw error;
+    throw createError(productData.error, 'FATAL');
   }
 
+  // Validate required fields
   if (!productData.name || !productData.imageUrl || productData.salePrice === undefined) {
-    const error = new Error('Missing required product fields');
-    error.errorType = 'FATAL';
-    throw error;
+    throw createError('Missing required product fields', 'FATAL');
   }
 
-  const placeholderDomains = ['example.com', 'placeholder.com', 'via.placeholder.com', 'placehold.it', 'dummyimage.com'];
-  const imageUrl = productData.imageUrl.toLowerCase();
-  if (placeholderDomains.some(domain => imageUrl.includes(domain))) {
-    const error = new Error('AI returned placeholder image URL');
-    error.errorType = 'FATAL';
-    throw error;
+  // Check for placeholder images
+  const placeholderDomains = ['example.com', 'placeholder.com', 'via.placeholder.com', 'placehold.it'];
+  if (placeholderDomains.some(d => productData.imageUrl.toLowerCase().includes(d))) {
+    throw createError('AI returned placeholder image', 'FATAL');
   }
 
-  let originalPrice, salePrice, percentOff = 0;
-  let confidence = productData.confidence ? parseInt(productData.confidence) : 50;
+  // Parse prices
+  const salePrice = parseFloat(productData.salePrice);
+  let originalPrice = productData.originalPrice !== null && productData.originalPrice !== undefined
+    ? parseFloat(productData.originalPrice)
+    : null;
+  let percentOff = 0;
+  let confidence = parseInt(productData.confidence) || 70;
 
-  if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
-    originalPrice = deterministicResult.originalPrice;
-    salePrice = deterministicResult.salePrice;
-    percentOff = deterministicResult.percentOff;
-    confidence = Math.max(confidence, 88);
-    logger.log(`✅ Using deterministic prices: $${salePrice} (was $${originalPrice})`);
-  } else {
-    originalPrice = productData.originalPrice !== null && productData.originalPrice !== undefined ? parseFloat(productData.originalPrice) : null;
-    salePrice = parseFloat(productData.salePrice);
-
-    if (isNaN(salePrice)) {
-      const error = new Error('Invalid sale price');
-      error.errorType = 'FATAL';
-      throw error;
-    }
-
-    if (originalPrice !== null) {
-      if (isNaN(originalPrice)) {
-        logger.log(`⚠️  Invalid originalPrice (${productData.originalPrice}), setting to null`);
-        originalPrice = null;
-        percentOff = 0;
-        confidence = Math.max(30, confidence - 20);
-      } else if (originalPrice <= salePrice) {
-        logger.log(`⚠️  Invalid: originalPrice ($${originalPrice}) <= salePrice ($${salePrice}). Setting originalPrice to null.`);
-        originalPrice = null;
-        percentOff = 0;
-        confidence = Math.max(30, confidence - 25);
-      } else if (originalPrice === salePrice) {
-        logger.log(`⚠️  Prices are equal ($${originalPrice}), no discount. Setting originalPrice to null.`);
-        originalPrice = null;
-        percentOff = 0;
-        confidence = Math.max(40, confidence - 15);
-      } else {
-        percentOff = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
-
-        if (productData.percentOff && Math.abs(percentOff - productData.percentOff) > 2) {
-          logger.log(`⚠️  Percent off mismatch: AI said ${productData.percentOff}%, calculated ${percentOff}%`);
-          confidence = Math.max(40, confidence - 15);
-        }
-      }
-    }
+  if (isNaN(salePrice)) {
+    throw createError('Invalid sale price', 'FATAL');
   }
 
-  if (!deterministicResult) {
-    const priceVariants = [
-      `$${salePrice.toFixed(2)}`,
-      salePrice.toFixed(2),
-      String(Math.round(salePrice * 100)),
-      `${Math.floor(salePrice)}`,
-    ];
-
-    const matchedFormat = priceVariants.find(variant => html.includes(variant));
-    const foundInHtml = matchedFormat !== undefined;
-
-    testMetadata.priceValidation.foundInHtml = foundInHtml;
-
-    if (!foundInHtml) {
-      logger.log(`⚠️  Sale price $${salePrice} not found in HTML, possible hallucination`);
+  // Validate price logic
+  if (originalPrice !== null) {
+    if (isNaN(originalPrice) || originalPrice <= salePrice) {
+      logger.log(`⚠️  [AI] Invalid originalPrice, setting to null`);
+      originalPrice = null;
       confidence = Math.max(30, confidence - 20);
-      testMetadata.confidenceAdjustments.push({
-        reason: 'price_not_found_in_html',
-        adjustment: -20
-      });
+    } else {
+      percentOff = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
     }
   }
 
-  if (confidence < 50) {
-    const error = new Error(`Low confidence (${confidence}%) - data may be inaccurate`);
-    error.errorType = 'FATAL';
-    throw error;
-  }
+  // Use inferred color if AI didn't find one
+  const color = productData.color || inferredColor || null;
 
-  logger.log(`✅ Extracted product (confidence: ${confidence}%):`, { 
-    name: productData.name, 
-    brand: productData.brand, 
-    salePrice, 
-    originalPrice, 
-    percentOff 
-  });
-
-  testMetadata.phaseUsed = 'ai-extraction';
+  logger.log(`✅ [AI] Extracted product (confidence: ${confidence}%)`);
 
   return {
     name: productData.name,
-    brand: shouldAutofillBrand(url) ? (productData.brand || null) : null,
+    brand: productData.brand || null,
     imageUrl: productData.imageUrl,
-    originalPrice: originalPrice,
-    salePrice: salePrice,
-    percentOff: percentOff,
-    url: url,
-    confidence: confidence
+    originalPrice,
+    salePrice,
+    percentOff,
+    color,
+    url,
+    confidence
   };
 }
