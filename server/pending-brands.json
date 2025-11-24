@@ -238,5 +238,37 @@
     "qualityScore": 83,
     "id": "brand_1764017144803_i10fmkbvk",
     "createdAt": "2025-11-24T20:45:44.803Z"
+  },
+  {
+    "name": "Andrea Gomez",
+    "airtableRecordId": "rec7j2Tt0rDRQlUts",
+    "type": "Brand",
+    "priceRange": "$$$",
+    "category": "Shoes",
+    "values": "Independent label",
+    "maxWomensSize": "",
+    "sizingSource": "",
+    "description": "If you're tired of choosing between architectural minimalism and throwback sweetness in your shoe closet, Andrea Gomez bridges that gap with platforms that feel both substantial and refined. She's obsessed with the interplay between chunky proportions and luxe materials—think creamy suede meeting clean geometric lines—so you get the height and presence of a statement shoe without sacrificing sophistication.",
+    "notes": "Price: From 1 products via Shopping API (limited data) | Categories: From 1 Shopping API products",
+    "url": "https://andrea-gomez.com",
+    "qualityScore": 73,
+    "id": "brand_1764017158753_amxm0e4b6",
+    "createdAt": "2025-11-24T20:45:58.753Z"
+  },
+  {
+    "name": "Fendi",
+    "airtableRecordId": "rec7wKuMxdQvwT6Z7",
+    "type": "Brand",
+    "priceRange": "$$$$",
+    "category": "Shoes, Bags, Clothing",
+    "values": "",
+    "maxWomensSize": "",
+    "sizingSource": "",
+    "description": "If you love the craftsmanship of Bottega Veneta but want something with more personality than their quiet luxury, Fendi brings Italian savoir-faire with a sense of humor and unmistakable codes. The house perfected the art of the structured mini bag decades before it became ubiquitous, and their double-F logo feels earned rather than ostentatious—especially when it's woven into their signature canvas or embossed into buttery Roman leather that only gets better with age.",
+    "notes": "Price: From 26 products via Shopping API | Categories: From 26 Shopping API products | Sizing: Not found",
+    "url": "https://fendi.com",
+    "qualityScore": 83,
+    "id": "brand_1764017171056_v04nmpli6",
+    "createdAt": "2025-11-24T20:46:11.056Z"
   }
 ]
