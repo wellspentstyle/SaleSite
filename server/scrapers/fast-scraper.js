@@ -50,7 +50,7 @@ export async function scrapeProduct(url, options = {}) {
 
           const googleShoppingResult = await tryGoogleShopping(url, serperApiKey, logger);
 
-          if (googleShoppingResult && googleShoppingResult.success) {
+          if (googleShoppingResult) {
             // We got product info from Google Shopping!
             logger.log('✅ [Fast Scraper] Google Shopping found product data');
 
@@ -61,7 +61,7 @@ export async function scrapeProduct(url, options = {}) {
               logger.log('📄 [Fast Scraper] Attempting to fetch fresh sale price from page...');
               freshPrice = await fetchFreshSalePrice(url, fetchImpl, logger);
             } catch (error) {
-              logger.log(`⚠️ [Fast Scraper] Fresh price fetch failed (${error.message}), using Shopping API data`);
+              logger.log(`⚠️ [Fast Scraper] Fresh price fetch failed: ${error.message}, using Shopping API data`);
             }
 
             // Prefer fresh price if available, fall back to Shopping API price
@@ -532,147 +532,110 @@ function buildGoogleShoppingQuery(url, logger) {
 // ============================================
 
 async function tryGoogleShopping(url, serperApiKey, logger) {
+  const urlObj = new URL(url);
+  const urlDomain = urlObj.hostname.replace('www.', '');
+  
+  // Build multiple query strategies
+  const queries = [
+    url, // Try exact URL first
+    `${urlDomain} ${urlObj.pathname.split('/').filter(Boolean).slice(-2).join(' ').replace(/[-_]/g, ' ')}`.trim() // Domain + last path segments
+  ];
+
   try {
-    // Build smart search query from URL
-    const searchQuery = buildGoogleShoppingQuery(url, logger);
+    for (const query of queries) {
+      // Search Google Shopping for this product URL or a fallback query
+      const searchResponse = await fetch('https://google.serper.dev/shopping', {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': serperApiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          q: query,
+          num: 5 // Grab more results to improve matching
+        })
+      });
 
-    if (!searchQuery) {
-      logger.log('⚠️ Could not build search query from URL');
-      return { success: false, error: 'Could not parse URL' };
-    }
+      if (!searchResponse.ok) {
+        logger.log(`⚠️ Google Shopping API error (${query}): ${searchResponse.status}`);
+        continue;
+      }
 
-    // Search Google Shopping for this product
-    const searchResponse = await fetch('https://google.serper.dev/shopping', {
-      method: 'POST',
-      headers: {
-        'X-API-KEY': serperApiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        q: searchQuery,
-        num: 5, // Get top 5 results for better matching
-        gl: 'us', // US results
-        hl: 'en' // English
-      })
-    });
+      const data = await searchResponse.json();
 
-    if (!searchResponse.ok) {
-      const errorText = await searchResponse.text().catch(() => 'Unknown error');
-      logger.log(`⚠️ Google Shopping API error: ${searchResponse.status} - ${errorText}`);
-      return { success: false, error: `API returned ${searchResponse.status}` };
-    }
+      if (!data.shopping_results || data.shopping_results.length === 0) {
+        logger.log(`⚠️ No Google Shopping results found for query: ${query}`);
+        continue;
+      }
 
-    const data = await searchResponse.json();
+      logger.log(`✅ Found ${data.shopping_results.length} Google Shopping results for query: ${query}`);
 
-    if (!data.shopping_results || data.shopping_results.length === 0) {
-      logger.log('⚠️ No Google Shopping results found for this query');
-      return { success: false, error: 'No results found' };
-    }
-
-    logger.log(`✅ Found ${data.shopping_results.length} Google Shopping results`);
-
-    // Find the result that best matches our URL
-    const urlDomain = new URL(url).hostname.replace('www.', '');
-    let bestMatch = null;
-    let matchScore = 0;
-
-    for (const result of data.shopping_results) {
-      let score = 0;
-
-      // Check if the link matches the domain (highest priority)
-      if (result.link && result.link.includes(urlDomain)) {
-        score += 100;
-
-        // Extra points if significant part of URL matches
-        const urlPath = new URL(url).pathname.toLowerCase();
-        const resultPath = result.link.toLowerCase();
-        if (resultPath.includes(urlPath.substring(0, 30))) {
-          score += 50;
+      // Find the result that best matches our URL
+      let bestMatch = null;
+      
+      for (const result of data.shopping_results) {
+        // Check if the source matches the domain
+        if (result.link && result.link.includes(urlDomain)) {
+          bestMatch = result;
+          break;
+        }
+        // Or if source name matches
+        if (result.source && result.source.toLowerCase().includes(urlDomain.split('.')[0])) {
+          bestMatch = result;
+          break;
         }
       }
 
-      // Check if source name matches
-      if (result.source && result.source.toLowerCase().includes(urlDomain.split('.')[0])) {
-        score += 50;
+      // If no exact match, use first result
+      if (!bestMatch) {
+        bestMatch = data.shopping_results[0];
       }
 
-      // Prefer results with prices
-      if (result.price || result.extracted_price) {
-        score += 10;
+      // Extract product data
+      const product = {
+        name: bestMatch.title,
+        brand: extractBrandFromTitle(bestMatch.title),
+        imageUrl: bestMatch.imageUrl || bestMatch.image || bestMatch.thumbnail,
+        originalPrice: null,
+        currentPrice: null
+      };
+
+      // Parse prices
+      if (bestMatch.price) {
+        const priceStr = bestMatch.price.replace(/[^0-9.]/g, '');
+        product.currentPrice = parseFloat(priceStr);
       }
 
-      // Prefer results with images
-      if (result.imageUrl || result.thumbnail) {
-        score += 5;
+      // Check for original/compare price
+      if (bestMatch.extracted_price) {
+        product.currentPrice = bestMatch.extracted_price;
       }
 
-      if (score > matchScore) {
-        matchScore = score;
-        bestMatch = result;
+      // Some Google Shopping results have old_price or extracted_old_price
+      if (bestMatch.old_price) {
+        const oldPriceStr = bestMatch.old_price.replace(/[^0-9.]/g, '');
+        product.originalPrice = parseFloat(oldPriceStr);
+      } else if (bestMatch.extracted_old_price) {
+        product.originalPrice = bestMatch.extracted_old_price;
       }
-    }
 
-    // If no domain match found, use first result but with lower confidence
-    if (!bestMatch || matchScore < 50) {
-      logger.log('⚠️ No exact domain match, using best available result');
-      bestMatch = data.shopping_results[0];
-    } else {
-      logger.log(`✅ Found matching result (score: ${matchScore})`);
-    }
-
-    // Extract product data
-    const product = {
-      name: bestMatch.title,
-      brand: extractBrandFromTitle(bestMatch.title),
-      imageUrl: bestMatch.imageUrl || bestMatch.thumbnail,
-      originalPrice: null,
-      currentPrice: null
-    };
-
-    // Parse prices
-    if (bestMatch.price) {
-      const priceStr = bestMatch.price.replace(/[^0-9.]/g, '');
-      const parsed = parseFloat(priceStr);
-      if (!isNaN(parsed) && parsed > 0) {
-        product.currentPrice = parsed;
+      // Validate we got minimum required data
+      if (!product.name || !product.imageUrl) {
+        logger.log('⚠️ Google Shopping result missing name or image');
+        continue;
       }
-    }
 
-    // Check for original/compare price
-    if (bestMatch.extracted_price) {
-      product.currentPrice = bestMatch.extracted_price;
-    }
-
-    // Some Google Shopping results have old_price or extracted_old_price
-    if (bestMatch.old_price) {
-      const oldPriceStr = bestMatch.old_price.replace(/[^0-9.]/g, '');
-      const parsed = parseFloat(oldPriceStr);
-      if (!isNaN(parsed) && parsed > 0) {
-        product.originalPrice = parsed;
+      logger.log(`✅ Google Shopping: ${product.name}`);
+      if (product.originalPrice) {
+        logger.log(`   Original: $${product.originalPrice}, Current: $${product.currentPrice}`);
+      } else {
+        logger.log(`   Price: $${product.currentPrice}`);
       }
-    } else if (bestMatch.extracted_old_price) {
-      product.originalPrice = bestMatch.extracted_old_price;
+
+      return product;
     }
 
-    // Validate we got minimum required data
-    if (!product.name || !product.imageUrl) {
-      logger.log('⚠️ Google Shopping result missing name or image');
-      return { success: false, error: 'Incomplete product data' };
-    }
-
-    logger.log(`✅ Google Shopping: ${product.name}`);
-    if (product.originalPrice && product.currentPrice) {
-      logger.log(`   Original: $${product.originalPrice}, Current: $${product.currentPrice}`);
-    } else if (product.currentPrice) {
-      logger.log(`   Price: $${product.currentPrice}`);
-    } else {
-      logger.log(`   ⚠️ No price data available`);
-    }
-
-    return {
-      success: true,
-      ...product
-    };
+    return null;
 
   } catch (error) {
     logger.log(`⚠️ Google Shopping error: ${error.message}`);
