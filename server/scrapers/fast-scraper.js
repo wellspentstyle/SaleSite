@@ -48,7 +48,7 @@ export async function scrapeProduct(url, options = {}) {
         if (serperApiKey) {
           logger.log('🛍️ [Fast Scraper] Trying Google Shopping API...');
 
-          const googleShoppingResult = await tryGoogleShopping(url, serperApiKey, logger);
+          const googleShoppingResult = await tryGoogleShopping(url, serperApiKey, logger, fetchImpl);
 
           if (googleShoppingResult) {
             // We got product info from Google Shopping!
@@ -362,7 +362,7 @@ function extractProductInfoFromUrl(url) {
     const segments = pathname.split('/').filter(s => s.length > 0);
 
     // Remove common non-product segments
-    const skipSegments = ['shop', 'product', 'products', 'p', 's', 'pd', 'item', 'items'];
+    const skipSegments = ['shop', 'product', 'products', 'p', 's', 'pd', 'item', 'items', 'browse'];
     const relevantSegments = segments.filter(s => !skipSegments.includes(s.toLowerCase()));
 
     // Strategy 1: Look for product ID patterns in URL
@@ -483,111 +483,120 @@ function extractProductInfoFromUrl(url) {
   }
 }
 
-function buildGoogleShoppingQuery(url, logger) {
-  const info = extractProductInfoFromUrl(url);
+// ============================================
+// EXTRACT META TAGS FOR PRODUCT INFO
+// ============================================
 
-  if (!info.domain) {
-    logger.log('⚠️ Could not parse URL for product info');
+async function extractMetaTags(url, fetchImpl, logger) {
+  try {
+    logger.log('🏷️  [Meta Tags] Attempting quick meta tag extraction...');
+
+    const response = await fetchImpl(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      signal: AbortSignal.timeout(5000) // Fast 5-second timeout
+    });
+
+    if (!response.ok) {
+      logger.log(`⚠️  [Meta Tags] Failed with status ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+
+    // Extract og:title (most reliable for full product name)
+    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
+
+    let productName = null;
+    if (ogTitleMatch) {
+      productName = ogTitleMatch[1]
+        .replace(/\s*\|\s*.+$/, '')  // Remove " | Store Name"
+        .replace(/\s*-\s*.+$/, '')   // Remove " - Store Name"
+        .replace(/\s*–\s*.+$/, '')   // Remove " – Store Name"
+        .trim();
+
+      logger.log(`✅ [Meta Tags] Extracted product name: "${productName}"`);
+    }
+
+    // Also extract og:image as backup
+    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+
+    const imageUrl = ogImageMatch ? ogImageMatch[1] : null;
+
+    return {
+      productName,
+      imageUrl
+    };
+
+  } catch (error) {
+    logger.log(`⚠️  [Meta Tags] Extraction failed: ${error.message}`);
     return null;
   }
-
-  logger.log(`📝 Extracted from URL:`, {
-    domain: info.domain,
-    productName: info.productName,
-    productId: info.productId
-  });
-
-  // Build query based on what we found
-  let queryParts = [];
-
-  if (info.productName) {
-    // Use product name - this is the most effective
-    // Limit to first 50 chars to avoid overly specific queries
-    const truncatedName = info.productName.substring(0, 50);
-    queryParts.push(truncatedName);
-  } else if (info.productId) {
-    // Fallback to product ID if no name found
-    queryParts.push(info.productId);
-  } else {
-    // Last resort: use last path segment
-    logger.log('⚠️ No product name or ID found, using path segment');
-    const segments = info.fullPath.split('/').filter(s => s.length > 0);
-    if (segments.length > 0) {
-      const lastSegment = segments[segments.length - 1];
-      queryParts.push(lastSegment.replace(/-/g, ' ').substring(0, 50));
-    }
-  }
-
-  // Always add site restriction for better matching
-  queryParts.push(`site:${info.domain}`);
-
-  const query = queryParts.join(' ').trim();
-  logger.log(`🔍 Built Google Shopping query: "${query}"`);
-
-  return query;
 }
 
 // ============================================
 // GOOGLE SHOPPING API FUNCTIONS
 // ============================================
 
-async function tryGoogleShopping(url, serperApiKey, logger) {
+async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl) {
   const urlObj = new URL(url);
   const urlDomain = urlObj.hostname.replace('www.', '');
-  
-  // Step 1: Extract product info from URL using the smart parser
-  const productInfo = extractProductInfoFromUrl(url);
-  
-  // Step 2: Also check query parameters for product names
-  let queryParamName = null;
-  const searchParams = urlObj.searchParams;
-  
-  // Common query param names for products
-  const nameParams = ['searchText', 'q', 'query', 'search', 'keyword', 'name'];
-  for (const param of nameParams) {
-    const value = searchParams.get(param);
-    if (value && value.length > 2) {
-      queryParamName = decodeURIComponent(value).replace(/[+]/g, ' ').trim();
-      break;
-    }
-  }
-  
+
+  // Step 1: Try to extract product info from meta tags (HIGHEST PRIORITY)
+  const metaData = await extractMetaTags(url, fetchImpl, logger);
+
+  // Step 2: Extract product info from URL as fallback
+  const urlInfo = extractProductInfoFromUrl(url);
+
   logger.log('📝 Extracted product info:', {
-    fromPath: productInfo.productName,
-    fromQueryParams: queryParamName,
-    productId: productInfo.productId,
-    domain: productInfo.domain
+    fromMetaTags: metaData?.productName || 'none',
+    fromURL: urlInfo.productName || 'none',
+    productId: urlInfo.productId || 'none',
+    domain: urlInfo.domain
   });
-  
+
   // Step 3: Build multiple query strategies (most specific first)
   const queries = [];
-  
-  // Strategy 1: Query param name (often most accurate) + domain
-  if (queryParamName) {
-    queries.push(`${queryParamName} site:${urlDomain}`);
+
+  // Strategy 1: Meta og:title (BEST - exact product name with quotes)
+  if (metaData?.productName) {
+    // Use quotes for exact match since meta tags are accurate
+    queries.push(`"${metaData.productName}" ${urlDomain}`);
   }
-  
-  // Strategy 2: Product name from path + domain
-  if (productInfo.productName) {
-    queries.push(`${productInfo.productName} site:${urlDomain}`);
+
+  // Strategy 2: URL-extracted product name (GOOD - fuzzy match without quotes)
+  if (urlInfo.productName) {
+    // No quotes - URL slugs may be abbreviated, let Google fuzzy match
+    queries.push(`${urlInfo.productName} ${urlDomain}`);
   }
-  
+
   // Strategy 3: Product ID + domain (for sites with SKUs in URL)
-  if (productInfo.productId) {
-    queries.push(`${productInfo.productId} site:${urlDomain}`);
+  if (urlInfo.productId) {
+    queries.push(`${urlInfo.productId} ${urlDomain}`);
   }
-  
-  // Strategy 4: Fallback to exact URL (rarely works but worth trying)
-  queries.push(url);
-  
+
+  // Strategy 4: Last resort - just domain with generic product term
+  queries.push(`product ${urlDomain}`);
+
   if (queries.length === 1) {
-    // Only have the URL fallback, no extracted info
-    logger.log('⚠️ Could not extract product info from URL, only trying exact URL');
+    // Only have the generic fallback
+    logger.log('⚠️  Could not extract specific product info, using generic search');
   }
 
   try {
-    for (const query of queries) {
-      // Search Google Shopping for this product URL or a fallback query
+    for (let i = 0; i < queries.length; i++) {
+      const query = queries[i];
+      const strategyName = i === 0 && metaData?.productName ? 'Meta Tags (exact)' :
+                          i === 0 || (i === 1 && metaData?.productName) ? 'URL Slug (fuzzy)' :
+                          'Product ID' ;
+
+      logger.log(`🔍 [Google Shopping] Trying strategy ${i + 1}/${queries.length}: ${strategyName}`);
+      logger.log(`   Query: "${query}"`);
+
+      // Search Google Shopping
       const searchResponse = await fetch('https://google.serper.dev/shopping', {
         method: 'POST',
         headers: {
@@ -596,50 +605,63 @@ async function tryGoogleShopping(url, serperApiKey, logger) {
         },
         body: JSON.stringify({
           q: query,
-          num: 5 // Grab more results to improve matching
+          num: 10 // Get more results to improve matching chances
         })
       });
 
       if (!searchResponse.ok) {
-        logger.log(`⚠️ Google Shopping API error (${query}): ${searchResponse.status}`);
-        continue;
+        logger.log(`⚠️  [Google Shopping] API error: ${searchResponse.status}`);
+        continue; // Try next query
       }
 
       const data = await searchResponse.json();
 
       if (!data.shopping_results || data.shopping_results.length === 0) {
-        logger.log(`⚠️ No Google Shopping results found for query: ${query}`);
-        continue;
+        logger.log(`⚠️  [Google Shopping] No results for this query`);
+        continue; // Try next query
       }
 
-      logger.log(`✅ Found ${data.shopping_results.length} Google Shopping results for query: ${query}`);
+      logger.log(`✅ [Google Shopping] Found ${data.shopping_results.length} results`);
 
-      // Find the result that best matches our URL
+      // Find the result that best matches our domain
       let bestMatch = null;
-      
+
       for (const result of data.shopping_results) {
-        // Check if the source matches the domain
+        // Check if the link matches the domain
         if (result.link && result.link.includes(urlDomain)) {
           bestMatch = result;
+          logger.log(`✅ [Google Shopping] Found exact domain match in results`);
           break;
         }
-        // Or if source name matches
+        // Or if source name matches domain
         if (result.source && result.source.toLowerCase().includes(urlDomain.split('.')[0])) {
           bestMatch = result;
+          logger.log(`✅ [Google Shopping] Found source name match: ${result.source}`);
           break;
         }
       }
 
-      // If no exact match, use first result
-      if (!bestMatch) {
-        bestMatch = data.shopping_results[0];
+      // If no domain match but we have results, check if we're on first/best query
+      if (!bestMatch && i === 0 && data.shopping_results.length > 0) {
+        // First query (meta tags) found results but not from exact retailer
+        // This could still be the right product on a different retailer
+        // Take first result as "close enough" only if meta tag query
+        if (metaData?.productName) {
+          bestMatch = data.shopping_results[0];
+          logger.log(`⚠️  [Google Shopping] Using first result (meta tag match, different retailer)`);
+        }
       }
 
-      // Extract product data
+      if (!bestMatch) {
+        logger.log(`⚠️  [Google Shopping] Results found but none from ${urlDomain}, trying next query...`);
+        continue; // Try next query
+      }
+
+      // Extract product data from matched result
       const product = {
         name: bestMatch.title,
         brand: extractBrandFromTitle(bestMatch.title),
-        imageUrl: bestMatch.imageUrl || bestMatch.image || bestMatch.thumbnail,
+        imageUrl: metaData?.imageUrl || bestMatch.imageUrl || bestMatch.image || bestMatch.thumbnail,
         originalPrice: null,
         currentPrice: null
       };
@@ -650,12 +672,12 @@ async function tryGoogleShopping(url, serperApiKey, logger) {
         product.currentPrice = parseFloat(priceStr);
       }
 
-      // Check for original/compare price
+      // Check for extracted_price (more reliable)
       if (bestMatch.extracted_price) {
         product.currentPrice = bestMatch.extracted_price;
       }
 
-      // Some Google Shopping results have old_price or extracted_old_price
+      // Look for original/compare price
       if (bestMatch.old_price) {
         const oldPriceStr = bestMatch.old_price.replace(/[^0-9.]/g, '');
         product.originalPrice = parseFloat(oldPriceStr);
@@ -665,11 +687,11 @@ async function tryGoogleShopping(url, serperApiKey, logger) {
 
       // Validate we got minimum required data
       if (!product.name || !product.imageUrl) {
-        logger.log('⚠️ Google Shopping result missing name or image');
+        logger.log('⚠️  [Google Shopping] Result missing name or image, trying next query...');
         continue;
       }
 
-      logger.log(`✅ Google Shopping: ${product.name}`);
+      logger.log(`✅ [Google Shopping] Product: ${product.name}`);
       if (product.originalPrice) {
         logger.log(`   Original: $${product.originalPrice}, Current: $${product.currentPrice}`);
       } else {
@@ -679,11 +701,13 @@ async function tryGoogleShopping(url, serperApiKey, logger) {
       return product;
     }
 
+    // All queries exhausted
+    logger.log('❌ [Google Shopping] All query strategies failed');
     return null;
 
   } catch (error) {
-    logger.log(`⚠️ Google Shopping error: ${error.message}`);
-    return { success: false, error: error.message };
+    logger.log(`❌ [Google Shopping] Error: ${error.message}`);
+    return null;
   }
 }
 
