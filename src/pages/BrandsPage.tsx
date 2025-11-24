@@ -225,13 +225,16 @@ export function BrandsPage() {
         backgroundColor: '#fff'
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <h1 style={{ 
-            fontFamily: 'Crimson Pro, serif',
-            fontSize: '48px',
-            fontWeight: 400,
-            marginBottom: '16px',
-            letterSpacing: '-0.02em'
-          }}>
+          <h1 
+            className="leading-tight md:leading-normal"
+            style={{ 
+              fontFamily: 'Crimson Pro, serif',
+              fontSize: '48px',
+              fontWeight: 400,
+              marginBottom: '16px',
+              letterSpacing: '-0.02em'
+            }}
+          >
             The Brands We're Watching
           </h1>
           <p style={{ 
