@@ -543,9 +543,8 @@ async function extractMetaTags(url, fetchImpl, logger, scraperApiKey) {
     }
 
     // Extract og:title (most reliable for full product name)
-    // Improved regex: matches property OR name, handles both attribute orders, flexible spacing
-    const ogTitleMatch = html.match(/<meta\s+[^>]*(?:property|name)=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:title["']/i);
+    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
 
     let productName = null;
     if (ogTitleMatch) {
@@ -559,9 +558,8 @@ async function extractMetaTags(url, fetchImpl, logger, scraperApiKey) {
     }
 
     // Also extract og:image as backup
-    // Improved regex: matches property OR name, handles both attribute orders, flexible spacing
-    const ogImageMatch = html.match(/<meta\s+[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["']/i);
+    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
 
     const imageUrl = ogImageMatch ? ogImageMatch[1] : null;
 
@@ -708,16 +706,14 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
         }
       }
 
-      // If no domain match but we have results, use first result if query is specific
-      if (!bestMatch && data.shopping_results.length > 0) {
-        // For specific queries (meta tags or URL query params), trust the first result
-        // even if it's from a third-party retailer (common for Gap/BR/etc)
-        const isSpecificQuery = source === 'meta-tags-exact' || source === 'url-query-param';
-        
-        if (isSpecificQuery) {
+      // If no domain match but we have results, check if we're on first/best query
+      if (!bestMatch && i === 0 && data.shopping_results.length > 0) {
+        // First query (meta tags) found results but not from exact retailer
+        // This could still be the right product on a different retailer
+        // Take first result as "close enough" only if meta tag query
+        if (metaData?.productName) {
           bestMatch = data.shopping_results[0];
-          logger.log(`⚠️  [Google Shopping] No exact domain match, using first result from ${bestMatch.source || 'third-party'}`);
-          logger.log(`   Reason: Specific query "${query}" likely has correct product`);
+          logger.log(`⚠️  [Google Shopping] Using first result (meta tag match, different retailer)`);
         }
       }
 
@@ -730,8 +726,7 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
       const product = {
         name: bestMatch.title,
         brand: extractBrandFromTitle(bestMatch.title),
-        // PREFER Google Shopping images (more reliable) over meta tags
-        imageUrl: bestMatch.imageUrl || bestMatch.image || bestMatch.thumbnail || metaData?.imageUrl,
+        imageUrl: metaData?.imageUrl || bestMatch.imageUrl || bestMatch.image || bestMatch.thumbnail,
         originalPrice: null,
         currentPrice: null
       };
