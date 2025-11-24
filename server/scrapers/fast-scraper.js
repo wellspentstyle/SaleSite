@@ -488,53 +488,88 @@ function extractProductInfoFromUrl(url) {
 // ============================================
 
 async function extractMetaTags(url, fetchImpl, logger) {
-  try {
-    logger.log('🏷️  [Meta Tags] Attempting quick meta tag extraction...');
+  // Try multiple user-agents, prioritizing social media bots (often whitelisted)
+  const userAgents = [
+    // Facebook bot - most commonly whitelisted for Open Graph tags
+    'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+    // Standard browser (fallback)
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    // Twitter bot
+    'Twitterbot/1.0',
+    // LinkedIn bot
+    'LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient +http://www.linkedin.com)'
+  ];
 
-    const response = await fetchImpl(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      },
-      signal: AbortSignal.timeout(5000) // Fast 5-second timeout
-    });
+  for (let i = 0; i < userAgents.length; i++) {
+    const userAgent = userAgents[i];
+    const isSocialBot = i < 3; // First 3 are social bots
 
-    if (!response.ok) {
-      logger.log(`⚠️  [Meta Tags] Failed with status ${response.status}`);
-      return null;
+    try {
+      logger.log(`🏷️  [Meta Tags] Attempt ${i + 1}/${userAgents.length}: ${isSocialBot ? 'Social bot' : 'Browser'}`);
+
+      const response = await fetchImpl(url, {
+        headers: {
+          'User-Agent': userAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5'
+        },
+        signal: AbortSignal.timeout(5000) // Fast 5-second timeout per attempt
+      });
+
+      if (!response.ok) {
+        logger.log(`⚠️  [Meta Tags] Status ${response.status}, trying next user-agent...`);
+        continue; // Try next user-agent
+      }
+
+      const html = await response.text();
+
+      // Check if we actually got content
+      if (html.length < 100) {
+        logger.log(`⚠️  [Meta Tags] Response too short (${html.length} bytes), trying next...`);
+        continue;
+      }
+
+      // Extract og:title (most reliable for full product name)
+      const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
+
+      let productName = null;
+      if (ogTitleMatch) {
+        productName = ogTitleMatch[1]
+          .replace(/\s*\|\s*.+$/, '')  // Remove " | Store Name"
+          .replace(/\s*-\s*.+$/, '')   // Remove " - Store Name"
+          .replace(/\s*–\s*.+$/, '')   // Remove " – Store Name"
+          .trim();
+
+        logger.log(`✅ [Meta Tags] Extracted product name: "${productName}" (via ${isSocialBot ? 'social bot' : 'browser'})`);
+      }
+
+      // Also extract og:image as backup
+      const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+
+      const imageUrl = ogImageMatch ? ogImageMatch[1] : null;
+
+      // If we found product name, return it (success!)
+      if (productName || imageUrl) {
+        return {
+          productName,
+          imageUrl
+        };
+      }
+
+      // No meta tags found, try next user-agent
+      logger.log(`⚠️  [Meta Tags] No og: tags found in response, trying next...`);
+
+    } catch (error) {
+      logger.log(`⚠️  [Meta Tags] Error with user-agent ${i + 1}: ${error.message}`);
+      // Continue to next user-agent
     }
-
-    const html = await response.text();
-
-    // Extract og:title (most reliable for full product name)
-    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
-
-    let productName = null;
-    if (ogTitleMatch) {
-      productName = ogTitleMatch[1]
-        .replace(/\s*\|\s*.+$/, '')  // Remove " | Store Name"
-        .replace(/\s*-\s*.+$/, '')   // Remove " - Store Name"
-        .replace(/\s*–\s*.+$/, '')   // Remove " – Store Name"
-        .trim();
-
-      logger.log(`✅ [Meta Tags] Extracted product name: "${productName}"`);
-    }
-
-    // Also extract og:image as backup
-    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
-
-    const imageUrl = ogImageMatch ? ogImageMatch[1] : null;
-
-    return {
-      productName,
-      imageUrl
-    };
-
-  } catch (error) {
-    logger.log(`⚠️  [Meta Tags] Extraction failed: ${error.message}`);
-    return null;
   }
+
+  // All user-agents failed
+  logger.log(`❌ [Meta Tags] All ${userAgents.length} attempts failed`);
+  return null;
 }
 
 // ============================================
