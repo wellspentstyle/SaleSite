@@ -55,8 +55,14 @@ export async function scrapeProduct(url, options = {}) {
             logger.log('✅ [Fast Scraper] Google Shopping found product data');
             
             // Always try to get fresh sale price from page (Shopping API can be stale)
-            logger.log('📄 [Fast Scraper] Attempting to fetch fresh sale price from page...');
-            const freshPrice = await fetchFreshSalePrice(url, fetchImpl, logger);
+            // Wrap in try-catch to prevent captcha/bot detection from failing the whole scrape
+            let freshPrice = null;
+            try {
+              logger.log('📄 [Fast Scraper] Attempting to fetch fresh sale price from page...');
+              freshPrice = await fetchFreshSalePrice(url, fetchImpl, logger);
+            } catch (error) {
+              logger.log(`⚠️ [Fast Scraper] Fresh price fetch failed: ${error.message}, using Shopping API data`);
+            }
             
             // Prefer fresh price if available, fall back to Shopping API price
             const salePrice = (freshPrice && freshPrice.salePrice) || googleShoppingResult.currentPrice;
