@@ -672,14 +672,16 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
         }
       }
 
-      // If no domain match but we have results, check if we're on first/best query
-      if (!bestMatch && i === 0 && data.shopping_results.length > 0) {
-        // First query (meta tags) found results but not from exact retailer
-        // This could still be the right product on a different retailer
-        // Take first result as "close enough" only if meta tag query
-        if (metaData?.productName) {
+      // If no domain match but we have results, use first result if query is specific
+      if (!bestMatch && data.shopping_results.length > 0) {
+        // For specific queries (meta tags or URL query params), trust the first result
+        // even if it's from a third-party retailer (common for Gap/BR/etc)
+        const isSpecificQuery = source === 'meta-tags-exact' || source === 'url-query-param';
+        
+        if (isSpecificQuery) {
           bestMatch = data.shopping_results[0];
-          logger.log(`⚠️  [Google Shopping] Using first result (meta tag match, different retailer)`);
+          logger.log(`⚠️  [Google Shopping] No exact domain match, using first result from ${bestMatch.source || 'third-party'}`);
+          logger.log(`   Reason: Specific query "${query}" likely has correct product`);
         }
       }
 
