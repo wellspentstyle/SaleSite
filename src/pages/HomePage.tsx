@@ -7,6 +7,7 @@ import { SalePicksDialog } from '../components/SalePicksDialog';
 import { FilterSidebar } from '../components/FilterSidebar';
 import { SortDropdown } from '../components/SortDropdown';
 import { Footer } from '../components/Footer';
+import { NewsletterModal } from '../components/NewsletterModal';
 import { fetchSalesFromAirtable } from '../services/airtable';
 import { Sale, FilterOptions, SortOption } from '../types';
 
@@ -306,6 +307,8 @@ export function HomePage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />
+
+      <NewsletterModal />
     </div>
   );
 }
