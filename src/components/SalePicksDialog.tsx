@@ -3,7 +3,6 @@ import { Sale } from '../types';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
@@ -183,7 +182,7 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
             onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => e.currentTarget.style.backgroundColor = ''}
             onClick={() => window.open(sale.saleUrl, '_blank')}
           >
-            Shop All Sale
+            Shop the Sale
           </Button>
         </div>
       </DialogContent>
