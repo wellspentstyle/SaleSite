@@ -8,7 +8,7 @@ export function Hero() {
       <div className="absolute inset-0">
         {isMobile ? (
           <img 
-            src="/hero-mobile.gif" 
+            src="/hero-mobile.png" 
             alt="Hero background" 
             className="w-full h-full object-cover" 
             style={{ objectPosition: 'center 35%' }} 
