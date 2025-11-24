@@ -7,11 +7,12 @@ const API_BASE = '/api';
 export function AdminSidebar() {
   const [pendingCount, setPendingCount] = useState(0);
   const [draftsCount, setDraftsCount] = useState(0);
+  const [pendingBrandsCount, setPendingBrandsCount] = useState(0);
   
   const navItems = [
     { path: '/admin/picks', label: 'Add Picks', icon: Package, badge: draftsCount },
     { path: '/admin/sales-approvals', label: 'Sales Approvals', icon: CheckSquare, badge: pendingCount },
-    { path: '/admin/brands', label: 'Add Brands', icon: Tag },
+    { path: '/admin/brands', label: 'Add Brands', icon: Tag, badge: pendingBrandsCount },
     { path: '/admin/assets', label: 'Generate Assets', icon: Image },
     { path: '/admin/freshness', label: 'Freshness', icon: RefreshCw },
     { path: '/admin/sync', label: 'Sync Gem', icon: Gem },
@@ -22,17 +23,21 @@ export function AdminSidebar() {
       try {
         const auth = sessionStorage.getItem('adminAuth') || '';
         
-        const [salesRes, draftsRes] = await Promise.all([
+        const [salesRes, draftsRes, brandsRes] = await Promise.all([
           fetch(`${API_BASE}/pending-sales`, {
             headers: { 'auth': auth }
           }),
           fetch(`${API_BASE}/admin/finalize-drafts`, {
+            headers: { 'auth': auth }
+          }),
+          fetch(`${API_BASE}/admin/pending-brands`, {
             headers: { 'auth': auth }
           })
         ]);
         
         const salesData = await salesRes.json();
         const draftsData = await draftsRes.json();
+        const brandsData = await brandsRes.json();
         
         if (salesData.success && salesData.sales) {
           setPendingCount(salesData.sales.length);
@@ -40,6 +45,10 @@ export function AdminSidebar() {
         
         if (draftsData.success && draftsData.drafts) {
           setDraftsCount(draftsData.drafts.length);
+        }
+        
+        if (brandsData.success && brandsData.brands) {
+          setPendingBrandsCount(brandsData.brands.length);
         }
       } catch (error) {
         console.error('Error fetching counts:', error);
