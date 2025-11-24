@@ -47,13 +47,13 @@ export async function scrapeProduct(url, options = {}) {
         // ============================================
         if (serperApiKey) {
           logger.log('🛍️ [Fast Scraper] Trying Google Shopping API...');
-          
+
           const googleShoppingResult = await tryGoogleShopping(url, serperApiKey, logger);
-          
-          if (googleShoppingResult) {
+
+          if (googleShoppingResult && googleShoppingResult.success) {
             // We got product info from Google Shopping!
             logger.log('✅ [Fast Scraper] Google Shopping found product data');
-            
+
             // Always try to get fresh sale price from page (Shopping API can be stale)
             // Wrap in try-catch to prevent captcha/bot detection from failing the whole scrape
             let freshPrice = null;
@@ -61,13 +61,13 @@ export async function scrapeProduct(url, options = {}) {
               logger.log('📄 [Fast Scraper] Attempting to fetch fresh sale price from page...');
               freshPrice = await fetchFreshSalePrice(url, fetchImpl, logger);
             } catch (error) {
-              logger.log(`⚠️ [Fast Scraper] Fresh price fetch failed: ${error.message}, using Shopping API data`);
+              logger.log(`⚠️ [Fast Scraper] Fresh price fetch failed (${error.message}), using Shopping API data`);
             }
-            
+
             // Prefer fresh price if available, fall back to Shopping API price
             const salePrice = (freshPrice && freshPrice.salePrice) || googleShoppingResult.currentPrice;
             const originalPrice = (freshPrice && freshPrice.originalPrice) || googleShoppingResult.originalPrice;
-            
+
             // We need at least a sale price to continue
             if (salePrice) {
               const product = {
@@ -80,18 +80,18 @@ export async function scrapeProduct(url, options = {}) {
                 url: url,
                 confidence: 90
               };
-              
+
               // Calculate percent off
               if (product.originalPrice && product.originalPrice > product.salePrice) {
                 product.percentOff = Math.round(((product.originalPrice - product.salePrice) / product.originalPrice) * 100);
               }
-              
+
               testMetadata.phaseUsed = freshPrice ? 'google-shopping-hybrid' : 'google-shopping-api';
               testMetadata.imageExtraction.source = 'google-shopping';
-              
+
               const priceSource = freshPrice ? 'fresh page data' : 'Shopping API';
               logger.log(`✅ [Fast Scraper] Google Shopping success using ${priceSource} (confidence: ${product.confidence}%)`);
-              
+
               return {
                 success: true,
                 product: product,
@@ -104,10 +104,12 @@ export async function scrapeProduct(url, options = {}) {
                 }
               };
             }
-            
+
             logger.log('⚠️ [Fast Scraper] Google Shopping has no price data');
+          } else {
+            logger.log('⚠️ [Fast Scraper] Google Shopping failed or returned no results');
           }
-          
+
           logger.log('⚠️ [Fast Scraper] Google Shopping incomplete, falling back to traditional methods...');
         }
 
@@ -178,7 +180,7 @@ export async function scrapeProduct(url, options = {}) {
 
         logger.log('⚠️  Deterministic extraction incomplete, falling back to AI...');
         const aiResult = await extractWithAI(html, url, openai, testMetadata, logger, jsonLdResult, deterministicResult);
-        
+
         return {
           success: true,
           product: aiResult,
@@ -229,22 +231,22 @@ function classifyHttpError(statusCode) {
   if ([500, 502, 503, 504].includes(statusCode)) {
     return 'RETRYABLE';
   }
-  
+
   // Authentication/blocking errors - skip domain
   if ([401, 403, 429].includes(statusCode)) {
     return 'BLOCKING';
   }
-  
+
   // Not found - fatal for this URL only
   if (statusCode === 404) {
     return 'FATAL';
   }
-  
+
   // Client errors - fatal
   if (statusCode >= 400 && statusCode < 500) {
     return 'FATAL';
   }
-  
+
   // Unknown - treat as retryable
   return 'RETRYABLE';
 }
@@ -254,14 +256,14 @@ function classifyError(error) {
   if (error.statusCode) {
     return classifyHttpError(error.statusCode);
   }
-  
+
   const errorMsg = error.message?.toLowerCase() || '';
-  
+
   // Network timeout errors - retryable
   if (errorMsg.includes('timeout') || errorMsg.includes('timed out')) {
     return 'RETRYABLE';
   }
-  
+
   // Connection errors - retryable
   if (errorMsg.includes('econnreset') || 
       errorMsg.includes('econnrefused') || 
@@ -269,22 +271,24 @@ function classifyError(error) {
       errorMsg.includes('socket hang up')) {
     return 'RETRYABLE';
   }
-  
+
   // Blocking/access errors
   if (errorMsg.includes('cloudflare') ||
       errorMsg.includes('access denied') ||
       errorMsg.includes('forbidden') ||
-      errorMsg.includes('rate limit')) {
+      errorMsg.includes('rate limit') ||
+      errorMsg.includes('captcha') ||
+      errorMsg.includes('bot detection')) {
     return 'BLOCKING';
   }
-  
+
   // Invalid URL or data errors - fatal
   if (errorMsg.includes('invalid url') ||
       errorMsg.includes('missing required') ||
       errorMsg.includes('placeholder image')) {
     return 'FATAL';
   }
-  
+
   // Default: treat as retryable (give it a chance)
   return 'RETRYABLE';
 }
@@ -295,7 +299,7 @@ async function sleep(ms) {
 
 async function retryWithBackoff(fn, maxRetries, logger, testMetadata) {
   let lastError = null;
-  
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       if (attempt > 0) {
@@ -305,39 +309,222 @@ async function retryWithBackoff(fn, maxRetries, logger, testMetadata) {
     } catch (error) {
       lastError = error;
       const errorType = error.errorType || classifyError(error);
-      
+
       // Don't retry blocking or fatal errors
       if (errorType === 'BLOCKING') {
         logger.log(`🚫 [Fast Scraper] Blocking error detected, not retrying: ${error.message}`);
         error.errorType = 'BLOCKING';
         throw error;
       }
-      
+
       if (errorType === 'FATAL') {
         logger.log(`❌ [Fast Scraper] Fatal error, not retrying: ${error.message}`);
         error.errorType = 'FATAL';
         throw error;
       }
-      
+
       // If this is the last attempt, throw the error
       if (attempt === maxRetries - 1) {
         logger.log(`❌ [Fast Scraper] All ${maxRetries} attempts failed`);
         error.errorType = errorType;
         throw error;
       }
-      
+
       // Calculate backoff delay: 2s, 4s, 8s
       const delay = Math.pow(2, attempt + 1) * 1000;
       logger.log(`⚠️  [Fast Scraper] Attempt ${attempt + 1}/${maxRetries} failed (${errorType}), retrying in ${delay}ms...`);
       logger.log(`   Error: ${error.message}`);
-      
+
       await sleep(delay);
     }
   }
-  
+
   // Should never reach here, but just in case
   lastError.errorType = classifyError(lastError);
   throw lastError;
+}
+
+// ============================================
+// INTELLIGENT URL PARSING FOR GOOGLE SHOPPING
+// ============================================
+
+function extractProductInfoFromUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.replace('www.', '');
+    const pathname = urlObj.pathname;
+    const searchParams = urlObj.searchParams;
+
+    let productName = null;
+    let productId = null;
+
+    // Split path into segments
+    const segments = pathname.split('/').filter(s => s.length > 0);
+
+    // Remove common non-product segments
+    const skipSegments = ['shop', 'product', 'products', 'p', 's', 'pd', 'item', 'items'];
+    const relevantSegments = segments.filter(s => !skipSegments.includes(s.toLowerCase()));
+
+    // Strategy 1: Look for product ID patterns in URL
+    // Common patterns: /prod123456, /5234567, /p-123456, ?pid=123, ?productId=456
+    const idPatterns = [
+      /prod(\d{6,})/i,           // prod123456
+      /\/(\d{6,})$/,              // /5234567 at end
+      /p-(\d{6,})/i,              // p-123456
+      /item[_-]?(\d{6,})/i,       // item-123456
+      /sku[_-]?(\d{6,})/i,        // sku-123456
+    ];
+
+    for (const pattern of idPatterns) {
+      const match = pathname.match(pattern);
+      if (match) {
+        productId = match[1];
+        break;
+      }
+    }
+
+    // Check URL params for product ID
+    if (!productId) {
+      const idParams = ['id', 'productid', 'pid', 'itemid', 'sku', 'productcode'];
+      for (const param of idParams) {
+        const value = searchParams.get(param) || searchParams.get(param.toUpperCase());
+        if (value && /^\d{6,}$/.test(value)) {
+          productId = value;
+          break;
+        }
+      }
+    }
+
+    // Strategy 2: Extract product name from URL slug
+    // Look for the longest segment that looks like a product name (has dashes/words)
+    let bestNameSegment = null;
+    let maxWords = 0;
+
+    for (const segment of relevantSegments) {
+      // Skip if it's just numbers (likely an ID)
+      if (/^\d+$/.test(segment)) continue;
+
+      // Count word-like parts (separated by dashes/underscores)
+      const words = segment.split(/[-_]/).filter(w => w.length > 2);
+
+      if (words.length > maxWords) {
+        maxWords = words.length;
+        bestNameSegment = segment;
+      }
+    }
+
+    if (bestNameSegment) {
+      // Clean up the slug: replace dashes/underscores with spaces, decode URI
+      productName = decodeURIComponent(bestNameSegment)
+        .replace(/[-_]/g, ' ')
+        .replace(/\+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      // Remove common suffixes
+      productName = productName
+        .replace(/\s+(reviews?|ratings?|specs?|details?)$/i, '')
+        .trim();
+    }
+
+    // Strategy 3: Domain-specific patterns
+    if (domain.includes('nordstrom')) {
+      // Nordstrom: /s/product-name/1234567
+      const nordstromMatch = pathname.match(/\/s\/([^/]+)\/(\d+)/);
+      if (nordstromMatch) {
+        productName = decodeURIComponent(nordstromMatch[1]).replace(/-/g, ' ');
+        productId = nordstromMatch[2];
+      }
+    } else if (domain.includes('saks')) {
+      // Saks: /product/brand-product-name/0400012345678
+      const saksMatch = pathname.match(/\/product\/([^/]+)\/(\d+)/);
+      if (saksMatch) {
+        productName = decodeURIComponent(saksMatch[1]).replace(/-/g, ' ');
+        productId = saksMatch[2];
+      }
+    } else if (domain.includes('bloomingdales')) {
+      // Bloomingdales: /shop/product/brand-product?ID=1234
+      const bloomMatch = pathname.match(/\/product\/([^/?]+)/);
+      if (bloomMatch) {
+        productName = decodeURIComponent(bloomMatch[1]).replace(/-/g, ' ');
+      }
+      const idParam = searchParams.get('ID');
+      if (idParam) productId = idParam;
+    } else if (domain.includes('neimanmarcus') || domain.includes('bergdorfgoodman')) {
+      // Neiman/Bergdorf: /p/brand-product-name-prod123456
+      const nmMatch = pathname.match(/\/p\/([^/]+)/);
+      if (nmMatch) {
+        const fullSlug = nmMatch[1];
+        // Extract product name (everything before 'prod')
+        const nameMatch = fullSlug.match(/^(.+?)-prod(\d+)/);
+        if (nameMatch) {
+          productName = decodeURIComponent(nameMatch[1]).replace(/-/g, ' ');
+          productId = nameMatch[2];
+        } else {
+          productName = decodeURIComponent(fullSlug).replace(/-/g, ' ');
+        }
+      }
+    }
+
+    return {
+      domain,
+      productName,
+      productId,
+      fullPath: pathname
+    };
+
+  } catch (error) {
+    return {
+      domain: null,
+      productName: null,
+      productId: null,
+      fullPath: null
+    };
+  }
+}
+
+function buildGoogleShoppingQuery(url, logger) {
+  const info = extractProductInfoFromUrl(url);
+
+  if (!info.domain) {
+    logger.log('⚠️ Could not parse URL for product info');
+    return null;
+  }
+
+  logger.log(`📝 Extracted from URL:`, {
+    domain: info.domain,
+    productName: info.productName,
+    productId: info.productId
+  });
+
+  // Build query based on what we found
+  let queryParts = [];
+
+  if (info.productName) {
+    // Use product name - this is the most effective
+    // Limit to first 50 chars to avoid overly specific queries
+    const truncatedName = info.productName.substring(0, 50);
+    queryParts.push(truncatedName);
+  } else if (info.productId) {
+    // Fallback to product ID if no name found
+    queryParts.push(info.productId);
+  } else {
+    // Last resort: use last path segment
+    logger.log('⚠️ No product name or ID found, using path segment');
+    const segments = info.fullPath.split('/').filter(s => s.length > 0);
+    if (segments.length > 0) {
+      const lastSegment = segments[segments.length - 1];
+      queryParts.push(lastSegment.replace(/-/g, ' ').substring(0, 50));
+    }
+  }
+
+  // Always add site restriction for better matching
+  queryParts.push(`site:${info.domain}`);
+
+  const query = queryParts.join(' ').trim();
+  logger.log(`🔍 Built Google Shopping query: "${query}"`);
+
+  return query;
 }
 
 // ============================================
@@ -346,7 +533,15 @@ async function retryWithBackoff(fn, maxRetries, logger, testMetadata) {
 
 async function tryGoogleShopping(url, serperApiKey, logger) {
   try {
-    // Search Google Shopping for this product URL
+    // Build smart search query from URL
+    const searchQuery = buildGoogleShoppingQuery(url, logger);
+
+    if (!searchQuery) {
+      logger.log('⚠️ Could not build search query from URL');
+      return { success: false, error: 'Could not parse URL' };
+    }
+
+    // Search Google Shopping for this product
     const searchResponse = await fetch('https://google.serper.dev/shopping', {
       method: 'POST',
       headers: {
@@ -354,43 +549,75 @@ async function tryGoogleShopping(url, serperApiKey, logger) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        q: url,
-        num: 3 // Get top 3 results to find best match
+        q: searchQuery,
+        num: 5, // Get top 5 results for better matching
+        gl: 'us', // US results
+        hl: 'en' // English
       })
     });
 
     if (!searchResponse.ok) {
-      logger.log(`⚠️ Google Shopping API error: ${searchResponse.status}`);
-      return null;
+      const errorText = await searchResponse.text().catch(() => 'Unknown error');
+      logger.log(`⚠️ Google Shopping API error: ${searchResponse.status} - ${errorText}`);
+      return { success: false, error: `API returned ${searchResponse.status}` };
     }
 
     const data = await searchResponse.json();
 
     if (!data.shopping_results || data.shopping_results.length === 0) {
-      logger.log('⚠️ No Google Shopping results found');
-      return null;
+      logger.log('⚠️ No Google Shopping results found for this query');
+      return { success: false, error: 'No results found' };
     }
+
+    logger.log(`✅ Found ${data.shopping_results.length} Google Shopping results`);
 
     // Find the result that best matches our URL
     const urlDomain = new URL(url).hostname.replace('www.', '');
     let bestMatch = null;
-    
+    let matchScore = 0;
+
     for (const result of data.shopping_results) {
-      // Check if the source matches the domain
+      let score = 0;
+
+      // Check if the link matches the domain (highest priority)
       if (result.link && result.link.includes(urlDomain)) {
-        bestMatch = result;
-        break;
+        score += 100;
+
+        // Extra points if significant part of URL matches
+        const urlPath = new URL(url).pathname.toLowerCase();
+        const resultPath = result.link.toLowerCase();
+        if (resultPath.includes(urlPath.substring(0, 30))) {
+          score += 50;
+        }
       }
-      // Or if source name matches
+
+      // Check if source name matches
       if (result.source && result.source.toLowerCase().includes(urlDomain.split('.')[0])) {
+        score += 50;
+      }
+
+      // Prefer results with prices
+      if (result.price || result.extracted_price) {
+        score += 10;
+      }
+
+      // Prefer results with images
+      if (result.imageUrl || result.thumbnail) {
+        score += 5;
+      }
+
+      if (score > matchScore) {
+        matchScore = score;
         bestMatch = result;
-        break;
       }
     }
 
-    // If no exact match, use first result
-    if (!bestMatch) {
+    // If no domain match found, use first result but with lower confidence
+    if (!bestMatch || matchScore < 50) {
+      logger.log('⚠️ No exact domain match, using best available result');
       bestMatch = data.shopping_results[0];
+    } else {
+      logger.log(`✅ Found matching result (score: ${matchScore})`);
     }
 
     // Extract product data
@@ -405,7 +632,10 @@ async function tryGoogleShopping(url, serperApiKey, logger) {
     // Parse prices
     if (bestMatch.price) {
       const priceStr = bestMatch.price.replace(/[^0-9.]/g, '');
-      product.currentPrice = parseFloat(priceStr);
+      const parsed = parseFloat(priceStr);
+      if (!isNaN(parsed) && parsed > 0) {
+        product.currentPrice = parsed;
+      }
     }
 
     // Check for original/compare price
@@ -416,7 +646,10 @@ async function tryGoogleShopping(url, serperApiKey, logger) {
     // Some Google Shopping results have old_price or extracted_old_price
     if (bestMatch.old_price) {
       const oldPriceStr = bestMatch.old_price.replace(/[^0-9.]/g, '');
-      product.originalPrice = parseFloat(oldPriceStr);
+      const parsed = parseFloat(oldPriceStr);
+      if (!isNaN(parsed) && parsed > 0) {
+        product.originalPrice = parsed;
+      }
     } else if (bestMatch.extracted_old_price) {
       product.originalPrice = bestMatch.extracted_old_price;
     }
@@ -424,21 +657,26 @@ async function tryGoogleShopping(url, serperApiKey, logger) {
     // Validate we got minimum required data
     if (!product.name || !product.imageUrl) {
       logger.log('⚠️ Google Shopping result missing name or image');
-      return null;
+      return { success: false, error: 'Incomplete product data' };
     }
 
     logger.log(`✅ Google Shopping: ${product.name}`);
-    if (product.originalPrice) {
+    if (product.originalPrice && product.currentPrice) {
       logger.log(`   Original: $${product.originalPrice}, Current: $${product.currentPrice}`);
-    } else {
+    } else if (product.currentPrice) {
       logger.log(`   Price: $${product.currentPrice}`);
+    } else {
+      logger.log(`   ⚠️ No price data available`);
     }
 
-    return product;
+    return {
+      success: true,
+      ...product
+    };
 
   } catch (error) {
     logger.log(`⚠️ Google Shopping error: ${error.message}`);
-    return null;
+    return { success: false, error: error.message };
   }
 }
 
@@ -475,7 +713,7 @@ async function fetchFreshSalePrice(url, fetchImpl, logger) {
             const offers = data.offers || data.Offers;
             if (offers) {
               const offerData = Array.isArray(offers) ? offers[0] : offers;
-              
+
               if (offerData.price) {
                 salePrice = parseFloat(offerData.price);
                 logger.log(`💰 Fresh sale price from JSON-LD: $${salePrice}`);
@@ -567,19 +805,19 @@ function extractBrandFromTitle(title) {
   const cleaned = title
     .split(/[|–—-]/)[0] // Take everything before separators
     .trim();
-  
+
   // Common brand patterns
   const brandMatch = cleaned.match(/^([A-Z][a-zA-Z&\s]+?)(?:\s+[A-Z][a-z]|\s+\d|\s*$)/);
   if (brandMatch) {
     return brandMatch[1].trim();
   }
-  
+
   // Fallback: first word if it's capitalized
   const firstWord = cleaned.split(/\s+/)[0];
   if (firstWord && /^[A-Z]/.test(firstWord)) {
     return firstWord;
   }
-  
+
   return null;
 }
 
@@ -646,7 +884,7 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
   logger.log(`📊 Found ${jsonLdMatch.length} JSON-LD scripts, trying structured data extraction...`);
 
   let allJsonLdData = [];
-  
+
   for (const scriptTag of jsonLdMatch) {
     try {
       const jsonContent = scriptTag.replace(/<script[^>]*>/, '').replace(/<\/script>/, '').trim();
@@ -662,7 +900,7 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
       for (const item of items) {
         if (item['@type'] === 'Product' || item['@type']?.includes?.('Product')) {
           allJsonLdData.push(item);
-          
+
           const name = item.name;
 
           let imageUrl = null;
@@ -687,7 +925,7 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
 
             if (name && imageUrl && !isNaN(currentPrice)) {
               let salePrice, originalPrice;
-              
+
               if (comparePrice && comparePrice > currentPrice) {
                 salePrice = currentPrice;
                 originalPrice = comparePrice;
@@ -739,7 +977,7 @@ async function extractFromJsonLd(html, url, testMetadata, logger) {
 
 async function extractFromHtmlDeterministic(html, url, testMetadata, logger) {
   logger.log('🔬 Starting deterministic HTML extraction...');
-  
+
   let foundPrices = {
     salePrice: null,
     originalPrice: null,
@@ -772,14 +1010,14 @@ async function extractFromHtmlDeterministic(html, url, testMetadata, logger) {
   if (!foundPrices.source) {
     const microdataPattern = /<[^>]*itemprop=["']price["'][^>]*content=["']([^"']+)["'][^>]*>/gi;
     const comparePricePattern = /<[^>]*itemprop=["'](?:highPrice|listPrice)["'][^>]*content=["']([^"']+)["'][^>]*>/gi;
-    
+
     const priceMatches = [...html.matchAll(microdataPattern)];
     const compareMatches = [...html.matchAll(comparePricePattern)];
-    
+
     if (priceMatches.length > 0) {
       const currentPrice = parseFloat(priceMatches[0][1]);
       const comparePrice = compareMatches.length > 0 ? parseFloat(compareMatches[0][1]) : null;
-      
+
       if (!isNaN(currentPrice)) {
         if (comparePrice && comparePrice > currentPrice) {
           foundPrices.salePrice = currentPrice;
@@ -793,11 +1031,11 @@ async function extractFromHtmlDeterministic(html, url, testMetadata, logger) {
 
   if (foundPrices.source && foundPrices.salePrice && foundPrices.originalPrice > foundPrices.salePrice) {
     const percentOff = Math.round(((foundPrices.originalPrice - foundPrices.salePrice) / foundPrices.originalPrice) * 100);
-    
+
     testMetadata.phaseUsed = 'html-deterministic';
     testMetadata.priceValidation.foundInHtml = true;
     testMetadata.priceValidation.checkedFormats.push(foundPrices.source);
-    
+
     return {
       originalPrice: foundPrices.originalPrice,
       salePrice: foundPrices.salePrice,
@@ -942,7 +1180,7 @@ Confidence scoring:
 NEVER use placeholder images. Return {"error": "..."} if you can't extract required data.`;
 
   let userPrompt = contentToSend;
-  
+
   if (isJsonLd) {
     userPrompt = `Here is the JSON-LD structured product data:\n\n${contentToSend}`;
     if (preExtractedImage) {
@@ -953,7 +1191,7 @@ NEVER use placeholder images. Return {"error": "..."} if you can't extract requi
       userPrompt = `${contentToSend}\n\nNOTE: Pre-extracted image URL: ${preExtractedImage} - use this for imageUrl.`;
     }
   }
-  
+
   if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
     userPrompt += `\n\n✅ VERIFIED PRICES (use these exact values):
 - Sale Price (current price): $${deterministicResult.salePrice}
@@ -1014,7 +1252,7 @@ These were extracted from reliable structured data. Use these EXACT prices. Only
 
   let originalPrice, salePrice, percentOff = 0;
   let confidence = productData.confidence ? parseInt(productData.confidence) : 50;
-  
+
   if (deterministicResult && deterministicResult.salePrice && deterministicResult.originalPrice) {
     originalPrice = deterministicResult.originalPrice;
     salePrice = deterministicResult.salePrice;
@@ -1049,7 +1287,7 @@ These were extracted from reliable structured data. Use these EXACT prices. Only
         confidence = Math.max(40, confidence - 15);
       } else {
         percentOff = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
-        
+
         if (productData.percentOff && Math.abs(percentOff - productData.percentOff) > 2) {
           logger.log(`⚠️  Percent off mismatch: AI said ${productData.percentOff}%, calculated ${percentOff}%`);
           confidence = Math.max(40, confidence - 15);
