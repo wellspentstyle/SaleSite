@@ -1,37 +1,5 @@
-import { useState } from 'react';
-
 export function Footer() {
   const currentYear = new Date().getFullYear();
-  const [email, setEmail] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleNewsletterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || isSubmitting) return;
-
-    setIsSubmitting(true);
-    try {
-      const response = await fetch('/api/newsletter/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, source: 'Footer' })
-      });
-
-      if (response.ok) {
-        setSubmitted(true);
-        setEmail('');
-        setTimeout(() => setSubmitted(false), 3000);
-      } else {
-        alert('Failed to subscribe. Please try again.');
-      }
-    } catch (error) {
-      console.error('Newsletter subscription error:', error);
-      alert('Failed to subscribe. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <footer className="border-t border-border mt-32">
@@ -79,31 +47,18 @@ export function Footer() {
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed" style={{ fontFamily: 'Crimson Pro, serif' }}>
               Join for curated, CP-friendly designer deals
             </p>
-            {!submitted ? (
-              <form onSubmit={handleNewsletterSubmit} className="space-y-3">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email address"
-                  required
-                  className="w-full px-3 py-2 text-sm border border-border focus:outline-none focus:border-foreground transition-colors"
-                  style={{ fontFamily: 'Crimson Pro, serif' }}
-                />
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-2 bg-foreground text-background text-sm hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600 }}
-                >
-                  {isSubmitting ? 'Subscribing...' : 'Subscribe'}
-                </button>
-              </form>
-            ) : (
-              <p className="text-sm text-foreground" style={{ fontFamily: 'Crimson Pro, serif', fontWeight: 600 }}>
-                Thanks for subscribing!
-              </p>
-            )}
+            <iframe 
+              src="https://wellspentstyle.substack.com/embed" 
+              width="100%" 
+              height="150"
+              style={{
+                border: '1px solid #EEE',
+                background: 'white',
+                maxWidth: '100%'
+              }}
+              frameBorder={0}
+              scrolling="no"
+            />
           </div>
         </div>
 
