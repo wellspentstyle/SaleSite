@@ -54,7 +54,7 @@ export function Footer() {
             </h4>
             <ul className="space-y-3 text-sm text-muted-foreground" style={{ fontFamily: 'Crimson Pro, serif' }}>
               <li>
-                <a href="mailto:hello@wellspentstyle.com" className="hover:text-foreground transition-colors">
+                <a href="mailto:wellspentstyle@gmail.com" className="hover:text-foreground transition-colors">
                   Email
                 </a>
               </li>
