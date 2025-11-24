@@ -48,7 +48,9 @@ export function AdminSidebar() {
         }
         
         if (brandsData.success && brandsData.brands) {
-          setPendingBrandsCount(brandsData.brands.length);
+          // Only count high priority brands (those with active sales)
+          const highPriorityCount = brandsData.brands.filter(b => b.hasActiveSales).length;
+          setPendingBrandsCount(highPriorityCount);
         }
       } catch (error) {
         console.error('Error fetching counts:', error);
