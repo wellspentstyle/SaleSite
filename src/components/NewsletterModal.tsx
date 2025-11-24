@@ -83,13 +83,13 @@ export function NewsletterModal() {
         <p
           style={{
             fontFamily: 'Crimson Pro, serif',
-            fontSize: '16px',
+            fontSize: '18px',
             color: '#666',
             marginBottom: '24px',
             lineHeight: 1.6
           }}
         >
-          Stay in the know with the best CP-friendly designer deals.
+          Stay in the know with the best Creative Pragmatist designer deals.
         </p>
 
         {/* Substack Embed */}
