@@ -103,7 +103,7 @@ export function NewsletterModal() {
             width="100%" 
             height="150"
             style={{
-              border: '1px solid #EEE',
+              border: '1px solid white',
               background: 'white',
               maxWidth: '100%'
             }}

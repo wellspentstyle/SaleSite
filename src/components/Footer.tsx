@@ -44,7 +44,7 @@ export function Footer() {
             <h4 className="text-sm mb-5" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600 }}>
               Newsletter
             </h4>
-            <p className="text-sm text-muted-foreground mb-4 leading-relaxed" style={{ fontFamily: 'Crimson Pro, serif' }}>
+            <p className="text-base text-muted-foreground mb-4 leading-relaxed" style={{ fontFamily: 'Crimson Pro, serif' }}>
               Join for curated, CP-friendly designer deals
             </p>
             <iframe 
@@ -52,7 +52,7 @@ export function Footer() {
               width="100%" 
               height="150"
               style={{
-                border: '1px solid #EEE',
+                border: '1px solid white',
                 background: 'white',
                 maxWidth: '100%'
               }}
