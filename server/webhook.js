@@ -444,7 +444,7 @@ app.get('/companies', async (req, res) => {
 // Newsletter subscription endpoint (public)
 app.post('/api/newsletter/subscribe', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, source } = req.body;
     
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email is required' });
@@ -488,7 +488,7 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
               fields: {
                 Email: email,
                 SubscribedDate: new Date().toISOString().split('T')[0],
-                Source: 'Website'
+                Source: source || 'Website'
               }
             }
           ]
