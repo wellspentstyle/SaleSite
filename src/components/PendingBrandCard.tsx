@@ -49,6 +49,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
       if (response.ok) {
         toast.success('Changes saved');
         setIsEditing(false);
+        onApprove();
       } else {
         toast.error('Failed to save changes');
       }
