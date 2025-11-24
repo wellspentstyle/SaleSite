@@ -1,0 +1,264 @@
+# Enable JavaScript Rendering for Google Shopping
+
+## The Problem
+Google Shopping results pages are heavily JavaScript-rendered. Without JS execution, ScraperAPI returns mostly empty HTML with no product data.
+
+## The Solution
+Enable JavaScript rendering in ScraperAPI with these changes:
+
+---
+
+## Change 1: Enable render=true in ScraperAPI call
+
+**Location:** `tryGoogleShopping()` function, around line 890
+
+**BEFORE:**
+```javascript
+const scraperUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(googleShoppingUrl)}`;
+
+const searchResponse = await fetchImpl(scraperUrl, {
+  signal: AbortSignal.timeout(15000)
+});
+```
+
+**AFTER:**
+```javascript
+// Use ScraperAPI with JS rendering enabled
+const scraperUrl = new URL('http://api.scraperapi.com/');
+scraperUrl.searchParams.set('api_key', scraperApiKey);
+scraperUrl.searchParams.set('url', googleShoppingUrl);
+scraperUrl.searchParams.set('render', 'true');      // ← ENABLE JS RENDERING
+scraperUrl.searchParams.set('wait_for', '3000');    // ← WAIT 3 SECONDS FOR CONTENT
+
+logger.log(`   ScraperAPI: Rendering with JS (3s wait)`);
+
+const searchResponse = await fetchImpl(scraperUrl.toString(), {
+  signal: AbortSignal.timeout(30000)  // ← INCREASE TO 30 SECONDS
+});
+```
+
+---
+
+## Change 2: Improve HTML Parser for Rendered Content
+
+**Location:** `parseGoogleShoppingResults()` function, around line 950
+
+The current parser is too simplistic. Replace it with this improved version:
+
+```javascript
+function parseGoogleShoppingResults(html, logger) {
+  try {
+    const products = [];
+    
+    // After JS rendering, Google Shopping has cleaner structure
+    // Strategy 1: Extract all prices
+    const priceRegex = /\$([0-9,]+(?:\.\d{2})?)/g;
+    const prices = [];
+    let match;
+    
+    while ((match = priceRegex.exec(html)) !== null) {
+      const price = parseFloat(match[1].replace(/,/g, ''));
+      if (price > 0 && price < 100000) {
+        prices.push(price);
+      }
+    }
+    
+    // Strategy 2: Extract all product titles (h3/h4 tags)
+    const titleRegex = /<h[34][^>]*>([^<]+)<\/h[34]>/gi;
+    const titles = [];
+    
+    while ((match = titleRegex.exec(html)) !== null) {
+      const title = match[1].trim();
+      if (title.length > 5 && !title.includes('Google') && !title.includes('Shopping')) {
+        titles.push(title);
+      }
+    }
+    
+    // Strategy 3: Extract product links
+    const linkRegex = /href="(https?:\/\/[^"]+)"/gi;
+    const links = [];
+    
+    while ((match = linkRegex.exec(html)) !== null) {
+      const link = match[1];
+      // Filter out Google's own URLs
+      if (!link.includes('google.com') && !link.includes('gstatic.com')) {
+        links.push(link);
+      }
+    }
+    
+    // Strategy 4: Try to extract images
+    const imageRegex = /<img[^>]*src="(https?:\/\/[^"]+)"[^>]*>/gi;
+    const images = [];
+    
+    while ((match = imageRegex.exec(html)) !== null) {
+      const img = match[1];
+      if (!img.includes('gstatic.com') && !img.includes('google.com')) {
+        images.push(img);
+      }
+    }
+    
+    // Combine the data - match titles with prices and links
+    const minLength = Math.min(titles.length, prices.length, links.length);
+    
+    for (let i = 0; i < minLength; i++) {
+      products.push({
+        title: titles[i],
+        currentPrice: prices[i],
+        link: links[i],
+        imageUrl: images[i] || null,
+        originalPrice: null,
+        source: extractDomainFromUrl(links[i])
+      });
+    }
+    
+    // Strategy 5: Also check for JSON-LD structured data
+    const jsonLdMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+    if (jsonLdMatches) {
+      for (const jsonLdScript of jsonLdMatches) {
+        try {
+          const jsonContent = jsonLdScript.match(/<script[^>]*>([\s\S]*?)<\/script>/i)?.[1];
+          if (!jsonContent) continue;
+          
+          const data = JSON.parse(jsonContent);
+          
+          if (data['@type'] === 'ItemList' && data.itemListElement) {
+            for (const item of data.itemListElement) {
+              if (item.item && item.item.name) {
+                products.push({
+                  title: item.item.name,
+                  link: item.item.url || '',
+                  currentPrice: item.item.offers?.price ? parseFloat(item.item.offers.price) : null,
+                  originalPrice: item.item.offers?.highPrice ? parseFloat(item.item.offers.highPrice) : null,
+                  imageUrl: item.item.image || null,
+                  source: extractDomainFromUrl(item.item.url || '')
+                });
+              }
+            }
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
+      }
+    }
+
+    logger.log(`   Parsed ${products.length} products from rendered HTML`);
+    
+    // Deduplicate by link
+    const uniqueProducts = [];
+    const seenLinks = new Set();
+    
+    for (const product of products) {
+      if (product.link && !seenLinks.has(product.link)) {
+        seenLinks.add(product.link);
+        uniqueProducts.push(product);
+      }
+    }
+    
+    logger.log(`   After deduplication: ${uniqueProducts.length} unique products`);
+    return uniqueProducts;
+    
+  } catch (error) {
+    logger.log(`⚠️  Error parsing Google Shopping HTML: ${error.message}`);
+    return [];
+  }
+}
+```
+
+---
+
+## Change 3: Add Debug Logging (Optional but Recommended)
+
+Add this right after fetching the HTML to see what you're getting:
+
+```javascript
+const html = await searchResponse.text();
+logger.log(`   Got HTML: ${html.length} chars`);
+
+// DEBUG: Save HTML to see what we got
+if (process.env.DEBUG_SHOPPING_HTML) {
+  const fs = require('fs');
+  fs.writeFileSync(`/tmp/shopping-${Date.now()}.html`, html);
+  logger.log(`   DEBUG: Saved HTML to /tmp/shopping-${Date.now()}.html`);
+}
+
+// Parse product data
+const products = parseGoogleShoppingResults(html, logger);
+```
+
+---
+
+## Cost Impact
+
+**With render=false (current):**
+- ~$0.001 per request
+- Fast (2-3 seconds)
+- ❌ Returns no data
+
+**With render=true (new):**
+- ~$0.005-0.01 per request (5-10x more expensive)
+- Slower (5-10 seconds with 3s wait)
+- ✅ Returns actual product data
+
+**Monthly cost for 6,000 URLs:**
+- Before: $6/month (but doesn't work)
+- After: $30-60/month (but actually works)
+
+---
+
+## Testing the Changes
+
+After making these changes, test with a real URL:
+
+```javascript
+const result = await scrapeProduct('https://saksfifthavenue.com/product/proenza-schouler-zion-top-0400022421822.html', {
+  openai: openaiClient,
+  scraperApiKey: process.env.SCRAPER_API_KEY,
+  fetchImpl: fetch,
+  logger: console
+});
+
+console.log('Result:', result);
+```
+
+**Expected output:**
+```
+🔍 [Fast Scraper] Scraping product: https://saksfifthavenue.com/...
+🛍️ [Fast Scraper] Trying Google Shopping scraping...
+📝 Extracted product info:
+   Meta tags: "Proenza Schouler Zion Linen-Blend Top"
+   Product ID: 0400022421822
+   Domain: saksfifthavenue.com
+🔍 [Google Shopping] Strategy 1/4: meta-tags
+   Query: "Proenza Schouler Zion Linen-Blend Top saksfifthavenue.com"
+   URL: https://www.google.com/search?udm=28&q=...
+   ScraperAPI: Rendering with JS (3s wait)
+   Got HTML: 145823 chars
+   Parsed 12 products from rendered HTML
+   After deduplication: 8 unique products
+✅ [Google Shopping] Found exact domain match
+✅ [Google Shopping] Product: Proenza Schouler Zion Linen-Blend Top
+   Original: $435.00, Current: $131.00
+✅ [Fast Scraper] Google Shopping success using Shopping scrape (confidence: 90%)
+```
+
+---
+
+## If It Still Doesn't Work
+
+If you're still getting 0 products after enabling rendering:
+
+1. **Check ScraperAPI dashboard** - Make sure render=true is actually being used
+2. **Save the HTML to a file** - Use the debug logging to see what you're getting
+3. **Test the Google Shopping URL manually** - Open it in a browser to see if products show up
+4. **Check if you need premium proxies** - Some Google searches require premium residential IPs
+
+---
+
+## Alternative: Test Without Rendering First
+
+Before spending money on rendering, test if the HTML parser is the issue:
+
+1. Manually save a Google Shopping page's HTML (after JS renders in your browser)
+2. Run your parser on that saved HTML
+3. If it works → the parser is good, you just need rendering
+4. If it doesn't work → fix the parser first, then enable rendering

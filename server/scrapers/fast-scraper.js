@@ -667,11 +667,17 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
       const googleShoppingUrl = `https://www.google.com/search?udm=28&q=${encodeURIComponent(query)}`;
       logger.log(`   URL: ${googleShoppingUrl}`);
 
-      // Use ScraperAPI to fetch Google Shopping results
-      const scraperUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(googleShoppingUrl)}`;
+      // Use ScraperAPI with JS rendering enabled
+      const scraperUrl = new URL('http://api.scraperapi.com/');
+      scraperUrl.searchParams.set('api_key', scraperApiKey);
+      scraperUrl.searchParams.set('url', googleShoppingUrl);
+      scraperUrl.searchParams.set('render', 'true');      // Enable JS rendering
+      scraperUrl.searchParams.set('wait_for', '3000');    // Wait 3 seconds for content
+      
+      logger.log(`   ScraperAPI: Rendering with JS (3s wait)`);
 
-      const searchResponse = await fetchImpl(scraperUrl, {
-        signal: AbortSignal.timeout(15000)
+      const searchResponse = await fetchImpl(scraperUrl.toString(), {
+        signal: AbortSignal.timeout(30000)  // Increase to 30 seconds for rendering
       });
 
       if (!searchResponse.ok) {
@@ -680,6 +686,7 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
       }
 
       const html = await searchResponse.text();
+      logger.log(`   Got HTML: ${html.length} chars`);
 
       // Parse product data from Google Shopping HTML
       const products = parseGoogleShoppingResults(html, logger);
@@ -690,6 +697,12 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
       }
 
       logger.log(`✅ [Google Shopping] Found ${products.length} results`);
+      
+      // DEBUG: Log all products to see what we got
+      logger.log(`   DEBUG: Products parsed:`);
+      products.forEach((p, idx) => {
+        logger.log(`     [${idx}] Title: ${p.title || 'MISSING'}, Link: ${p.link?.substring(0, 50) || 'MISSING'}..., Price: $${p.currentPrice || 'MISSING'}`);
+      });
 
       // Find the result that best matches our domain
       let bestMatch = null;
@@ -698,6 +711,7 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
         if (result.link && result.link.includes(urlDomain)) {
           bestMatch = result;
           logger.log(`✅ [Google Shopping] Found exact domain match`);
+          logger.log(`   Match details: Title="${bestMatch.title}", Image=${bestMatch.imageUrl ? 'YES' : 'NO'}, Price=$${bestMatch.currentPrice}`);
           break;
         }
         if (result.source && result.source.toLowerCase().includes(urlDomain.split('.')[0])) {
@@ -752,40 +766,88 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
   }
 }
 
-// Parse Google Shopping HTML results
+// Parse Google Shopping HTML results (after JS rendering)
 function parseGoogleShoppingResults(html, logger) {
   try {
     const products = [];
     
-    // Google Shopping uses divs with product data
-    // Look for product containers - they typically have data attributes or specific classes
-    // This is a simplified parser - Google's HTML structure may vary
-    
-    // Strategy 1: Look for product links with shopping pattern
-    const productLinkRegex = /<a[^>]*href="([^"]*)"[^>]*>[\s\S]*?<div[^>]*>([^<]+)<\/div>[\s\S]*?<span[^>]*>\$([0-9.,]+)<\/span>/gi;
+    // After JS rendering, Google Shopping has cleaner structure
+    // Strategy 1: Extract all prices
+    const priceRegex = /\$([0-9,]+(?:\.\d{2})?)/g;
+    const prices = [];
     let match;
     
-    while ((match = productLinkRegex.exec(html)) !== null) {
-      const [, link, title, price] = match;
-      
-      // Clean up the data
-      const cleanLink = link.replace(/&amp;/g, '&');
-      const cleanPrice = parseFloat(price.replace(/,/g, ''));
-      
-      if (title && cleanPrice && !isNaN(cleanPrice)) {
-        products.push({
-          title: title.trim(),
-          link: cleanLink,
-          currentPrice: cleanPrice,
-          originalPrice: null,
-          imageUrl: null,
-          source: extractDomainFromUrl(cleanLink)
-        });
+    while ((match = priceRegex.exec(html)) !== null) {
+      const price = parseFloat(match[1].replace(/,/g, ''));
+      if (price > 0 && price < 100000) {
+        prices.push(price);
       }
     }
-
-    // Strategy 2: Look for structured data in the page
-    const jsonLdMatches = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
+    
+    // Strategy 2: Extract all product titles (h3/h4 tags)
+    const titleRegex = /<h[34][^>]*>([^<]+)<\/h[34]>/gi;
+    const titles = [];
+    
+    while ((match = titleRegex.exec(html)) !== null) {
+      const title = match[1].trim();
+      if (title.length > 5 && !title.includes('Google') && !title.includes('Shopping')) {
+        titles.push(title);
+      }
+    }
+    
+    // Strategy 3: Extract product links (decode Google Shopping redirects)
+    const linkRegex = /href="(https?:\/\/[^"]+)"/gi;
+    const links = [];
+    
+    while ((match = linkRegex.exec(html)) !== null) {
+      let link = match[1];
+      
+      // Decode Google Shopping redirect URLs like: https://www.google.com/url?url=https://example.com
+      if (link.includes('google.com/url?')) {
+        try {
+          const urlParams = new URL(link).searchParams;
+          const decodedUrl = urlParams.get('url') || urlParams.get('q');
+          if (decodedUrl) {
+            link = decodedUrl;
+          }
+        } catch (e) {
+          continue; // Skip invalid URLs
+        }
+      }
+      
+      // Filter out Google's internal URLs but keep decoded product links
+      if (!link.includes('google.com') && !link.includes('gstatic.com')) {
+        links.push(link);
+      }
+    }
+    
+    // Strategy 4: Try to extract images
+    const imageRegex = /<img[^>]*src="(https?:\/\/[^"]+)"[^>]*>/gi;
+    const images = [];
+    
+    while ((match = imageRegex.exec(html)) !== null) {
+      const img = match[1];
+      if (!img.includes('gstatic.com') && !img.includes('google.com')) {
+        images.push(img);
+      }
+    }
+    
+    // Combine the data - match titles with prices and links
+    const minLength = Math.min(titles.length, prices.length, links.length);
+    
+    for (let i = 0; i < minLength; i++) {
+      products.push({
+        title: titles[i],
+        currentPrice: prices[i],
+        link: links[i],
+        imageUrl: images[i] || null,
+        originalPrice: null,
+        source: extractDomainFromUrl(links[i])
+      });
+    }
+    
+    // Strategy 5: Also check for JSON-LD structured data
+    const jsonLdMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
     if (jsonLdMatches) {
       for (const jsonLdScript of jsonLdMatches) {
         try {
@@ -794,7 +856,6 @@ function parseGoogleShoppingResults(html, logger) {
           
           const data = JSON.parse(jsonContent);
           
-          // Check if this is a product list
           if (data['@type'] === 'ItemList' && data.itemListElement) {
             for (const item of data.itemListElement) {
               if (item.item && item.item.name) {
@@ -802,7 +863,7 @@ function parseGoogleShoppingResults(html, logger) {
                   title: item.item.name,
                   link: item.item.url || '',
                   currentPrice: item.item.offers?.price ? parseFloat(item.item.offers.price) : null,
-                  originalPrice: null,
+                  originalPrice: item.item.offers?.highPrice ? parseFloat(item.item.offers.highPrice) : null,
                   imageUrl: item.item.image || null,
                   source: extractDomainFromUrl(item.item.url || '')
                 });
@@ -810,13 +871,26 @@ function parseGoogleShoppingResults(html, logger) {
             }
           }
         } catch (e) {
-          // Skip invalid JSON-LD
+          // Skip invalid JSON
         }
       }
     }
 
-    logger.log(`   Parsed ${products.length} products from HTML`);
-    return products;
+    logger.log(`   Parsed ${products.length} products from rendered HTML`);
+    
+    // Deduplicate by link
+    const uniqueProducts = [];
+    const seenLinks = new Set();
+    
+    for (const product of products) {
+      if (product.link && !seenLinks.has(product.link)) {
+        seenLinks.add(product.link);
+        uniqueProducts.push(product);
+      }
+    }
+    
+    logger.log(`   After deduplication: ${uniqueProducts.length} unique products`);
+    return uniqueProducts;
     
   } catch (error) {
     logger.log(`⚠️  Error parsing Google Shopping HTML: ${error.message}`);
