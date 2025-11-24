@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { FilterSidebar } from '../components/FilterSidebar';
+import { Footer } from '../components/Footer';
 import { Filter } from 'lucide-react';
 import { FilterOptions } from '../types';
 
@@ -361,6 +362,9 @@ export function BrandsPage() {
           onClose={() => setFilterOpen(false)}
         />
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }
