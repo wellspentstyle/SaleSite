@@ -39,6 +39,7 @@ The application uses React 18, TypeScript, and Vite for development. Tailwind CS
 - **Featured Sales Assets**: Generates 1080x1350 Instagram images from selected sales, auto-uploads to Google Drive.
 - **Freshness Tracking**: Hybrid manual/automated system to track product pick availability. Admin panel provides bulk refresh actions, mark-sold-out workflow, and filtering. Frontend filters out sold-out/stale items. Nightly checks validate picks.
 - **Brand Watchlist Directory**: Public `/brands` page showcasing curated brands/shops from Airtable. Features two sections (Brands/Shops), a left sidebar with counts, and uses the FilterSidebar component. Cards link to affiliate or official brand URLs.
+- **Newsletter Signup**: Dual newsletter capture system for building email list. (1) Popup modal appears after 3 seconds on first visit with headline "Never Pay Full Price for Good Design" and CTA "I'm In". Uses localStorage to prevent repeated displays. (2) Footer newsletter signup form in 4-column layout with email input and "Subscribe" button. Both save to Airtable Newsletter table with Email, SubscribedDate, and Source fields. Backend endpoint `/api/newsletter/subscribe` validates emails, prevents duplicates, and logs subscriptions. Future integration: Manual export to Substack at https://wellspentstyle.substack.com/.
 
 ## External Dependencies
 - **Airtable**: Primary data source.
