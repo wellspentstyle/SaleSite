@@ -155,7 +155,7 @@ export function BrandsPage() {
           {/* Desktop Nav */}
           <nav className="hidden md:block">
             <Link 
-              to="/brands" 
+              to="/" 
               style={{
                 fontSize: '13px',
                 letterSpacing: '1.5px',
@@ -170,7 +170,7 @@ export function BrandsPage() {
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.6'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             >
-              Brand Watchlist
+              Home
             </Link>
           </nav>
           {/* Mobile Hamburger */}
@@ -198,7 +198,7 @@ export function BrandsPage() {
         {mobileMenuOpen && (
           <div style={{ padding: '16px 24px 8px', borderTop: '1px solid var(--border)' }} className="md:hidden">
             <Link 
-              to="/brands" 
+              to="/" 
               style={{
                 display: 'block',
                 padding: '8px 0',
@@ -212,7 +212,7 @@ export function BrandsPage() {
               }}
               onClick={() => setMobileMenuOpen(false)}
             >
-              Brand Watchlist
+              Home
             </Link>
           </div>
         )}
