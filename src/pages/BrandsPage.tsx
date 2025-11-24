@@ -100,7 +100,7 @@ export function BrandsPage() {
 
   // Separate into brands and shops
   const brands = useMemo(() => 
-    filteredCompanies.filter(c => c.type === 'Brand' && c.priority === 'High Priority').sort((a, b) => a.name.localeCompare(b.name)),
+    filteredCompanies.filter(c => c.type === 'Brand' && c.priority === 'High').sort((a, b) => a.name.localeCompare(b.name)),
     [filteredCompanies]
   );
 
