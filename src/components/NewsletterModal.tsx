@@ -31,7 +31,7 @@ export function NewsletterModal() {
       const response = await fetch('/api/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, source: 'Pop-up' })
       });
 
       if (response.ok) {
@@ -101,15 +101,15 @@ export function NewsletterModal() {
             {/* Headline */}
             <h2
               style={{
-                fontFamily: 'Crimson Pro, serif',
+                fontFamily: 'DM Sans, sans-serif',
                 fontSize: '32px',
-                fontWeight: 600,
+                fontWeight: 700,
                 marginBottom: '16px',
-                lineHeight: 1.2,
-                letterSpacing: '-0.02em'
+                lineHeight: 1.3,
+                letterSpacing: '0.02em'
               }}
             >
-              Never Pay Full Price for Good Design
+              Never Pay Full Price<br />for Good Design
             </h2>
 
             {/* Subtext */}
@@ -127,46 +127,56 @@ export function NewsletterModal() {
 
             {/* Form */}
             <form onSubmit={handleSubmit}>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Your email address"
-                required
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  border: '1px solid var(--border)',
-                  fontFamily: 'Crimson Pro, serif',
-                  fontSize: '15px',
-                  marginBottom: '16px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = '#000'}
-                onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
-              />
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your email address"
+                  required
+                  style={{
+                    flex: 1,
+                    padding: '14px 16px',
+                    border: '1px solid var(--border)',
+                    fontFamily: 'Crimson Pro, serif',
+                    fontSize: '15px',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#000'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
+                />
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  backgroundColor: '#000',
-                  color: 'white',
-                  border: 'none',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  letterSpacing: '0.05em',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseEnter={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = '#374151')}
-                onMouseLeave={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = '#000')}
-              >
-                {isSubmitting ? 'Subscribing...' : "I'm In"}
-              </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  style={{
+                    padding: '14px 24px',
+                    backgroundColor: '#000',
+                    color: 'white',
+                    border: 'none',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    letterSpacing: '0.05em',
+                    transition: 'background-color 0.2s',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = '#374151')}
+                  onMouseLeave={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = '#000')}
+                >
+                  {isSubmitting ? 'Subscribing...' : "I'm In"}
+                </button>
+              </div>
+
+              <p style={{
+                fontFamily: 'Crimson Pro, serif',
+                fontSize: '13px',
+                color: '#999',
+                textAlign: 'center'
+              }}>
+                Unsubscribe anytime
+              </p>
             </form>
           </>
         ) : (
