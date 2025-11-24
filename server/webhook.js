@@ -441,6 +441,76 @@ app.get('/companies', async (req, res) => {
   }
 });
 
+// Newsletter subscription endpoint (public)
+app.post('/api/newsletter/subscribe', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: 'Invalid email address' });
+    }
+    
+    // Check if email already exists in Newsletter table
+    const existingRecords = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Newsletter?filterByFormula={Email}='${email}'`,
+      {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    const existingData = await existingRecords.json();
+    
+    if (existingData.records && existingData.records.length > 0) {
+      return res.json({ success: true, message: 'Already subscribed', duplicate: true });
+    }
+    
+    // Add email to Newsletter table
+    const response = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Newsletter`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          records: [
+            {
+              fields: {
+                Email: email,
+                SubscribedDate: new Date().toISOString().split('T')[0],
+                Source: 'Website'
+              }
+            }
+          ]
+        })
+      }
+    );
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      console.log(`📧 New newsletter subscriber: ${email}`);
+      res.json({ success: true, message: 'Successfully subscribed' });
+    } else {
+      console.error('❌ Error adding to Newsletter:', data);
+      res.status(500).json({ success: false, message: 'Failed to subscribe' });
+    }
+  } catch (error) {
+    console.error('❌ Newsletter subscription error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ============================================
 // ADMIN ENDPOINTS
 // ============================================
