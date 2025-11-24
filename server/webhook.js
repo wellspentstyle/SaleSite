@@ -405,7 +405,8 @@ app.post('/admin/pending-brands/:id/approve', async (req, res) => {
       SizingSource: brand.sizingSource,
       Description: brand.description,
       Notes: brand.notes,
-      URL: brand.url
+      URL: brand.url,
+      Priority: 'High'
     };
     
     Object.keys(updateData).forEach(key => {
