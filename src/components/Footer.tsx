@@ -56,7 +56,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="https://kariclark.substack.com/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                <a href="https://wellspentstyle.substack.com/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
                   Substack
                 </a>
               </li>
