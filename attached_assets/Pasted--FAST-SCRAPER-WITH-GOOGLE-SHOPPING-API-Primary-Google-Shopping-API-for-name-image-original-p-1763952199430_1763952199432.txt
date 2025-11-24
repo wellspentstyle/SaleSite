@@ -422,7 +422,7 @@ function extractProductInfoFromUrl(url) {
         for (const segment of relevantSegments) {
           // Skip if it's just numbers (likely an ID)
           if (/^\d+$/.test(segment)) continue;
-
+          
           // Skip file extensions like product.do, browse.jsp, etc.
           if (/\.(do|jsp|php|aspx|html|htm)$/i.test(segment)) continue;
 
@@ -481,13 +481,13 @@ async function extractMetaTags(url, fetchImpl, logger, scraperApiKey) {
 
   try {
     logger.log('🏷️  [Meta Tags] Fetching via ScraperAPI (bypasses DataDome/bot protection)...');
-
+    
     // Use ScraperAPI to bypass bot protection (DataDome, Cloudflare, etc.)
     const scraperUrl = new URL('http://api.scraperapi.com/');
     scraperUrl.searchParams.set('api_key', scraperApiKey);
     scraperUrl.searchParams.set('url', url);
     scraperUrl.searchParams.set('render', 'false'); // Fast mode, no JS rendering
-
+    
     const response = await fetchImpl(scraperUrl.toString(), {
       method: 'GET',
       signal: AbortSignal.timeout(5000) // 5-second timeout
@@ -499,7 +499,7 @@ async function extractMetaTags(url, fetchImpl, logger, scraperApiKey) {
     }
 
     const html = await response.text();
-
+    
     // Check if we actually got content
     if (html.length < 100) {
       logger.log(`⚠️  [Meta Tags] Response too short (${html.length} bytes)`);
@@ -507,10 +507,9 @@ async function extractMetaTags(url, fetchImpl, logger, scraperApiKey) {
     }
 
     // Extract og:title (most reliable for full product name)
-    // Improved regex: matches property OR name, handles both attribute orders, flexible spacing
-    const ogTitleMatch = html.match(/<meta\s+[^>]*(?:property|name)=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:title["']/i);
-
+    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
+    
     let productName = null;
     if (ogTitleMatch) {
       productName = ogTitleMatch[1]
@@ -518,15 +517,14 @@ async function extractMetaTags(url, fetchImpl, logger, scraperApiKey) {
         .replace(/\s*-\s*.+$/, '')   // Remove " - Store Name"
         .replace(/\s*–\s*.+$/, '')   // Remove " – Store Name"
         .trim();
-
+      
       logger.log(`✅ [Meta Tags] Extracted product name: "${productName}"`);
     }
 
     // Also extract og:image as backup
-    // Improved regex: matches property OR name, handles both attribute orders, flexible spacing
-    const ogImageMatch = html.match(/<meta\s+[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta\s+[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["']/i);
-
+    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+    
     const imageUrl = ogImageMatch ? ogImageMatch[1] : null;
 
     if (imageUrl) {
@@ -562,23 +560,23 @@ async function extractMetaTags(url, fetchImpl, logger, scraperApiKey) {
 async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperApiKey) {
   const urlObj = new URL(url);
   const urlDomain = urlObj.hostname.replace('www.', '');
-
+  
   // Step 1: Try to extract product info from meta tags via ScraperAPI
   const metaData = await extractMetaTags(url, fetchImpl, logger, scraperApiKey);
-
+  
   // Step 2: Extract product info from URL as fallback
   const urlInfo = extractProductInfoFromUrl(url);
-
+  
   logger.log('📝 Extracted product info:');
   logger.log(`   Meta tags: ${metaData?.productName ? `"${metaData.productName}"` : 'none'}`);
   logger.log(`   URL query params: ${urlInfo.productName && !metaData?.productName ? `"${urlInfo.productName}"` : 'n/a'}`);
   logger.log(`   URL slug: ${urlInfo.productName && metaData?.productName ? `"${urlInfo.productName}" (not used)` : 'n/a'}`);
   logger.log(`   Product ID: ${urlInfo.productId || 'none'}`);
   logger.log(`   Domain: ${urlInfo.domain}`);
-
+  
   // Step 3: Build multiple query strategies (most specific first)
   const queries = [];
-
+  
   // Strategy 1: Meta og:title (BEST - exact product name with quotes)
   if (metaData?.productName) {
     // Use quotes for exact match since meta tags are accurate
@@ -588,7 +586,7 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
       useQuotes: true
     });
   }
-
+  
   // Strategy 2: URL query param name (GOOD - user's search term, fuzzy match)
   if (urlInfo.productName && !metaData?.productName) {
     // No quotes - let Google fuzzy match
@@ -598,7 +596,7 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
       useQuotes: false
     });
   }
-
+  
   // Strategy 3: Product ID + domain (for sites with SKUs in URL)
   if (urlInfo.productId) {
     queries.push({
@@ -607,14 +605,14 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
       useQuotes: false
     });
   }
-
+  
   // Strategy 4: Last resort - generic product search on domain
   queries.push({
     query: `product ${urlDomain}`,
     source: 'generic-fallback',
     useQuotes: false
   });
-
+  
   if (queries.length === 1) {
     // Only have the generic fallback
     logger.log('⚠️  Could not extract specific product info, using generic search');
@@ -623,10 +621,10 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
   try {
     for (let i = 0; i < queries.length; i++) {
       const { query, source, useQuotes } = queries[i];
-
+      
       logger.log(`🔍 [Google Shopping] Strategy ${i + 1}/${queries.length}: ${source}`);
       logger.log(`   Query: "${query}"${useQuotes ? ' (exact match)' : ' (fuzzy match)'}`);
-
+      
       // Search Google Shopping
       const searchResponse = await fetch('https://google.serper.dev/shopping', {
         method: 'POST',
@@ -656,7 +654,7 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
 
       // Find the result that best matches our domain
       let bestMatch = null;
-
+      
       for (const result of data.shopping_results) {
         // Check if the link matches the domain
         if (result.link && result.link.includes(urlDomain)) {
@@ -692,8 +690,7 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
       const product = {
         name: bestMatch.title,
         brand: extractBrandFromTitle(bestMatch.title),
-        // PREFER Google Shopping images (more reliable) over meta tags
-        imageUrl: bestMatch.imageUrl || bestMatch.image || bestMatch.thumbnail || metaData?.imageUrl,
+        imageUrl: metaData?.imageUrl || bestMatch.imageUrl || bestMatch.image || bestMatch.thumbnail,
         originalPrice: null,
         currentPrice: null
       };

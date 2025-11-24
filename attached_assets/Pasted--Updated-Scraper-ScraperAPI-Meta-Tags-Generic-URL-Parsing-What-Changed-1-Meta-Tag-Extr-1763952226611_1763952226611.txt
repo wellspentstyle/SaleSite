@@ -1,0 +1,341 @@
+# Updated Scraper: ScraperAPI Meta Tags + Generic URL Parsing
+
+## What Changed
+
+### 1. Meta Tag Extraction via ScraperAPI ✅
+
+**Old approach:** Tried 4 different user-agents directly
+**Problem:** All got blocked by DataDome (403 Forbidden)
+
+**New approach:** Use ScraperAPI to bypass bot protection
+
+```javascript
+// Now uses ScraperAPI with render: false for speed
+await extractMetaTags(url, fetchImpl, logger, scraperApiKey);
+
+// Settings:
+// - render: false (no JS, fast)
+// - 5-second timeout
+// - Fails gracefully (doesn't block whole scrape)
+```
+
+**Benefits:**
+- ✅ Bypasses DataDome, Cloudflare, etc.
+- ✅ Fast (no JS rendering needed for meta tags)
+- ✅ One API call per URL
+- ✅ Graceful failure (continues without meta tags if it fails)
+
+**Cost:** 
+- 1 ScraperAPI call per product
+- 200 URLs/day = 6,000 calls/month
+- Check your ScraperAPI plan for limits
+
+---
+
+### 2. Generic URL Parsing (No Domain-Specific Code) ✅
+
+**Priority order:**
+
+#### Priority 1: Query Parameters (NEW!)
+Checks these params FIRST:
+- `searchText` (Banana Republic, Gap)
+- `q` (generic)
+- `query` (common)
+- `search` (alternative)
+- `keyword` (some sites)
+- `name`, `title`, `text` (direct names)
+
+**Example:**
+```
+URL: bananarepublic.gap.com/product.do?searchText=denim+shirt
+Extracted: "denim shirt" ✅
+```
+
+#### Priority 2: Product ID from Query Params
+Checks: `id`, `productid`, `pid`, `itemid`, `sku`, `productcode`, `ID`
+
+**Example:**
+```
+URL: ...?pid=825024012
+Extracted: "825024012" ✅
+```
+
+#### Priority 3: URL Path Slugs
+If nothing in query params, extract from path:
+- Takes longest segment with words
+- Skips file extensions (`.do`, `.jsp`, `.php`, `.aspx`, `.html`)
+- Skips common words (`product`, `browse`, `shop`)
+- Converts dashes to spaces
+
+**Example:**
+```
+URL: /product/proenza-schouler-dress/12345
+Extracted: "proenza schouler dress" ✅
+```
+
+**No domain-specific code!** Works generically across all sites.
+
+---
+
+### 3. Improved Google Shopping Queries ✅
+
+**Query strategies (in order):**
+
+```javascript
+// Strategy 1: Meta tags (if available) - EXACT match with quotes
+"Proenza Schouler Zion Linen Top" saksfifthavenue.com
+
+// Strategy 2: URL query param (if available) - FUZZY match
+denim shirt bananarepublic.gap.com
+
+// Strategy 3: Product ID (if available)
+825024012 bananarepublic.gap.com
+
+// Strategy 4: Generic fallback
+product saksfifthavenue.com
+```
+
+**Improved logging:**
+```
+🔍 [Google Shopping] Strategy 1/4: meta-tags-exact
+   Query: "Proenza Schouler..." (exact match)
+   
+🔍 [Google Shopping] Strategy 2/4: url-query-param  
+   Query: "denim shirt..." (fuzzy match)
+```
+
+---
+
+## Flow Diagram
+
+```
+┌─────────────────────────────────────────────────┐
+│  Input: Product URL                             │
+└─────────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────┐
+│  Step 1: Extract Meta Tags via ScraperAPI      │
+│  • Uses ScraperAPI (bypasses DataDome)         │
+│  • 5-second timeout                             │
+│  • Gets: og:title, og:image                     │
+│  • If fails → continues (not critical)          │
+└─────────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────┐
+│  Step 2: Parse URL (Generic Patterns)          │
+│  Priority 1: Query params (searchText, q, etc.) │
+│  Priority 2: Product ID from params             │
+│  Priority 3: Path slugs (longest segment)       │
+│  • Skips .do, .jsp, etc.                        │
+│  • No domain-specific code                      │
+└─────────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────┐
+│  Step 3: Build Google Shopping Queries         │
+│  Query 1: Meta tag name (exact, with quotes)    │
+│  Query 2: URL param name (fuzzy, no quotes)     │
+│  Query 3: Product ID + domain                   │
+│  Query 4: Generic "product" + domain            │
+└─────────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────┐
+│  Step 4: Try Each Query Until Success          │
+│  • Matches domain in results                    │
+│  • Returns: name, brand, image, prices          │
+└─────────────────────────────────────────────────┘
+                    ↓
+         ┌──────────┴──────────┐
+         │                     │
+    ✅ Found              ❌ Not Found
+         │                     │
+         ↓                     ↓
+   Return Product      Fallback to Full
+      (fast!)          ScraperAPI Scrape
+                         (slow backup)
+```
+
+---
+
+## Expected Behavior
+
+### Example 1: Banana Republic
+
+**Input:**
+```
+URL: https://bananarepublic.gap.com/browse/product.do?pid=825024012&searchText=denim%20shirt
+```
+
+**Processing:**
+```
+🏷️  [Meta Tags] Fetching via ScraperAPI...
+⚠️  [Meta Tags] No og: tags found (OK, continuing)
+
+📝 Extracted product info:
+   Meta tags: none
+   URL query params: "denim shirt" ✅
+   Product ID: 825024012 ✅
+   Domain: bananarepublic.gap.com
+
+🔍 [Google Shopping] Strategy 1/2: url-query-param
+   Query: "denim shirt bananarepublic.gap.com" (fuzzy match)
+✅ Found 15 results
+✅ First result: "Relaxed-Fit Denim Short-Sleeve Shirt"
+✅ Match! Price: $89.50
+```
+
+**Result:** ✅ Success in ~3-5 seconds
+
+---
+
+### Example 2: Saks (Meta Tags Available)
+
+**Input:**
+```
+URL: https://www.saksfifthavenue.com/product/proenza-schouler-zion-top-0400022421822.html
+```
+
+**Processing:**
+```
+🏷️  [Meta Tags] Fetching via ScraperAPI...
+✅ [Meta Tags] Extracted product name: "Proenza Schouler Zion Linen-Blend Top"
+✅ [Meta Tags] Extracted image URL
+
+📝 Extracted product info:
+   Meta tags: "Proenza Schouler Zion Linen-Blend Top" ✅
+   Product ID: 0400022421822 ✅
+   Domain: saksfifthavenue.com
+
+🔍 [Google Shopping] Strategy 1/3: meta-tags-exact
+   Query: "Proenza Schouler Zion Linen-Blend Top saksfifthavenue.com" (exact match)
+✅ Found 8 results
+✅ Exact domain match from Saks
+✅ Price: $435.00
+```
+
+**Result:** ✅ Success in ~4-6 seconds (includes ScraperAPI call)
+
+---
+
+### Example 3: No Query Params, No Meta Tags
+
+**Input:**
+```
+URL: https://example.com/catalog/blue-cotton-tshirt/prod789012
+```
+
+**Processing:**
+```
+🏷️  [Meta Tags] Fetching via ScraperAPI...
+⚠️  [Meta Tags] Timeout after 5 seconds, continuing without meta tags
+
+📝 Extracted product info:
+   Meta tags: none
+   URL slug: "blue cotton tshirt" ✅
+   Product ID: 789012 ✅
+   Domain: example.com
+
+🔍 [Google Shopping] Strategy 1/3: url-query-param
+   Query: "blue cotton tshirt example.com" (fuzzy match)
+✅ Found results...
+```
+
+**Result:** ✅ Success via URL parsing fallback
+
+---
+
+## Configuration Required
+
+### Environment Variables:
+
+```bash
+# Required: Google Shopping API
+SERPER_API_KEY=your_serper_key_here
+
+# Required: For meta tag extraction via ScraperAPI
+SCRAPER_API_KEY=your_scraper_api_key_here
+
+# Optional: OpenAI (for fallback AI extraction)
+OPENAI_API_KEY=your_openai_key_here
+```
+
+### In Your Code:
+
+```javascript
+import { scrapeProduct } from './fast-scraper-updated.js';
+
+const result = await scrapeProduct(url, {
+  openai: openaiClient,
+  serperApiKey: process.env.SERPER_API_KEY,
+  scraperApiKey: process.env.SCRAPER_API_KEY,  // ← NEW!
+  fetchImpl: fetch,
+  logger: console
+});
+```
+
+---
+
+## Cost Breakdown
+
+### Per Product URL:
+
+1. **Meta Tag Extraction:** 1 ScraperAPI call (~$0.001)
+2. **Google Shopping:** 1-4 Serper API calls (free tier available)
+3. **Fallback Scrape:** 1 additional ScraperAPI call if all fails (~$0.001)
+
+### For 200 URLs/day (6,000/month):
+
+**Best case (meta tags + Google Shopping work):**
+- ScraperAPI: 6,000 calls = ~$6/month
+- Serper: Free tier (25,000 calls/month)
+- **Total: ~$6/month**
+
+**Worst case (all fallback to full scrape):**
+- ScraperAPI: 12,000 calls (meta + fallback) = ~$12/month
+- Serper: Free tier
+- **Total: ~$12/month**
+
+**Check your ScraperAPI pricing!** Rates vary by plan.
+
+---
+
+## What to Test
+
+1. **Banana Republic URL with searchText:**
+   ```
+   https://bananarepublic.gap.com/browse/product.do?pid=825024012&searchText=denim%20shirt
+   ```
+   **Expected:** Query param extraction works, Google Shopping finds it
+
+2. **Saks URL (DataDome protected):**
+   ```
+   https://www.saksfifthavenue.com/product/proenza-schouler-zion-top-0400022421822.html
+   ```
+   **Expected:** ScraperAPI gets meta tags, exact match in Google Shopping
+
+3. **Generic URL with path slug:**
+   ```
+   https://nordstrom.com/s/good-american-jeans/7656237
+   ```
+   **Expected:** Path parsing works, Google Shopping finds it
+
+---
+
+## Differences from Old Code
+
+| Feature | Old Code | New Code |
+|---------|----------|----------|
+| Meta tag extraction | 4 user-agent attempts (all blocked) | ScraperAPI (bypasses blocks) ✅ |
+| URL parsing | Domain-specific patterns | Generic patterns for all sites ✅ |
+| Query params | Not checked | Checked FIRST ✅ |
+| File extensions | Not filtered | Skipped (.do, .jsp, etc.) ✅ |
+| Google Shopping queries | Basic | Multi-strategy with quotes/fuzzy ✅ |
+| Logging | Minimal | Detailed (shows sources) ✅ |
+| Maintenance | Domain-specific code to update | Generic (works everywhere) ✅ |
+
+---
+
+## Ready to Test!
+
+The updated code is in: `/mnt/user-data/outputs/fast-scraper-updated.js`
+
+**Just add your ScraperAPI key and test it out!**
