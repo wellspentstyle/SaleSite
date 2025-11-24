@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { X, Image as ImageIcon } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface ManualEntryFormProps {
   url: string;
@@ -27,8 +27,6 @@ export function ManualEntryForm({ url, onDataChange, onRemove, initialData }: Ma
   const [originalPrice, setOriginalPrice] = useState(initialData?.originalPrice?.toString() || '');
   const [salePrice, setSalePrice] = useState(initialData?.salePrice?.toString() || '');
   const [percentOff, setPercentOff] = useState(initialData?.percentOff || 0);
-  const [loadingImage, setLoadingImage] = useState(false);
-  const [imageError, setImageError] = useState<string | null>(null);
 
   // Hydrate state from initialData when it becomes available
   useEffect(() => {
@@ -54,49 +52,23 @@ export function ManualEntryForm({ url, onDataChange, onRemove, initialData }: Ma
     }
   }, [originalPrice, salePrice]);
 
+  // Debounced data change to prevent glitching while typing
   useEffect(() => {
-    onDataChange({
-      url,
-      name,
-      brand: brand || undefined,
-      imageUrl,
-      originalPrice: parseFloat(originalPrice) || 0,
-      salePrice: parseFloat(salePrice) || 0,
-      percentOff
-    });
+    const timeoutId = setTimeout(() => {
+      onDataChange({
+        url,
+        name,
+        brand: brand || undefined,
+        imageUrl,
+        originalPrice: parseFloat(originalPrice) || 0,
+        salePrice: parseFloat(salePrice) || 0,
+        percentOff
+      });
+    }, 300); // Wait 300ms after user stops typing
+
+    return () => clearTimeout(timeoutId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, name, brand, imageUrl, originalPrice, salePrice, percentOff]);
-
-  const handleFindImage = async () => {
-    setLoadingImage(true);
-    setImageError(null);
-    
-    try {
-      const password = sessionStorage.getItem('adminToken');
-      const response = await fetch('/api/admin/extract-image', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'auth': password || ''
-        },
-        body: JSON.stringify({ url })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success && data.imageUrl) {
-        setImageUrl(data.imageUrl);
-        setImageError(null);
-      } else {
-        setImageError(data.message || 'Could not find image');
-      }
-    } catch (error) {
-      setImageError('Failed to extract image');
-      console.error('Image extraction error:', error);
-    } finally {
-      setLoadingImage(false);
-    }
-  };
 
   return (
     <div className="border border-border bg-white p-6 mb-4 relative">
