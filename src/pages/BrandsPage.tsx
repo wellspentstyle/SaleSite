@@ -349,7 +349,7 @@ export function BrandsPage() {
               padding: '24px',
               border: '1px solid var(--border)',
               borderRadius: '4px',
-              backgroundColor: '#fafafa'
+              backgroundColor: '#fff'
             }}>
               <InlineFilters filters={filters} onFilterChange={setFilters} />
             </div>

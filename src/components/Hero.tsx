@@ -1,4 +1,4 @@
-import { useIsMobile } from '@/components/ui/use-mobile';
+import { useIsMobile } from '../components/ui/use-mobile';
 
 export function Hero() {
   const isMobile = useIsMobile();
