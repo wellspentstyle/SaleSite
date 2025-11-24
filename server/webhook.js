@@ -338,7 +338,27 @@ app.get('/admin/pending-brands', async (req, res) => {
   
   try {
     const brands = await getPendingBrands();
-    res.json({ success: true, brands });
+    
+    // Fetch all live sales to check which brands have active sales
+    const salesRecords = await fetchAllAirtableRecords(TABLE_NAME, {
+      filterByFormula: `{Live}='YES'`,
+      pageSize: '100'
+    });
+    
+    // Create a set of brand record IDs that have active sales
+    const brandsWithActiveSales = new Set();
+    salesRecords.forEach(sale => {
+      const companyLinks = sale.fields.Company || [];
+      companyLinks.forEach(companyId => brandsWithActiveSales.add(companyId));
+    });
+    
+    // Add hasActiveSales flag to each brand
+    const brandsWithSalesInfo = brands.map(brand => ({
+      ...brand,
+      hasActiveSales: brandsWithActiveSales.has(brand.airtableRecordId)
+    }));
+    
+    res.json({ success: true, brands: brandsWithSalesInfo });
   } catch (error) {
     console.error('Error fetching pending brands:', error);
     res.status(500).json({ success: false, error: error.message });

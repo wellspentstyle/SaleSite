@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Loader2, Copy, RotateCcw, X, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EditBrandDialog } from '../components/EditBrandDialog';
@@ -49,6 +50,7 @@ interface PendingBrand {
   notes: string;
   url: string;
   qualityScore: number;
+  hasActiveSales: boolean;
 }
 
 export function AddBrands() {
@@ -445,7 +447,7 @@ export function AddBrands() {
         {pendingBrands.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">
+              <h2 className="text-xl font-bold" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                 Pending Approvals ({pendingBrands.length})
               </h2>
               <Button
@@ -461,16 +463,55 @@ export function AddBrands() {
                 )}
               </Button>
             </div>
-            <div className="space-y-4">
-              {pendingBrands.map((brand) => (
-                <PendingBrandCard
-                  key={brand.id}
-                  brand={brand}
-                  onApprove={fetchPendingBrands}
-                  onReject={fetchPendingBrands}
-                />
-              ))}
-            </div>
+            
+            <Tabs defaultValue="high-priority" className="w-full">
+              <TabsList style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                <TabsTrigger value="high-priority">
+                  High Priority ({pendingBrands.filter(b => b.hasActiveSales).length})
+                </TabsTrigger>
+                <TabsTrigger value="other">
+                  Other ({pendingBrands.filter(b => !b.hasActiveSales).length})
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="high-priority" className="space-y-4 mt-4">
+                {pendingBrands.filter(b => b.hasActiveSales).length === 0 ? (
+                  <p className="text-gray-500 text-sm" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                    No high priority brands pending approval
+                  </p>
+                ) : (
+                  pendingBrands
+                    .filter(b => b.hasActiveSales)
+                    .map((brand) => (
+                      <PendingBrandCard
+                        key={brand.id}
+                        brand={brand}
+                        onApprove={fetchPendingBrands}
+                        onReject={fetchPendingBrands}
+                      />
+                    ))
+                )}
+              </TabsContent>
+              
+              <TabsContent value="other" className="space-y-4 mt-4">
+                {pendingBrands.filter(b => !b.hasActiveSales).length === 0 ? (
+                  <p className="text-gray-500 text-sm" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                    No other brands pending approval
+                  </p>
+                ) : (
+                  pendingBrands
+                    .filter(b => !b.hasActiveSales)
+                    .map((brand) => (
+                      <PendingBrandCard
+                        key={brand.id}
+                        brand={brand}
+                        onApprove={fetchPendingBrands}
+                        onReject={fetchPendingBrands}
+                      />
+                    ))
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         )}
 
