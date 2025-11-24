@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
 import { Loader2, Copy, RotateCcw, X, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EditBrandDialog } from '../components/EditBrandDialog';
+import { PendingBrandCard } from '../components/PendingBrandCard';
 
 const API_BASE = '/api';
 
@@ -34,6 +35,22 @@ interface BrandResult {
   };
 }
 
+interface PendingBrand {
+  id: string;
+  name: string;
+  airtableRecordId: string;
+  type: string;
+  priceRange: string;
+  category: string;
+  values: string;
+  maxWomensSize: string;
+  sizingSource: string;
+  description: string;
+  notes: string;
+  url: string;
+  qualityScore: number;
+}
+
 export function AddBrands() {
   const [brandNames, setBrandNames] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -43,6 +60,33 @@ export function AddBrands() {
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<number>>(new Set());
+  const [pendingBrands, setPendingBrands] = useState<PendingBrand[]>([]);
+  const [isFetchingPending, setIsFetchingPending] = useState(false);
+
+  useEffect(() => {
+    fetchPendingBrands();
+    const interval = setInterval(fetchPendingBrands, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchPendingBrands = async () => {
+    try {
+      setIsFetchingPending(true);
+      const auth = sessionStorage.getItem('adminAuth') || '';
+      const response = await fetch(`${API_BASE}/admin/pending-brands`, {
+        headers: { 'auth': auth }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPendingBrands(data.brands || []);
+      }
+    } catch (error) {
+      console.error('Error fetching pending brands:', error);
+    } finally {
+      setIsFetchingPending(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -396,6 +440,39 @@ export function AddBrands() {
             <p className="text-gray-600 mt-1">Research fashion brands using AI to automatically categorize pricing, values, and size ranges</p>
           </div>
         </div>
+
+        {/* Pending Approvals Section */}
+        {pendingBrands.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold">
+                Pending Approvals ({pendingBrands.length})
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchPendingBrands}
+                disabled={isFetchingPending}
+              >
+                {isFetchingPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {pendingBrands.map((brand) => (
+                <PendingBrandCard
+                  key={brand.id}
+                  brand={brand}
+                  onApprove={fetchPendingBrands}
+                  onReject={fetchPendingBrands}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Input Form */}
         <form onSubmit={handleSubmit}>
