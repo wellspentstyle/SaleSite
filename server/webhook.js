@@ -444,17 +444,22 @@ app.get('/companies', async (req, res) => {
 // Newsletter subscription endpoint (public)
 app.post('/api/newsletter/subscribe', async (req, res) => {
   try {
+    console.log('📨 Newsletter subscription request:', req.body);
     const { email, source } = req.body;
     
     if (!email) {
+      console.log('❌ No email provided');
       return res.status(400).json({ success: false, message: 'Email is required' });
     }
     
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
+      console.log('❌ Invalid email format:', email);
       return res.status(400).json({ success: false, message: 'Invalid email address' });
     }
+    
+    console.log('✅ Email validated, checking for duplicates...');
     
     // Check if email already exists in Newsletter table
     const existingRecords = await fetch(
@@ -468,10 +473,14 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
     );
     
     const existingData = await existingRecords.json();
+    console.log('📊 Duplicate check result:', existingData.records?.length || 0, 'existing records');
     
     if (existingData.records && existingData.records.length > 0) {
+      console.log('ℹ️ Email already subscribed:', email);
       return res.json({ success: true, message: 'Already subscribed', duplicate: true });
     }
+    
+    console.log('💾 Adding email to Airtable Newsletter table...');
     
     // Add email to Newsletter table
     const response = await fetch(
@@ -497,9 +506,11 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
     );
     
     const data = await response.json();
+    console.log('📡 Airtable response status:', response.status);
+    console.log('📡 Airtable response data:', JSON.stringify(data, null, 2));
     
     if (response.ok) {
-      console.log(`📧 New newsletter subscriber: ${email}`);
+      console.log(`✅ New newsletter subscriber: ${email} (source: ${source})`);
       res.json({ success: true, message: 'Successfully subscribed' });
     } else {
       console.error('❌ Error adding to Newsletter:', data);
@@ -507,6 +518,7 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
     }
   } catch (error) {
     console.error('❌ Newsletter subscription error:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ success: false, message: error.message });
   }
 });
