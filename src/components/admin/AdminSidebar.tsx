@@ -65,7 +65,7 @@ export function AdminSidebar() {
         <ul style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const hasBadge = item.badge && item.badge > 0;
+            const hasBadge = item.badge !== undefined && item.badge > 0;
             return (
               <li key={item.path}>
                 <NavLink
