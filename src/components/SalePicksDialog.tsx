@@ -173,7 +173,7 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
           </div>
         </ScrollArea>
         
-        <div className="flex justify-end pt-4 border-t">
+        <div className="flex justify-end pt-4">
           <Button
             className="h-10 text-sm transition-colors"
             style={{
@@ -183,7 +183,7 @@ export function SalePicksDialog({ sale, open, onOpenChange }: SalePicksDialogPro
             onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => e.currentTarget.style.backgroundColor = ''}
             onClick={() => window.open(sale.saleUrl, '_blank')}
           >
-            Shop All
+            Shop All Sale
           </Button>
         </div>
       </DialogContent>

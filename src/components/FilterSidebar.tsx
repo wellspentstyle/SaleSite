@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FilterOptions } from '../types';
 import { Checkbox } from './ui/checkbox';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
@@ -18,6 +18,16 @@ export function FilterSidebar({ filters, onFilterChange, isOpen, onClose }: Filt
     maxWomensSize: true,
     values: true,
   });
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
@@ -97,29 +107,40 @@ export function FilterSidebar({ filters, onFilterChange, isOpen, onClose }: Filt
   };
 
   return (
-    <div 
-      className="bg-white overflow-hidden transition-all duration-300 ease-in-out"
-      style={{ 
-        fontFamily: 'DM Sans, sans-serif',
-        width: isOpen ? '280px' : '0px',
-        paddingLeft: isOpen ? '24px' : '0px',
-        opacity: isOpen ? 1 : 0,
-        borderLeft: isOpen ? '1px solid var(--border)' : 'none',
-        transform: isOpen ? 'translateX(0)' : 'translateX(280px)'
-      }}
-    >
-      <div className="mb-8 flex items-center justify-between" style={{ minWidth: '256px' }}>
-        <h2 className="text-sm tracking-widest uppercase font-medium">FILTERS</h2>
-        <button
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           onClick={onClose}
-          className="p-1 hover:opacity-70 transition-opacity"
-          aria-label="Close filters"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+        />
+      )}
+      
+      {/* Filter Sidebar */}
+      <div 
+        className="bg-white overflow-hidden transition-all duration-300 ease-in-out fixed md:relative right-0 top-0 h-full z-50"
+        style={{ 
+          fontFamily: 'DM Sans, sans-serif',
+          width: isOpen ? (isMobile ? '100%' : '280px') : '0px',
+          paddingLeft: isOpen ? '24px' : '0px',
+          paddingRight: isOpen ? '24px' : '0px',
+          opacity: isOpen ? 1 : 0,
+          borderLeft: isOpen ? '1px solid var(--border)' : 'none',
+          transform: isOpen ? 'translateX(0)' : (isMobile ? 'translateX(100%)' : 'translateX(280px)')
+        }}
+      >
+        <div className="mb-8 flex items-center justify-between pt-6 md:pt-0">
+          <h2 className="text-sm tracking-widest uppercase font-medium">FILTERS</h2>
+          <button
+            onClick={onClose}
+            className="p-1 hover:opacity-70 transition-opacity"
+            aria-label="Close filters"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
-      <div style={{ minWidth: '256px' }}>
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
         <FilterSection
           title="TYPE"
           filterKey="type"
@@ -189,5 +210,6 @@ export function FilterSidebar({ filters, onFilterChange, isOpen, onClose }: Filt
         />
       </div>
     </div>
+    </>
   );
 }

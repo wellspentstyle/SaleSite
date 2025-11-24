@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { FilterSidebar } from '../components/FilterSidebar';
 import { Footer } from '../components/Footer';
-import { Filter } from 'lucide-react';
+import { Filter, ChevronDown, ChevronRight } from 'lucide-react';
 import { FilterOptions } from '../types';
+import { Checkbox } from '../components/ui/checkbox';
 
 interface Company {
   id: string;
@@ -23,6 +23,7 @@ export function BrandsPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
     type: [],
     priceRange: [],
@@ -151,7 +152,8 @@ export function BrandsPage() {
               style={{ height: '64px' }}
             />
           </Link>
-          <nav>
+          {/* Desktop Nav */}
+          <nav className="hidden md:block">
             <Link 
               to="/brands" 
               style={{
@@ -171,7 +173,49 @@ export function BrandsPage() {
               Brand Watchlist
             </Link>
           </nav>
+          {/* Mobile Hamburger */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden"
+            style={{
+              padding: '8px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+            aria-label="Toggle menu"
+          >
+            <svg style={{ width: '24px', height: '24px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div style={{ padding: '16px 24px 8px', borderTop: '1px solid var(--border)' }} className="md:hidden">
+            <Link 
+              to="/brands" 
+              style={{
+                display: 'block',
+                padding: '8px 0',
+                fontSize: '13px',
+                letterSpacing: '1.5px',
+                textTransform: 'uppercase',
+                fontWeight: 500,
+                fontFamily: 'DM Sans, sans-serif',
+                textDecoration: 'none',
+                color: '#000'
+              }}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Brand Watchlist
+            </Link>
+          </div>
+        )}
       </header>
       
       {/* Hero Section */}
@@ -206,8 +250,8 @@ export function BrandsPage() {
         display: 'flex',
         position: 'relative'
       }}>
-        {/* Left Sidebar Navigation */}
-        <div style={{
+        {/* Left Sidebar Navigation - Hidden on Mobile */}
+        <div className="hidden md:block" style={{
           width: '200px',
           flexShrink: 0,
           position: 'sticky',
@@ -261,16 +305,25 @@ export function BrandsPage() {
             >
               Shops ({shops.length})
             </button>
-            
-            {/* Filter Button */}
+          </nav>
+        </div>
+
+        {/* Center Content */}
+        <div style={{ 
+          flex: 1,
+          padding: '24px',
+          maxWidth: '1200px',
+          margin: '0 auto'
+        }} className="md:px-12">
+          {/* Filter Button - Above Content */}
+          <div style={{ marginBottom: '24px' }}>
             <button
               onClick={() => setFilterOpen(!filterOpen)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                width: '100%',
-                padding: '10px 12px',
+                padding: '10px 16px',
                 fontSize: '13px',
                 fontWeight: 500,
                 letterSpacing: '0.5px',
@@ -281,24 +334,26 @@ export function BrandsPage() {
                 borderRadius: '3px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
-                fontFamily: 'DM Sans, sans-serif',
-                marginTop: '16px'
+                fontFamily: 'DM Sans, sans-serif'
               }}
             >
-              <Filter className="w-4 h-4" />
-              Filter
+              <Filter style={{ width: '16px', height: '16px' }} />
+              {filterOpen ? 'Hide Filters' : 'Filter'}
             </button>
-          </nav>
-        </div>
+          </div>
 
-        {/* Center Content */}
-        <div style={{ 
-          flex: 1,
-          padding: '48px',
-          maxWidth: '1000px',
-          marginRight: filterOpen ? '0' : 'auto',
-          transition: 'margin-right 0.3s ease-in-out'
-        }}>
+          {/* Filters Expandable Section */}
+          {filterOpen && (
+            <div style={{
+              marginBottom: '32px',
+              padding: '24px',
+              border: '1px solid var(--border)',
+              borderRadius: '4px',
+              backgroundColor: '#fafafa'
+            }}>
+              <InlineFilters filters={filters} onFilterChange={setFilters} />
+            </div>
+          )}
           {/* Brands Section */}
           <section id="brands" style={{ marginBottom: '80px' }}>
             <h2 style={{
@@ -353,18 +408,144 @@ export function BrandsPage() {
             )}
           </section>
         </div>
-
-        {/* Right Filter Sidebar */}
-        <FilterSidebar
-          filters={filters}
-          onFilterChange={setFilters}
-          isOpen={filterOpen}
-          onClose={() => setFilterOpen(false)}
-        />
       </div>
 
       {/* Footer */}
       <Footer />
+    </div>
+  );
+}
+
+function InlineFilters({ filters, onFilterChange }: { filters: FilterOptions; onFilterChange: (filters: FilterOptions) => void }) {
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    type: true,
+    priceRange: true,
+    maxWomensSize: true,
+    values: true,
+  });
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const handleCheckboxChange = (
+    filterKey: keyof FilterOptions,
+    value: string,
+    checked: boolean
+  ) => {
+    const currentValues = filters[filterKey];
+    const newValues = checked
+      ? [...currentValues, value]
+      : currentValues.filter(v => v !== value);
+
+    onFilterChange({
+      ...filters,
+      [filterKey]: newValues
+    });
+  };
+
+  const FilterSection = ({
+    title,
+    filterKey,
+    options
+  }: {
+    title: string;
+    filterKey: keyof FilterOptions;
+    options: string[];
+  }) => {
+    const isExpanded = expandedSections[filterKey];
+    
+    return (
+      <div style={{ marginBottom: '24px' }}>
+        <button
+          onClick={() => toggleSection(filterKey)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            padding: '12px 0',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'opacity 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+        >
+          <span style={{
+            fontSize: '13px',
+            letterSpacing: '1.5px',
+            textTransform: 'uppercase',
+            fontWeight: 500,
+            fontFamily: 'DM Sans, sans-serif'
+          }}>
+            {title}
+          </span>
+          {isExpanded ? <ChevronDown style={{ width: '16px', height: '16px' }} /> : <ChevronRight style={{ width: '16px', height: '16px' }} />}
+        </button>
+        
+        {isExpanded && (
+          <div style={{ paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {options.map((option) => (
+              <div key={option} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                <label
+                  htmlFor={`${filterKey}-${option}`}
+                  style={{
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    fontFamily: 'DM Sans, sans-serif',
+                    textTransform: 'uppercase',
+                    fontWeight: 300,
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  {option}
+                </label>
+                <Checkbox
+                  id={`${filterKey}-${option}`}
+                  checked={filters[filterKey].includes(option)}
+                  onCheckedChange={(checked: boolean) =>
+                    handleCheckboxChange(filterKey, option, checked)
+                  }
+                  style={{ width: '16px', height: '16px' }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '32px' }}>
+        <FilterSection
+          title="TYPE"
+          filterKey="type"
+          options={['Brand', 'Shop']}
+        />
+        <FilterSection
+          title="PRICE RANGE"
+          filterKey="priceRange"
+          options={['$', '$$', '$$$', '$$$$']}
+        />
+        <FilterSection
+          title="MAX SIZE"
+          filterKey="maxWomensSize"
+          options={['Up to 12', 'Up to 16', 'Up to 20', '20+']}
+        />
+        <FilterSection
+          title="VALUES"
+          filterKey="values"
+          options={['Sustainable', 'Inclusive Sizing', 'BIPOC-Owned', 'Woman-Owned', 'Family-Owned', 'Small Business']}
+        />
+      </div>
     </div>
   );
 }
