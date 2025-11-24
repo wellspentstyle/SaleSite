@@ -549,7 +549,7 @@ export function PicksAdmin() {
                   className="border bg-white cursor-pointer transition-all hover:shadow-md"
                   style={{ 
                     padding: '20px', 
-                    paddingRight: '60px',
+                    paddingRight: '80px',
                     borderRadius: '4px',
                     borderColor: '#e5e7eb',
                     position: 'relative'

@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { X } from 'lucide-react';
+import { Button } from './ui/button';
+import { X, Calculator } from 'lucide-react';
 
 interface ManualEntryFormProps {
   url: string;
   onDataChange: (data: ManualProductData) => void;
   onRemove: () => void;
   initialData?: ManualProductData;
+  salePercentOff?: number;
 }
 
 export interface ManualProductData {
@@ -20,13 +22,15 @@ export interface ManualProductData {
   percentOff: number;
 }
 
-export function ManualEntryForm({ url, onDataChange, onRemove, initialData }: ManualEntryFormProps) {
+export function ManualEntryForm({ url, onDataChange, onRemove, initialData, salePercentOff }: ManualEntryFormProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [brand, setBrand] = useState(initialData?.brand || '');
   const [imageUrl, setImageUrl] = useState(initialData?.imageUrl || '');
   const [originalPrice, setOriginalPrice] = useState(initialData?.originalPrice?.toString() || '');
   const [salePrice, setSalePrice] = useState(initialData?.salePrice?.toString() || '');
   const [percentOff, setPercentOff] = useState(initialData?.percentOff || 0);
+  const [showCustomPercentDialog, setShowCustomPercentDialog] = useState(false);
+  const [customPercent, setCustomPercent] = useState('');
 
   // Hydrate state from initialData when it becomes available
   useEffect(() => {
@@ -51,6 +55,27 @@ export function ManualEntryForm({ url, onDataChange, onRemove, initialData }: Ma
       setPercentOff(0);
     }
   }, [originalPrice, salePrice]);
+
+  const handleUseSalePercent = () => {
+    if (!salePercentOff || !originalPrice) {
+      return;
+    }
+    const orig = parseFloat(originalPrice);
+    const calculatedSalePrice = orig * (1 - salePercentOff / 100);
+    setSalePrice(calculatedSalePrice.toFixed(2));
+  };
+
+  const handleUseCustomPercent = () => {
+    const custom = parseFloat(customPercent);
+    if (!custom || custom < 0 || custom > 100 || !originalPrice) {
+      return;
+    }
+    const orig = parseFloat(originalPrice);
+    const calculatedSalePrice = orig * (1 - custom / 100);
+    setSalePrice(calculatedSalePrice.toFixed(2));
+    setShowCustomPercentDialog(false);
+    setCustomPercent('');
+  };
 
   // Debounced data change to prevent glitching while typing
   useEffect(() => {
@@ -169,17 +194,89 @@ export function ManualEntryForm({ url, onDataChange, onRemove, initialData }: Ma
             >
               Sale Price ($)
             </Label>
-            <Input
-              id={`sale-${url}`}
-              type="number"
-              step="0.01"
-              min="0"
-              value={salePrice}
-              onChange={(e) => setSalePrice(e.target.value)}
-              placeholder="0.00"
-              className="h-10"
-              required
-            />
+            <div className="flex gap-2">
+              <Input
+                id={`sale-${url}`}
+                type="number"
+                step="0.01"
+                min="0"
+                value={salePrice}
+                onChange={(e) => setSalePrice(e.target.value)}
+                placeholder="0.00"
+                className="h-10 flex-1"
+                required
+              />
+              {salePercentOff && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUseSalePercent}
+                  disabled={!originalPrice}
+                  title={`Apply ${salePercentOff}% off`}
+                  style={{ fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap' }}
+                >
+                  <Calculator className="h-3 w-3 mr-1" />
+                  {salePercentOff}% off
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCustomPercentDialog(true)}
+                disabled={!originalPrice}
+                title="Apply custom % off"
+                style={{ fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap' }}
+              >
+                <Calculator className="h-3 w-3 mr-1" />
+                Custom %
+              </Button>
+            </div>
+            {showCustomPercentDialog && (
+              <div className="mt-2 p-3 border rounded bg-muted/20">
+                <Label 
+                  htmlFor={`custom-percent-${url}`}
+                  style={{ fontFamily: 'system-ui, sans-serif', fontSize: '12px' }}
+                >
+                  Enter discount percentage:
+                </Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    id={`custom-percent-${url}`}
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="100"
+                    value={customPercent}
+                    onChange={(e) => setCustomPercent(e.target.value)}
+                    placeholder="e.g., 25"
+                    className="h-8 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleUseCustomPercent}
+                    disabled={!customPercent}
+                    style={{ fontFamily: 'system-ui, sans-serif' }}
+                  >
+                    Apply
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setShowCustomPercentDialog(false);
+                      setCustomPercent('');
+                    }}
+                    style={{ fontFamily: 'system-ui, sans-serif' }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {percentOff > 0 && (

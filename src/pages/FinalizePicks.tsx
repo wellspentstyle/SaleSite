@@ -804,6 +804,7 @@ export function FinalizePicks() {
                 initialData={manualEntries.get(url)}
                 onDataChange={(data) => handleManualDataChange(url, data)}
                 onRemove={() => handleRemoveManualEntry(url)}
+                salePercentOff={salePercentOff}
               />
             ))}
           </div>

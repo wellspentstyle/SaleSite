@@ -82,10 +82,14 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const GEM_EMAIL = process.env.GEM_EMAIL;
 const GEM_TABLE_NAME = 'Gem';
 
-// Simple in-memory cache for sales data
+// Simple in-memory cache for sales data and companies
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const cache = {
   sales: {
+    data: null,
+    expiresAt: 0
+  },
+  companies: {
     data: null,
     expiresAt: 0
   }
@@ -128,6 +132,80 @@ function clearSalesCache() {
   cache.sales.data = null;
   cache.sales.expiresAt = 0;
   console.log('🗑️  Sales cache cleared');
+}
+
+// Companies cache helpers
+function getCachedCompanies() {
+  if (cache.companies.data && Date.now() < cache.companies.expiresAt) {
+    return cache.companies.data;
+  }
+  return null;
+}
+
+function setCachedCompanies(data) {
+  cache.companies.data = data;
+  cache.companies.expiresAt = Date.now() + CACHE_TTL_MS;
+}
+
+async function fetchCompanies() {
+  try {
+    const cached = getCachedCompanies();
+    if (cached) return cached;
+
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}`;
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+    });
+
+    if (!response.ok) {
+      console.warn('⚠️  Failed to fetch companies from Airtable');
+      return [];
+    }
+
+    const data = await response.json();
+    const companies = data.records.map(record => ({
+      name: record.fields.Name,
+      type: record.fields.Type,
+      urls: (record.fields.URLs || []).map(url => {
+        try {
+          const urlObj = new URL(url);
+          return urlObj.hostname.toLowerCase().replace(/^www\./, '');
+        } catch {
+          return null;
+        }
+      }).filter(Boolean)
+    }));
+
+    setCachedCompanies(companies);
+    return companies;
+  } catch (error) {
+    console.warn('⚠️  Error fetching companies:', error.message);
+    return [];
+  }
+}
+
+function shouldAutofillBrand(url) {
+  // Returns true if brand should be auto-filled (domain is a Shop), false otherwise
+  try {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.toLowerCase().replace(/^www\./, '');
+    
+    const companies = cache.companies.data || [];
+    const matchingCompany = companies.find(company => 
+      company.urls.includes(domain)
+    );
+
+    if (!matchingCompany) {
+      // No match found - keep current behavior (auto-fill)
+      return true;
+    }
+
+    // Only auto-fill if it's a Shop (multi-brand retailer)
+    return matchingCompany.type === 'Shop';
+  } catch (error) {
+    console.warn('⚠️  Error checking domain type:', error.message);
+    return true; // Fallback to current behavior
+  }
 }
 
 // Helper function to clean URLs (remove all tracking parameters)
@@ -1077,7 +1155,8 @@ app.post('/admin/scrape-product-stream', async (req, res) => {
         const result = await scrapeProduct(productUrl, {
           openai,
           enableTestMetadata: test || false,
-          logger: console
+          logger: console,
+          shouldAutofillBrand
         });
         
         if (!result.success) {
@@ -1200,7 +1279,8 @@ app.post('/admin/scrape-product', async (req, res) => {
         const result = await scrapeProduct(productUrl, {
           openai,
           enableTestMetadata: test || false,
-          logger: console
+          logger: console,
+          shouldAutofillBrand
         });
         
         if (!result.success) {
@@ -3397,6 +3477,13 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Webhook server running on port ${PORT}`);
   console.log(`📬 AgentMail webhook endpoint: http://0.0.0.0:${PORT}/webhook/agentmail`);
   console.log(`📦 Serving React build from: ${buildPath}`);
+  
+  // Pre-fetch companies to cache for brand auto-fill logic
+  fetchCompanies().then(companies => {
+    console.log(`✅ Cached ${companies.length} companies for brand auto-fill`);
+  }).catch(err => {
+    console.warn('⚠️  Failed to pre-fetch companies:', err.message);
+  });
   
   if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
     console.log('📱 Initializing Telegram bot...');

@@ -11,7 +11,8 @@ export async function scrapeProduct(url, options = {}) {
     fetchImpl = fetch,
     enableTestMetadata = false,
     maxRetries = 3,
-    logger = console
+    logger = console,
+    shouldAutofillBrand = () => true // Default to always auto-fill
   } = options;
 
   if (!openai) {
@@ -73,7 +74,7 @@ export async function scrapeProduct(url, options = {}) {
             if (salePrice) {
               const product = {
                 name: googleShoppingResult.name,
-                brand: googleShoppingResult.brand || null,
+                brand: shouldAutofillBrand(url) ? (googleShoppingResult.brand || null) : null,
                 imageUrl: googleShoppingResult.imageUrl,
                 originalPrice: originalPrice || salePrice,
                 salePrice: salePrice,
@@ -735,7 +736,7 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
       // Build product object
       const product = {
         name: bestMatch.title,
-        brand: extractBrandFromTitle(bestMatch.title),
+        brand: shouldAutofillBrand(url) ? extractBrandFromTitle(bestMatch.title) : null,
         imageUrl: metaData?.imageUrl || bestMatch.imageUrl,
         originalPrice: bestMatch.originalPrice || null,
         currentPrice: bestMatch.currentPrice || null
@@ -1573,7 +1574,7 @@ These were extracted from reliable structured data. Use these EXACT prices. Only
 
   return {
     name: productData.name,
-    brand: productData.brand || null,
+    brand: shouldAutofillBrand(url) ? (productData.brand || null) : null,
     imageUrl: productData.imageUrl,
     originalPrice: originalPrice,
     salePrice: salePrice,

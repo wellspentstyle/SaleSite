@@ -6,9 +6,10 @@ const API_BASE = '/api';
 
 export function AdminSidebar() {
   const [pendingCount, setPendingCount] = useState(0);
+  const [draftsCount, setDraftsCount] = useState(0);
   
   const navItems = [
-    { path: '/admin/picks', label: 'Add Picks', icon: Package },
+    { path: '/admin/picks', label: 'Add Picks', icon: Package, badge: draftsCount },
     { path: '/admin/sales-approvals', label: 'Sales Approvals', icon: CheckSquare, badge: pendingCount },
     { path: '/admin/brands', label: 'Add Brands', icon: Tag },
     { path: '/admin/assets', label: 'Generate Assets', icon: Image },
@@ -17,24 +18,37 @@ export function AdminSidebar() {
   ];
   
   useEffect(() => {
-    const fetchPendingCount = async () => {
+    const fetchCounts = async () => {
       try {
         const auth = sessionStorage.getItem('adminAuth') || '';
-        const response = await fetch(`${API_BASE}/pending-sales`, {
-          headers: { 'auth': auth }
-        });
-        const data = await response.json();
-        if (data.success && data.sales) {
-          setPendingCount(data.sales.length);
+        
+        const [salesRes, draftsRes] = await Promise.all([
+          fetch(`${API_BASE}/pending-sales`, {
+            headers: { 'auth': auth }
+          }),
+          fetch(`${API_BASE}/admin/finalize-drafts`, {
+            headers: { 'auth': auth }
+          })
+        ]);
+        
+        const salesData = await salesRes.json();
+        const draftsData = await draftsRes.json();
+        
+        if (salesData.success && salesData.sales) {
+          setPendingCount(salesData.sales.length);
+        }
+        
+        if (draftsData.success && draftsData.drafts) {
+          setDraftsCount(draftsData.drafts.length);
         }
       } catch (error) {
-        console.error('Error fetching pending sales count:', error);
+        console.error('Error fetching counts:', error);
       }
     };
     
-    fetchPendingCount();
+    fetchCounts();
     // Refresh count every 30 seconds
-    const interval = setInterval(fetchPendingCount, 30000);
+    const interval = setInterval(fetchCounts, 30000);
     return () => clearInterval(interval);
   }, []);
 
