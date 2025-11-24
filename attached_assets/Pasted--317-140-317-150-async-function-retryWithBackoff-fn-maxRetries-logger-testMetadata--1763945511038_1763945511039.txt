@@ -1,0 +1,226 @@
+@@ -317,140 +317,150 @@ async function retryWithBackoff(fn, maxRetries, logger, testMetadata) {
+      if (attempt === maxRetries - 1) {
+        logger.log(`❌ [Fast Scraper] All ${maxRetries} attempts failed`);
+        error.errorType = errorType;
+        throw error;
+      }
+      
+      // Calculate backoff delay: 2s, 4s, 8s
+      const delay = Math.pow(2, attempt + 1) * 1000;
+      logger.log(`⚠️  [Fast Scraper] Attempt ${attempt + 1}/${maxRetries} failed (${errorType}), retrying in ${delay}ms...`);
+      logger.log(`   Error: ${error.message}`);
+      
+      await sleep(delay);
+    }
+  }
+  
+  // Should never reach here, but just in case
+  lastError.errorType = classifyError(lastError);
+  throw lastError;
+}
+
+// ============================================
+// GOOGLE SHOPPING API FUNCTIONS
+// ============================================
+
+async function tryGoogleShopping(url, serperApiKey, logger) {
+  try {
+    // Search Google Shopping for this product URL
+    const searchResponse = await fetch('https://google.serper.dev/shopping', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': serperApiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: url,
+        num: 3 // Get top 3 results to find best match
+      })
+    });
+  const urlObj = new URL(url);
+  const urlDomain = urlObj.hostname.replace('www.', '');
+  const queries = [
+    url,
+    `${urlDomain} ${urlObj.pathname.split('/').filter(Boolean).slice(-2).join(' ').replace(/[-_]/g, ' ')}`.trim()
+  ];
+
+    if (!searchResponse.ok) {
+      logger.log(`⚠️ Google Shopping API error: ${searchResponse.status}`);
+      return null;
+    }
+  try {
+    for (const query of queries) {
+      // Search Google Shopping for this product URL or a fallback query
+      const searchResponse = await fetch('https://google.serper.dev/shopping', {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': serperApiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          q: query,
+          num: 5 // Grab more results to improve matching
+        })
+      });
+
+    const data = await searchResponse.json();
+      if (!searchResponse.ok) {
+        logger.log(`⚠️ Google Shopping API error (${query}): ${searchResponse.status}`);
+        continue;
+      }
+
+    if (!data.shopping_results || data.shopping_results.length === 0) {
+      logger.log('⚠️ No Google Shopping results found');
+      return null;
+    }
+      const data = await searchResponse.json();
+
+    // Find the result that best matches our URL
+    const urlDomain = new URL(url).hostname.replace('www.', '');
+    let bestMatch = null;
+    
+    for (const result of data.shopping_results) {
+      // Check if the source matches the domain
+      if (result.link && result.link.includes(urlDomain)) {
+        bestMatch = result;
+        break;
+      if (!data.shopping_results || data.shopping_results.length === 0) {
+        logger.log(`⚠️ No Google Shopping results found for query: ${query}`);
+        continue;
+      }
+      // Or if source name matches
+      if (result.source && result.source.toLowerCase().includes(urlDomain.split('.')[0])) {
+        bestMatch = result;
+        break;
+
+      // Find the result that best matches our URL
+      let bestMatch = null;
+      
+      for (const result of data.shopping_results) {
+        // Check if the source matches the domain
+        if (result.link && result.link.includes(urlDomain)) {
+          bestMatch = result;
+          break;
+        }
+        // Or if source name matches
+        if (result.source && result.source.toLowerCase().includes(urlDomain.split('.')[0])) {
+          bestMatch = result;
+          break;
+        }
+      }
+    }
+
+    // If no exact match, use first result
+    if (!bestMatch) {
+      bestMatch = data.shopping_results[0];
+    }
+      // If no exact match, use first result
+      if (!bestMatch) {
+        bestMatch = data.shopping_results[0];
+      }
+
+    // Extract product data
+    const product = {
+      name: bestMatch.title,
+      brand: extractBrandFromTitle(bestMatch.title),
+      imageUrl: bestMatch.imageUrl || bestMatch.thumbnail,
+      originalPrice: null,
+      currentPrice: null
+    };
+      // Extract product data
+      const product = {
+        name: bestMatch.title,
+        brand: extractBrandFromTitle(bestMatch.title),
+        imageUrl: bestMatch.imageUrl || bestMatch.image || bestMatch.thumbnail,
+        originalPrice: null,
+        currentPrice: null
+      };
+
+      // Parse prices
+      if (bestMatch.price) {
+        const priceStr = bestMatch.price.replace(/[^0-9.]/g, '');
+        product.currentPrice = parseFloat(priceStr);
+      }
+
+    // Parse prices
+    if (bestMatch.price) {
+      const priceStr = bestMatch.price.replace(/[^0-9.]/g, '');
+      product.currentPrice = parseFloat(priceStr);
+    }
+      // Check for original/compare price
+      if (bestMatch.extracted_price) {
+        product.currentPrice = bestMatch.extracted_price;
+      }
+
+    // Check for original/compare price
+    if (bestMatch.extracted_price) {
+      product.currentPrice = bestMatch.extracted_price;
+    }
+      // Some Google Shopping results have old_price or extracted_old_price
+      if (bestMatch.old_price) {
+        const oldPriceStr = bestMatch.old_price.replace(/[^0-9.]/g, '');
+        product.originalPrice = parseFloat(oldPriceStr);
+      } else if (bestMatch.extracted_old_price) {
+        product.originalPrice = bestMatch.extracted_old_price;
+      }
+
+    // Some Google Shopping results have old_price or extracted_old_price
+    if (bestMatch.old_price) {
+      const oldPriceStr = bestMatch.old_price.replace(/[^0-9.]/g, '');
+      product.originalPrice = parseFloat(oldPriceStr);
+    } else if (bestMatch.extracted_old_price) {
+      product.originalPrice = bestMatch.extracted_old_price;
+    }
+      // Validate we got minimum required data
+      if (!product.name || !product.imageUrl) {
+        logger.log('⚠️ Google Shopping result missing name or image');
+        continue;
+      }
+
+    // Validate we got minimum required data
+    if (!product.name || !product.imageUrl) {
+      logger.log('⚠️ Google Shopping result missing name or image');
+      return null;
+    }
+      logger.log(`✅ Google Shopping: ${product.name}`);
+      if (product.originalPrice) {
+        logger.log(`   Original: $${product.originalPrice}, Current: $${product.currentPrice}`);
+      } else {
+        logger.log(`   Price: $${product.currentPrice}`);
+      }
+
+    logger.log(`✅ Google Shopping: ${product.name}`);
+    if (product.originalPrice) {
+      logger.log(`   Original: $${product.originalPrice}, Current: $${product.currentPrice}`);
+    } else {
+      logger.log(`   Price: $${product.currentPrice}`);
+      return product;
+    }
+
+    return product;
+    return null;
+
+  } catch (error) {
+    logger.log(`⚠️ Google Shopping error: ${error.message}`);
+    return null;
+  }
+}
+
+async function fetchFreshSalePrice(url, fetchImpl, logger) {
+  try {
+    const response = await fetchImpl(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      logger.log(`⚠️ Page fetch failed: ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+
+    let salePrice = null;
+    let originalPrice = null;
