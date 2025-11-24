@@ -615,9 +615,8 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
 
   // Strategy 1: Meta og:title (BEST - exact product name with quotes)
   if (metaData?.productName) {
-    // Use quotes for exact match since meta tags are accurate
     queries.push({
-      query: `"${metaData.productName}" ${urlDomain}`,
+      query: `${metaData.productName} ${urlDomain}`,
       source: 'meta-tags-exact',
       useQuotes: true
     });
@@ -625,7 +624,6 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
 
   // Strategy 2: URL query param name (GOOD - user's search term, fuzzy match)
   if (urlInfo.productName && !metaData?.productName) {
-    // No quotes - let Google fuzzy match
     queries.push({
       query: `${urlInfo.productName} ${urlDomain}`,
       source: 'url-query-param',
@@ -650,55 +648,58 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
   });
 
   if (queries.length === 1) {
-    // Only have the generic fallback
     logger.log('⚠️  Could not extract specific product info, using generic search');
+  }
+
+  if (!scraperApiKey) {
+    logger.log('❌ [Google Shopping] No ScraperAPI key, skipping Google Shopping scrape');
+    return null;
   }
 
   try {
     for (let i = 0; i < queries.length; i++) {
-      const { query, source, useQuotes } = queries[i];
+      const { query, source } = queries[i];
 
       logger.log(`🔍 [Google Shopping] Strategy ${i + 1}/${queries.length}: ${source}`);
-      logger.log(`   Query: "${query}"${useQuotes ? ' (exact match)' : ' (fuzzy match)'}`);
+      logger.log(`   Query: "${query}"`);
 
-      // Search Google Shopping
-      const searchResponse = await fetch('https://google.serper.dev/shopping', {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': serperApiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          q: query,
-          num: 10 // Get more results to improve matching chances
-        })
+      // Build Google Shopping URL with udm=28 (Shopping Graph - the new index)
+      const googleShoppingUrl = `https://www.google.com/search?udm=28&q=${encodeURIComponent(query)}`;
+      logger.log(`   URL: ${googleShoppingUrl}`);
+
+      // Use ScraperAPI to fetch Google Shopping results
+      const scraperUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(googleShoppingUrl)}`;
+
+      const searchResponse = await fetchImpl(scraperUrl, {
+        signal: AbortSignal.timeout(15000)
       });
 
       if (!searchResponse.ok) {
-        logger.log(`⚠️  [Google Shopping] API error: ${searchResponse.status}`);
-        continue; // Try next query
+        logger.log(`⚠️  [Google Shopping] ScraperAPI error: ${searchResponse.status}`);
+        continue;
       }
 
-      const data = await searchResponse.json();
+      const html = await searchResponse.text();
 
-      if (!data.shopping_results || data.shopping_results.length === 0) {
-        logger.log(`⚠️  [Google Shopping] No results for this query`);
-        continue; // Try next query
+      // Parse product data from Google Shopping HTML
+      const products = parseGoogleShoppingResults(html, logger);
+
+      if (!products || products.length === 0) {
+        logger.log(`⚠️  [Google Shopping] No results found in HTML`);
+        continue;
       }
 
-      logger.log(`✅ [Google Shopping] Found ${data.shopping_results.length} results`);
+      logger.log(`✅ [Google Shopping] Found ${products.length} results`);
 
       // Find the result that best matches our domain
       let bestMatch = null;
 
-      for (const result of data.shopping_results) {
-        // Check if the link matches the domain
+      for (const result of products) {
         if (result.link && result.link.includes(urlDomain)) {
           bestMatch = result;
-          logger.log(`✅ [Google Shopping] Found exact domain match in results`);
+          logger.log(`✅ [Google Shopping] Found exact domain match`);
           break;
         }
-        // Or if source name matches domain
         if (result.source && result.source.toLowerCase().includes(urlDomain.split('.')[0])) {
           bestMatch = result;
           logger.log(`✅ [Google Shopping] Found source name match: ${result.source}`);
@@ -706,73 +707,129 @@ async function tryGoogleShopping(url, serperApiKey, logger, fetchImpl, scraperAp
         }
       }
 
-      // If no domain match but we have results, check if we're on first/best query
-      if (!bestMatch && i === 0 && data.shopping_results.length > 0) {
-        // First query (meta tags) found results but not from exact retailer
-        // This could still be the right product on a different retailer
-        // Take first result as "close enough" only if meta tag query
-        if (metaData?.productName) {
-          bestMatch = data.shopping_results[0];
-          logger.log(`⚠️  [Google Shopping] Using first result (meta tag match, different retailer)`);
-        }
+      // If no domain match but we have results from meta tag query, use first result
+      if (!bestMatch && i === 0 && products.length > 0 && metaData?.productName) {
+        bestMatch = products[0];
+        logger.log(`⚠️  [Google Shopping] Using first result (meta tag match, different retailer)`);
       }
 
       if (!bestMatch) {
-        logger.log(`⚠️  [Google Shopping] Results found but none from ${urlDomain}, trying next query...`);
-        continue; // Try next query
+        logger.log(`⚠️  [Google Shopping] Results found but none from ${urlDomain}`);
+        continue;
       }
 
-      // Extract product data from matched result
+      // Build product object
       const product = {
         name: bestMatch.title,
         brand: extractBrandFromTitle(bestMatch.title),
-        imageUrl: metaData?.imageUrl || bestMatch.imageUrl || bestMatch.image || bestMatch.thumbnail,
-        originalPrice: null,
-        currentPrice: null
+        imageUrl: metaData?.imageUrl || bestMatch.imageUrl,
+        originalPrice: bestMatch.originalPrice || null,
+        currentPrice: bestMatch.currentPrice || null
       };
-
-      // Parse prices
-      if (bestMatch.price) {
-        const priceStr = bestMatch.price.replace(/[^0-9.]/g, '');
-        product.currentPrice = parseFloat(priceStr);
-      }
-
-      // Check for extracted_price (more reliable)
-      if (bestMatch.extracted_price) {
-        product.currentPrice = bestMatch.extracted_price;
-      }
-
-      // Look for original/compare price
-      if (bestMatch.old_price) {
-        const oldPriceStr = bestMatch.old_price.replace(/[^0-9.]/g, '');
-        product.originalPrice = parseFloat(oldPriceStr);
-      } else if (bestMatch.extracted_old_price) {
-        product.originalPrice = bestMatch.extracted_old_price;
-      }
 
       // Validate we got minimum required data
       if (!product.name || !product.imageUrl) {
-        logger.log('⚠️  [Google Shopping] Result missing name or image, trying next query...');
+        logger.log('⚠️  [Google Shopping] Result missing name or image');
         continue;
       }
 
       logger.log(`✅ [Google Shopping] Product: ${product.name}`);
       if (product.originalPrice) {
         logger.log(`   Original: $${product.originalPrice}, Current: $${product.currentPrice}`);
-      } else {
+      } else if (product.currentPrice) {
         logger.log(`   Price: $${product.currentPrice}`);
       }
 
       return product;
     }
 
-    // All queries exhausted
     logger.log('❌ [Google Shopping] All query strategies failed');
     return null;
 
   } catch (error) {
     logger.log(`❌ [Google Shopping] Error: ${error.message}`);
     return null;
+  }
+}
+
+// Parse Google Shopping HTML results
+function parseGoogleShoppingResults(html, logger) {
+  try {
+    const products = [];
+    
+    // Google Shopping uses divs with product data
+    // Look for product containers - they typically have data attributes or specific classes
+    // This is a simplified parser - Google's HTML structure may vary
+    
+    // Strategy 1: Look for product links with shopping pattern
+    const productLinkRegex = /<a[^>]*href="([^"]*)"[^>]*>[\s\S]*?<div[^>]*>([^<]+)<\/div>[\s\S]*?<span[^>]*>\$([0-9.,]+)<\/span>/gi;
+    let match;
+    
+    while ((match = productLinkRegex.exec(html)) !== null) {
+      const [, link, title, price] = match;
+      
+      // Clean up the data
+      const cleanLink = link.replace(/&amp;/g, '&');
+      const cleanPrice = parseFloat(price.replace(/,/g, ''));
+      
+      if (title && cleanPrice && !isNaN(cleanPrice)) {
+        products.push({
+          title: title.trim(),
+          link: cleanLink,
+          currentPrice: cleanPrice,
+          originalPrice: null,
+          imageUrl: null,
+          source: extractDomainFromUrl(cleanLink)
+        });
+      }
+    }
+
+    // Strategy 2: Look for structured data in the page
+    const jsonLdMatches = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
+    if (jsonLdMatches) {
+      for (const jsonLdScript of jsonLdMatches) {
+        try {
+          const jsonContent = jsonLdScript.match(/<script[^>]*>([\s\S]*?)<\/script>/i)?.[1];
+          if (!jsonContent) continue;
+          
+          const data = JSON.parse(jsonContent);
+          
+          // Check if this is a product list
+          if (data['@type'] === 'ItemList' && data.itemListElement) {
+            for (const item of data.itemListElement) {
+              if (item.item && item.item.name) {
+                products.push({
+                  title: item.item.name,
+                  link: item.item.url || '',
+                  currentPrice: item.item.offers?.price ? parseFloat(item.item.offers.price) : null,
+                  originalPrice: null,
+                  imageUrl: item.item.image || null,
+                  source: extractDomainFromUrl(item.item.url || '')
+                });
+              }
+            }
+          }
+        } catch (e) {
+          // Skip invalid JSON-LD
+        }
+      }
+    }
+
+    logger.log(`   Parsed ${products.length} products from HTML`);
+    return products;
+    
+  } catch (error) {
+    logger.log(`⚠️  Error parsing Google Shopping HTML: ${error.message}`);
+    return [];
+  }
+}
+
+function extractDomainFromUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace('www.', '');
+  } catch {
+    return '';
   }
 }
 
@@ -1215,11 +1272,14 @@ Return this structure:
   "originalPrice": 999.99,
   "salePrice": 499.99,
   "percentOff": 50,
+  "color": "Black",
   "confidence": 90
 }
 
 Rules:
 - Remove brand from product name
+- Extract color if present in product name or attributes (e.g., "Black", "Navy Blue", "Red")
+- If no color found, set color to null
 - confidence: 85-95 for JSON-LD
 - If no discount, originalPrice = null, percentOff = 0`
     : `You are a product page parser. Extract data from HTML and return ONLY valid JSON.
@@ -1264,8 +1324,14 @@ Return this structure:
   "originalPrice": 435.00,
   "salePrice": 131.00,
   "percentOff": 70,
+  "color": "Black",
   "confidence": 85
 }
+
+Color extraction:
+- Look for color in product name, color selectors, attributes, or variant data
+- Examples: "Black", "Navy Blue", "Cognac", "Ivory"
+- If no color found, set to null
 
 Confidence scoring:
 - 90-100: Prices in structured data (JSON, microdata) with clear original/sale distinction
