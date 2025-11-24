@@ -36,7 +36,7 @@ export function Footer() {
   return (
     <footer className="border-t border-border mt-32">
       <div className="container mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-16 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 mb-16">
           {/* Brand */}
           <div>
             <h3 className="text-sm mb-5 tracking-[0.1em]" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700 }}>
@@ -45,30 +45,6 @@ export function Footer() {
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed" style={{ fontFamily: 'Crimson Pro, serif' }}>
               Curated designer sales and exclusive discount codes for the discerning shopper.
             </p>
-          </div>
-
-          {/* Links */}
-          <div>
-            <h4 className="text-sm mb-5" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600 }}>
-              Navigate
-            </h4>
-            <ul className="space-y-3 text-sm text-muted-foreground" style={{ fontFamily: 'Crimson Pro, serif' }}>
-              <li>
-                <a href="#discount-codes" className="hover:text-foreground transition-colors">
-                  Discount Codes
-                </a>
-              </li>
-              <li>
-                <a href="#articles" className="hover:text-foreground transition-colors">
-                  Articles
-                </a>
-              </li>
-              <li>
-                <a href="#about" className="hover:text-foreground transition-colors">
-                  About
-                </a>
-              </li>
-            </ul>
           </div>
 
           {/* Contact */}
