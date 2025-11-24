@@ -32,6 +32,12 @@ import {
   deleteDraft as deleteFinalizeDraft
 } from './finalize-drafts.js';
 import { createBrandResearchRouter } from './brand-research.js';
+import {
+  getPendingBrands,
+  addPendingBrand,
+  removePendingBrand,
+  updatePendingBrand
+} from './pending-brands.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -318,6 +324,117 @@ const brandResearchRouter = createBrandResearchRouter({
   serperApiKey: process.env.SERPER_API_KEY
 });
 app.use('/admin/brand-research', brandResearchRouter);
+
+// ============================================
+// PENDING BRANDS AUTO-APPROVAL ENDPOINTS
+// ============================================
+
+// Get all pending brands
+app.get('/admin/pending-brands', async (req, res) => {
+  const { auth } = req.headers;
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const brands = await getPendingBrands();
+    res.json({ success: true, brands });
+  } catch (error) {
+    console.error('Error fetching pending brands:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update a pending brand (for editing before approval)
+app.put('/admin/pending-brands/:id', async (req, res) => {
+  const { auth } = req.headers;
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const brands = await updatePendingBrand(req.params.id, req.body);
+    res.json({ success: true, brands });
+  } catch (error) {
+    console.error('Error updating pending brand:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Approve a pending brand - update Airtable and remove from pending
+app.post('/admin/pending-brands/:id/approve', async (req, res) => {
+  const { auth } = req.headers;
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const brands = await getPendingBrands();
+    const brand = brands.find(b => b.id === req.params.id);
+    
+    if (!brand) {
+      return res.status(404).json({ success: false, error: 'Brand not found' });
+    }
+    
+    const updateData = {
+      Type: brand.type,
+      PriceRange: brand.priceRange,
+      Category: brand.category,
+      Values: brand.values?.split(', ') || [],
+      MaxWomensSize: brand.maxWomensSize,
+      SizingSource: brand.sizingSource,
+      Description: brand.description,
+      Notes: brand.notes,
+      URL: brand.url
+    };
+    
+    Object.keys(updateData).forEach(key => {
+      if (!updateData[key] || (Array.isArray(updateData[key]) && updateData[key].length === 0)) {
+        delete updateData[key];
+      }
+    });
+    
+    const updateResponse = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}/${brand.airtableRecordId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ fields: updateData })
+    });
+    
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text();
+      throw new Error(`Airtable update failed: ${updateResponse.status} ${errorText}`);
+    }
+    
+    await removePendingBrand(req.params.id);
+    
+    cache.companies.data = null;
+    cache.companies.expiresAt = 0;
+    
+    res.json({ success: true, message: 'Brand approved and updated in Airtable' });
+  } catch (error) {
+    console.error('Error approving brand:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Reject a pending brand - just remove from pending
+app.post('/admin/pending-brands/:id/reject', async (req, res) => {
+  const { auth } = req.headers;
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    await removePendingBrand(req.params.id);
+    res.json({ success: true, message: 'Brand rejected' });
+  } catch (error) {
+    console.error('Error rejecting brand:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -3473,6 +3590,78 @@ app.use((req, res) => {
   res.sendFile(path.join(buildPath, 'index.html'));
 });
 
+// Background job to auto-detect incomplete companies and research them
+async function checkForIncompleteBrands() {
+  try {
+    console.log('🔍 Checking for incomplete brands...');
+    
+    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}`, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Airtable fetch failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const companies = data.records;
+    
+    const pendingBrands = await getPendingBrands();
+    const pendingNames = new Set(pendingBrands.map(b => b.name.toLowerCase()));
+    
+    for (const company of companies) {
+      const fields = company.fields;
+      const name = fields.Name;
+      
+      if (!name || pendingNames.has(name.toLowerCase())) continue;
+      
+      const isIncomplete = !fields.PriceRange || !fields.Category || !fields.Description;
+      
+      if (isIncomplete) {
+        console.log(`📋 Found incomplete brand: ${name}, triggering research...`);
+        
+        try {
+          const researchResponse = await fetch('http://localhost:3001/admin/brand-research', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'auth': ADMIN_PASSWORD
+            },
+            body: JSON.stringify({ brandName: name })
+          });
+          
+          if (researchResponse.ok) {
+            const result = await researchResponse.json();
+            
+            await addPendingBrand({
+              name: name,
+              airtableRecordId: company.id,
+              type: result.brand.type,
+              priceRange: result.brand.priceRange,
+              category: result.brand.category,
+              values: result.brand.values,
+              maxWomensSize: result.brand.maxWomensSize,
+              sizingSource: result.brand.sizingSource,
+              description: result.brand.description,
+              notes: result.brand.notes,
+              url: result.brand.url,
+              qualityScore: result.qualityScore
+            });
+            
+            console.log(`✅ Researched and queued ${name} for approval (${result.qualityScore}% quality)`);
+          }
+        } catch (error) {
+          console.error(`❌ Failed to research ${name}:`, error.message);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('❌ Auto-detection failed:', error.message);
+  }
+}
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Webhook server running on port ${PORT}`);
   console.log(`📬 AgentMail webhook endpoint: http://0.0.0.0:${PORT}/webhook/agentmail`);
@@ -3484,6 +3673,12 @@ app.listen(PORT, '0.0.0.0', () => {
   }).catch(err => {
     console.warn('⚠️  Failed to pre-fetch companies:', err.message);
   });
+  
+  // Run initial brand auto-detection
+  checkForIncompleteBrands();
+  
+  // Run brand auto-detection every 15 minutes
+  setInterval(checkForIncompleteBrands, 15 * 60 * 1000);
   
   if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
     console.log('📱 Initializing Telegram bot...');
