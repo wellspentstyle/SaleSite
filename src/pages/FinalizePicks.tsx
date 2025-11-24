@@ -273,6 +273,12 @@ export function FinalizePicks() {
     setPicks(updatedPicks);
   };
 
+  const handleImageUrlChange = (index: number, newImageUrl: string) => {
+    const updatedPicks = [...picks];
+    updatedPicks[index] = { ...updatedPicks[index], imageUrl: newImageUrl };
+    setPicks(updatedPicks);
+  };
+
   const handlePriceChange = (index: number, field: 'salePrice' | 'originalPrice', value: string) => {
     const updatedPicks = [...picks];
     // Properly handle empty string vs 0 vs valid number
@@ -1059,6 +1065,32 @@ export function FinalizePicks() {
                         style={{ 
                           fontFamily: 'DM Sans, sans-serif',
                           fontSize: '12px'
+                        }}
+                      />
+                    </div>
+                    <div style={{ marginBottom: '12px' }}>
+                      <Label 
+                        htmlFor={`image-url-${index}`}
+                        style={{ 
+                          fontFamily: 'DM Sans, sans-serif', 
+                          fontWeight: 600, 
+                          fontSize: '11px',
+                          color: '#666',
+                          marginBottom: '4px',
+                          display: 'block'
+                        }}
+                      >
+                        Image URL (Override if Wrong)
+                      </Label>
+                      <Input
+                        id={`image-url-${index}`}
+                        value={pick.imageUrl || ''}
+                        onChange={(e) => handleImageUrlChange(index, e.target.value)}
+                        placeholder="https://example.com/image.jpg"
+                        className="h-8 text-xs"
+                        style={{ 
+                          fontFamily: 'DM Sans, sans-serif',
+                          fontSize: '11px'
                         }}
                       />
                     </div>
