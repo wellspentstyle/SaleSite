@@ -3,6 +3,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
+import { Checkbox } from './ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Check, X, Edit2, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -108,17 +110,38 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
     }
   };
 
+  const CATEGORY_OPTIONS = ['Clothing', 'Shoes', 'Bags', 'Accessories', 'Jewelry', 'Swimwear', 'Homewares'];
+  const VALUES_OPTIONS = ['Independent label', 'Sustainable', 'Women-Owned', 'BIPOC-Owned', 'Secondhand'];
+  const TYPE_OPTIONS = ['Brand', 'Shop'];
+  const MAX_SIZE_OPTIONS = ['Up to 0', 'Up to 2', 'Up to 4', 'Up to 6', 'Up to 8', 'Up to 10', 'Up to 12', 'Up to 14', 'Up to 16', 'Up to 18', 'Up to 18+', 'Not found'];
+
+  const handleCategoryToggle = (category: string) => {
+    const currentCategories = editedData.category.split(', ').filter(c => c);
+    const newCategories = currentCategories.includes(category)
+      ? currentCategories.filter(c => c !== category)
+      : [...currentCategories, category];
+    setEditedData({ ...editedData, category: newCategories.join(', ') });
+  };
+
+  const handleValueToggle = (value: string) => {
+    const currentValues = editedData.values.split(', ').filter(v => v);
+    const newValues = currentValues.includes(value)
+      ? currentValues.filter(v => v !== value)
+      : [...currentValues, value];
+    setEditedData({ ...editedData, values: newValues.join(', ') });
+  };
+
   return (
-    <div className="border border-yellow-300 bg-yellow-50 rounded-lg p-6 space-y-4">
+    <div className="border border-gray-300 bg-white rounded-lg p-6 space-y-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-xl font-bold">{brand.name}</h3>
-            <span className="text-xs px-2 py-1 bg-yellow-200 text-yellow-800 rounded-full">
+            <h3 className="text-xl font-bold" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.name}</h3>
+            <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full" style={{ fontFamily: 'DM Sans, sans-serif' }}>
               Auto-researched
             </span>
           </div>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-sm text-gray-600 mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>
             Quality Score: {brand.qualityScore}%
           </p>
         </div>
@@ -176,80 +199,116 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label className="text-sm font-medium">Type</Label>
+          <Label className="text-sm font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Type</Label>
           {isEditing ? (
-            <Input
-              value={editedData.type}
-              onChange={(e) => setEditedData({ ...editedData, type: e.target.value })}
-              className="mt-1"
-            />
+            <Select value={editedData.type} onValueChange={(value) => setEditedData({ ...editedData, type: value })}>
+              <SelectTrigger className="mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                {TYPE_OPTIONS.map(option => (
+                  <SelectItem key={option} value={option} style={{ fontFamily: 'DM Sans, sans-serif' }}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
-            <p className="text-sm text-gray-700 mt-1">{brand.type}</p>
+            <p className="text-sm text-gray-700 mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.type}</p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium">Price Range</Label>
+          <Label className="text-sm font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Price Range</Label>
           {isEditing ? (
             <Input
               value={editedData.priceRange}
               onChange={(e) => setEditedData({ ...editedData, priceRange: e.target.value })}
               className="mt-1"
+              style={{ fontFamily: 'DM Sans, sans-serif' }}
             />
           ) : (
-            <p className="text-sm text-gray-700 mt-1">{brand.priceRange}</p>
+            <p className="text-sm text-gray-700 mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.priceRange}</p>
           )}
         </div>
 
-        <div>
-          <Label className="text-sm font-medium">Categories</Label>
+        <div className="md:col-span-2">
+          <Label className="text-sm font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Categories (multi-select)</Label>
           {isEditing ? (
-            <Input
-              value={editedData.category}
-              onChange={(e) => setEditedData({ ...editedData, category: e.target.value })}
-              className="mt-1"
-            />
+            <div className="mt-2 space-y-2 p-3 border rounded-md" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              {CATEGORY_OPTIONS.map(category => {
+                const currentCategories = editedData.category.split(', ').filter(c => c);
+                return (
+                  <div key={category} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`category-${category}`}
+                      checked={currentCategories.includes(category)}
+                      onCheckedChange={() => handleCategoryToggle(category)}
+                    />
+                    <label htmlFor={`category-${category}`} className="text-sm cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                      {category}
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
-            <p className="text-sm text-gray-700 mt-1">{brand.category}</p>
+            <p className="text-sm text-gray-700 mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.category}</p>
           )}
         </div>
 
-        <div>
-          <Label className="text-sm font-medium">Values</Label>
+        <div className="md:col-span-2">
+          <Label className="text-sm font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Values (multi-select)</Label>
           {isEditing ? (
-            <Input
-              value={editedData.values}
-              onChange={(e) => setEditedData({ ...editedData, values: e.target.value })}
-              className="mt-1"
-            />
+            <div className="mt-2 space-y-2 p-3 border rounded-md" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              {VALUES_OPTIONS.map(value => {
+                const currentValues = editedData.values.split(', ').filter(v => v);
+                return (
+                  <div key={value} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`value-${value}`}
+                      checked={currentValues.includes(value)}
+                      onCheckedChange={() => handleValueToggle(value)}
+                    />
+                    <label htmlFor={`value-${value}`} className="text-sm cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                      {value}
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
-            <p className="text-sm text-gray-700 mt-1">{brand.values || 'None'}</p>
+            <p className="text-sm text-gray-700 mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.values || 'None'}</p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium">Max Size</Label>
+          <Label className="text-sm font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Max Size</Label>
           {isEditing ? (
-            <Input
-              value={editedData.maxWomensSize}
-              onChange={(e) => setEditedData({ ...editedData, maxWomensSize: e.target.value })}
-              className="mt-1"
-            />
+            <Select value={editedData.maxWomensSize} onValueChange={(value) => setEditedData({ ...editedData, maxWomensSize: value })}>
+              <SelectTrigger className="mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                <SelectValue placeholder="Select max size" />
+              </SelectTrigger>
+              <SelectContent style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                {MAX_SIZE_OPTIONS.map(option => (
+                  <SelectItem key={option} value={option} style={{ fontFamily: 'DM Sans, sans-serif' }}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
-            <p className="text-sm text-gray-700 mt-1">{brand.maxWomensSize || 'Not found'}</p>
+            <p className="text-sm text-gray-700 mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.maxWomensSize || 'Not found'}</p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium">URL</Label>
+          <Label className="text-sm font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>URL</Label>
           {isEditing ? (
             <Input
               value={editedData.url}
               onChange={(e) => setEditedData({ ...editedData, url: e.target.value })}
               className="mt-1"
+              style={{ fontFamily: 'DM Sans, sans-serif' }}
             />
           ) : (
-            <p className="text-sm text-gray-700 mt-1">
+            <p className="text-sm text-gray-700 mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>
               <a href={brand.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                 {brand.url}
               </a>
