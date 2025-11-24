@@ -423,8 +423,44 @@ function extractProductInfoFromUrl(url) {
           // Skip if it's just numbers (likely an ID)
           if (/^\d+$/.test(segment)) continue;
 
-          // Skip file extensions like product.do, browse.jsp, etc.
-          if (/\.(do|jsp|php|aspx|html|htm)$/i.test(segment)) continue;
+          // Special handling for .html/.htm files with product info
+          // Pattern: product-name-12345678.html or product-name-prod12345.html
+          if (/\.(html|htm)$/i.test(segment)) {
+            // Try to extract product name before the ID
+            const withoutExt = segment.replace(/\.(html|htm)$/i, '');
+
+            // Pattern 1: product-name-12345678 (name followed by long number)
+            const match1 = withoutExt.match(/^(.+?)-(\d{6,})$/);
+            if (match1) {
+              const name = match1[1].replace(/-/g, ' ');
+              const words = name.split(/\s+/).filter(w => w.length > 2);
+              if (words.length > maxWords) {
+                maxWords = words.length;
+                bestNameSegment = match1[1];
+                if (!productId) productId = match1[2]; // Also grab the product ID
+              }
+              continue;
+            }
+
+            // Pattern 2: product-name-prod12345 (name followed by prod+number)
+            const match2 = withoutExt.match(/^(.+?)-prod(\d+)$/i);
+            if (match2) {
+              const name = match2[1].replace(/-/g, ' ');
+              const words = name.split(/\s+/).filter(w => w.length > 2);
+              if (words.length > maxWords) {
+                maxWords = words.length;
+                bestNameSegment = match2[1];
+                if (!productId) productId = match2[2]; // Also grab the product ID
+              }
+              continue;
+            }
+
+            // If no pattern match, skip .html files entirely
+            continue;
+          }
+
+          // Skip other file extensions like product.do, browse.jsp, etc.
+          if (/\.(do|jsp|php|aspx)$/i.test(segment)) continue;
 
           // Count word-like parts (separated by dashes/underscores)
           const words = segment.split(/[-_]/).filter(w => w.length > 2);
