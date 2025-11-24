@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
 import { Loader2, Check, X, ExternalLink } from 'lucide-react';
@@ -64,6 +64,8 @@ export function SalesApprovals() {
       const settingsData = await settingsRes.json();
       
       if (salesData.success) {
+        // Don't filter on initial load - let admin see all pending sales
+        // They can expand each sale to check for duplicates manually
         setPendingSales(salesData.sales);
       }
       
@@ -116,9 +118,15 @@ export function SalesApprovals() {
       const data = await response.json();
       
       if (data.success) {
+        // Filter out any entries that match the pending sale's ID
+        // Only show true Airtable duplicates
+        const filteredDuplicates = data.duplicates.filter(
+          (dup: DuplicateSale) => dup.id !== saleId
+        );
+        
         setDuplicates(prev => ({
           ...prev,
-          [saleId]: data.duplicates
+          [saleId]: filteredDuplicates
         }));
       }
     } catch (error) {
@@ -173,10 +181,6 @@ export function SalesApprovals() {
   };
 
   const handleRejectSale = async (id: string) => {
-    if (!confirm('Are you sure you want to reject this sale?')) {
-      return;
-    }
-    
     const auth = sessionStorage.getItem('adminAuth') || '';
     
     try {
@@ -296,7 +300,7 @@ export function SalesApprovals() {
                       </div>
 
                       {/* Sale Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm" style={{ fontFamily: 'system-ui, sans-serif' }}>
                         <div>
                           <span className="text-muted-foreground">Email From:</span>
                           <p className="font-medium">{sale.emailFrom}</p>
@@ -383,6 +387,7 @@ export function SalesApprovals() {
                           onClick={() => handleApproveSale(sale.id)}
                           disabled={actionLoading === sale.id}
                           className="flex-1"
+                          style={{ fontFamily: 'system-ui, sans-serif' }}
                         >
                           {actionLoading === sale.id ? (
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -396,6 +401,7 @@ export function SalesApprovals() {
                           onClick={() => handleRejectSale(sale.id)}
                           disabled={actionLoading === sale.id}
                           className="flex-1"
+                          style={{ fontFamily: 'system-ui, sans-serif' }}
                         >
                           {actionLoading === sale.id ? (
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
