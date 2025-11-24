@@ -327,8 +327,13 @@ export function PicksAdmin() {
   const performScraping = async (urlList: string[]) => {
     setIsLoading(true);
     
-    // Navigate IMMEDIATELY to finalize page with URLs to scrape
-    // The finalize page will handle progressive scraping
+    // Show toast to let user know scraping is starting
+    toast.info(`Starting to scrape ${urlList.length} product${urlList.length === 1 ? '' : 's'}... Please wait while we fetch product details.`, {
+      duration: 3000
+    });
+    
+    // Navigate to finalize page with URLs to scrape
+    // The finalize page will handle progressive scraping with live updates
     navigate('/admin/picks/finalize', {
       state: {
         scrapedProducts: [], // Start empty
@@ -718,8 +723,8 @@ export function PicksAdmin() {
                 placeholder="Paste product URLs here, one per line:&#10;https://example.com/product-1&#10;https://example.com/product-2&#10;https://example.com/product-3"
                 className="min-h-[200px] text-sm"
                 style={{ fontFamily: 'monospace' }}
-                required
                 disabled={isLoading}
+                required
               />
             </div>
 
@@ -739,7 +744,7 @@ export function PicksAdmin() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Scraping...
+                    Starting...
                   </>
                 ) : (
                   'Scrape Picks'
