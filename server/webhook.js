@@ -442,7 +442,7 @@ app.get('/companies', async (req, res) => {
 });
 
 // Newsletter subscription endpoint (public)
-app.post('/api/newsletter/subscribe', async (req, res) => {
+app.post('/newsletter/subscribe', async (req, res) => {
   try {
     console.log('📨 Newsletter subscription request:', req.body);
     const { email, source } = req.body;
