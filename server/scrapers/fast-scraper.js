@@ -535,11 +535,55 @@ async function tryGoogleShopping(url, serperApiKey, logger) {
   const urlObj = new URL(url);
   const urlDomain = urlObj.hostname.replace('www.', '');
   
-  // Build multiple query strategies
-  const queries = [
-    url, // Try exact URL first
-    `${urlDomain} ${urlObj.pathname.split('/').filter(Boolean).slice(-2).join(' ').replace(/[-_]/g, ' ')}`.trim() // Domain + last path segments
-  ];
+  // Step 1: Extract product info from URL using the smart parser
+  const productInfo = extractProductInfoFromUrl(url);
+  
+  // Step 2: Also check query parameters for product names
+  let queryParamName = null;
+  const searchParams = urlObj.searchParams;
+  
+  // Common query param names for products
+  const nameParams = ['searchText', 'q', 'query', 'search', 'keyword', 'name'];
+  for (const param of nameParams) {
+    const value = searchParams.get(param);
+    if (value && value.length > 2) {
+      queryParamName = decodeURIComponent(value).replace(/[+]/g, ' ').trim();
+      break;
+    }
+  }
+  
+  logger.log('📝 Extracted product info:', {
+    fromPath: productInfo.productName,
+    fromQueryParams: queryParamName,
+    productId: productInfo.productId,
+    domain: productInfo.domain
+  });
+  
+  // Step 3: Build multiple query strategies (most specific first)
+  const queries = [];
+  
+  // Strategy 1: Query param name (often most accurate) + domain
+  if (queryParamName) {
+    queries.push(`${queryParamName} site:${urlDomain}`);
+  }
+  
+  // Strategy 2: Product name from path + domain
+  if (productInfo.productName) {
+    queries.push(`${productInfo.productName} site:${urlDomain}`);
+  }
+  
+  // Strategy 3: Product ID + domain (for sites with SKUs in URL)
+  if (productInfo.productId) {
+    queries.push(`${productInfo.productId} site:${urlDomain}`);
+  }
+  
+  // Strategy 4: Fallback to exact URL (rarely works but worth trying)
+  queries.push(url);
+  
+  if (queries.length === 1) {
+    // Only have the URL fallback, no extracted info
+    logger.log('⚠️ Could not extract product info from URL, only trying exact URL');
+  }
 
   try {
     for (const query of queries) {
