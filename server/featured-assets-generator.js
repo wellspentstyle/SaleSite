@@ -1044,8 +1044,8 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
   const showBrand = brand && company && brand !== company;
   
   if (showBrand) {
-    const brandBoxWidth = Math.min(Math.ceil(brand.length * charWidth) + (textPadding * 4), maxBoxWidth);
-    const brandBoxHeight = fontSize + (textPadding * 2);
+    const brandBoxWidth = Math.round(Math.min(Math.ceil(brand.length * charWidth) + (textPadding * 4), maxBoxWidth));
+    const brandBoxHeight = Math.round(fontSize + (textPadding * 2));
     
     const brandSvg = `
       <svg width="${brandBoxWidth}" height="${brandBoxHeight}">
@@ -1062,8 +1062,8 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
       </svg>
     `;
     
-    const nameBoxWidth = Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth);
-    const nameBoxHeight = fontSize + (textPadding * 2);
+    const nameBoxWidth = Math.round(Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth));
+    const nameBoxHeight = Math.round(fontSize + (textPadding * 2));
     
     const nameSvg = `
       <svg width="${nameBoxWidth}" height="${nameBoxHeight}">
@@ -1081,8 +1081,8 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
     `;
     
     if (priceText) {
-      const priceBoxWidth = Math.min(Math.ceil(priceText.length * charWidth) + (textPadding * 4), maxBoxWidth);
-      const priceBoxHeight = fontSize + (textPadding * 2);
+      const priceBoxWidth = Math.round(Math.min(Math.ceil(priceText.length * charWidth) + (textPadding * 4), maxBoxWidth));
+      const priceBoxHeight = Math.round(fontSize + (textPadding * 2));
       
       const priceSvg = `
         <svg width="${priceBoxWidth}" height="${priceBoxHeight}">
@@ -1099,9 +1099,9 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
         </svg>
       `;
       
-      const brandPositionY = currentY;
-      const namePositionY = brandPositionY - brandBoxHeight - lineGap;
-      const pricePositionY = namePositionY - nameBoxHeight - lineGap;
+      const brandPositionY = Math.round(currentY);
+      const namePositionY = Math.round(brandPositionY - brandBoxHeight - lineGap);
+      const pricePositionY = Math.round(namePositionY - nameBoxHeight - lineGap);
       
       compositeArray.push(
         { input: Buffer.from(priceSvg), top: pricePositionY, left: 40 },
@@ -1110,8 +1110,8 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
       );
     }
   } else {
-    const nameBoxWidth = Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth);
-    const nameBoxHeight = fontSize + (textPadding * 2);
+    const nameBoxWidth = Math.round(Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth));
+    const nameBoxHeight = Math.round(fontSize + (textPadding * 2));
     
     const nameSvg = `
       <svg width="${nameBoxWidth}" height="${nameBoxHeight}">
@@ -1129,8 +1129,8 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
     `;
     
     if (priceText) {
-      const priceBoxWidth = Math.min(Math.ceil(priceText.length * charWidth) + (textPadding * 4), maxBoxWidth);
-      const priceBoxHeight = fontSize + (textPadding * 2);
+      const priceBoxWidth = Math.round(Math.min(Math.ceil(priceText.length * charWidth) + (textPadding * 4), maxBoxWidth));
+      const priceBoxHeight = Math.round(fontSize + (textPadding * 2));
       
       const priceSvg = `
         <svg width="${priceBoxWidth}" height="${priceBoxHeight}">
@@ -1147,8 +1147,8 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
         </svg>
       `;
       
-      const pricePositionY = currentY;
-      const namePositionY = pricePositionY - priceBoxHeight - lineGap;
+      const pricePositionY = Math.round(currentY);
+      const namePositionY = Math.round(pricePositionY - priceBoxHeight - lineGap);
       
       compositeArray.push(
         { input: Buffer.from(nameSvg), top: namePositionY, left: 40 },
