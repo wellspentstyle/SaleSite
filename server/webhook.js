@@ -337,7 +337,39 @@ app.get('/admin/pending-brands', async (req, res) => {
   }
   
   try {
-    const brands = await getPendingBrands();
+    let brands = await getPendingBrands();
+    
+    // Fetch all companies to check which are already High Priority
+    const companyRecords = await fetchAllAirtableRecords(COMPANY_TABLE_NAME, {
+      fields: ['Name', 'Priority'],
+      pageSize: '100'
+    });
+    
+    // Create a set of already-approved brand record IDs (Priority = 'High')
+    const alreadyApprovedIds = new Set();
+    companyRecords.forEach(company => {
+      if (company.fields.Priority === 'High') {
+        alreadyApprovedIds.add(company.id);
+      }
+    });
+    
+    // Filter out brands already marked High Priority in Airtable
+    const brandsToRemove = [];
+    brands = brands.filter(brand => {
+      if (alreadyApprovedIds.has(brand.airtableRecordId)) {
+        brandsToRemove.push(brand.id);
+        return false;
+      }
+      return true;
+    });
+    
+    // Clean up the pending-brands.json file by removing already-approved brands
+    if (brandsToRemove.length > 0) {
+      for (const id of brandsToRemove) {
+        await removePendingBrand(id);
+      }
+      console.log(`🧹 Cleaned up ${brandsToRemove.length} already-approved brands from pending list`);
+    }
     
     // Fetch all live sales to check which brands have active sales
     const salesRecords = await fetchAllAirtableRecords(TABLE_NAME, {
