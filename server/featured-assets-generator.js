@@ -1061,7 +1061,8 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
   const compositeArray = [];
   
   // Bottom-left text overlays (price, name, brand, link)
-  const basePositionY = STORY_HEIGHT - 100;
+  // Move up so brand is where price used to be (up by ~90px)
+  const basePositionY = STORY_HEIGHT - 190;
   let currentY = basePositionY;
   
   const showBrand = brand && company && brand !== company;
@@ -1236,13 +1237,15 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
     const copyLineHeight = copyFontSize + 8;
     
     // Calculate box dimensions - ensure integer values for Sharp
+    // Use more accurate character width and add extra padding on right side
     let maxLineWidth = 0;
     for (const line of copyLines) {
-      const lineWidth = Math.ceil(line.length * copyFontSize * 0.55);
+      const lineWidth = Math.ceil(line.length * copyFontSize * 0.6); // Slightly wider char estimate
       if (lineWidth > maxLineWidth) maxLineWidth = lineWidth;
     }
     
-    const copyBoxWidth = Math.round(Math.min(maxLineWidth + (copyPadding * 4), STORY_WIDTH - 80));
+    // Add equal padding on both sides (copyPadding * 2 on each side = copyPadding * 4 total, plus extra for safety)
+    const copyBoxWidth = Math.round(Math.min(maxLineWidth + (copyPadding * 5), STORY_WIDTH - 80));
     const copyBoxHeight = Math.round((copyLines.length * copyLineHeight) + (copyPadding * 2));
     
     let copyTextElements = '';
@@ -1267,9 +1270,9 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
       </svg>
     `;
     
-    // Position in top-right with same margin as bottom-left - ensure integers for Sharp
-    const copyX = Math.round(STORY_WIDTH - copyBoxWidth - 40);
-    const copyY = 80;
+    // Position: 80px more to the left, and 1.5x box height lower
+    const copyX = Math.round(STORY_WIDTH - copyBoxWidth - 120); // 40 + 80 = 120px from right edge
+    const copyY = Math.round(80 + (copyBoxHeight * 1.5)); // 1.5x box height lower
     
     compositeArray.push({
       input: Buffer.from(copySvg),
