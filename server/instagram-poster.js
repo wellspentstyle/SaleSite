@@ -28,7 +28,7 @@ export async function postToInstagram({ imageUrl, caption, isStory = false }) {
       type: 'image',
       url: imageUrl
     }],
-    content: caption || ' ',
+    content: caption || '.',
     publishNow: true
   };
 
@@ -143,7 +143,7 @@ export async function scheduleInstagramPost({ imageUrl, caption, scheduledFor, i
       type: 'image',
       url: imageUrl
     }],
-    content: caption || ' ',
+    content: caption || '.',
     scheduledFor: scheduledFor
   };
 
