@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 const LATE_API_KEY = process.env.LATE_API_KEY;
 const INSTAGRAM_ACCOUNT_ID = process.env.LATE_INSTAGRAM_ACCOUNT_ID;
 
-const LATE_API_BASE = 'https://api.getlate.dev/v1';
+const LATE_API_BASE = 'https://getlate.dev/api/v1';
 
 export async function postToInstagram({ imageUrl, caption, isStory = false }) {
   if (!LATE_API_KEY) {
