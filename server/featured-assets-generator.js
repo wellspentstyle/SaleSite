@@ -357,3 +357,646 @@ export async function generateMultipleFeaturedAssets(saleIds) {
   
   return results;
 }
+
+// Generate header-only asset (no product images)
+export async function generateHeaderOnlyAsset(saleId) {
+  console.log(`🎨 Generating header-only asset for sale: ${saleId}`);
+  
+  const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
+  const saleResponse = await fetch(saleUrl, {
+    headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+  });
+  
+  if (!saleResponse.ok) {
+    throw new Error(`Failed to fetch sale: ${saleResponse.statusText}`);
+  }
+  
+  const saleData = await saleResponse.json();
+  const sale = saleData.fields;
+  
+  const company = sale.Company || 'Sale';
+  const percentOff = sale.PercentOff || 0;
+  const endDate = sale.EndDate ? new Date(sale.EndDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : null;
+  const discountCode = sale.DiscountCode || sale.PromoCode || null;
+  
+  const headerColor = getRandomColor();
+  const companyUpper = company.toUpperCase();
+  const percentOffText = `${percentOff}% OFF`;
+  
+  let headerInfoText = '';
+  if (endDate && discountCode) {
+    headerInfoText = `UNTIL ${endDate}\nPROMO CODE: ${discountCode}`;
+  } else if (endDate) {
+    headerInfoText = `UNTIL ${endDate}`;
+  } else if (discountCode) {
+    headerInfoText = `PROMO CODE: ${discountCode}`;
+  }
+  
+  // Full height header for header-only version
+  const svg = `
+    <svg width="${ASSET_WIDTH}" height="${ASSET_HEIGHT}">
+      <rect width="100%" height="100%" fill="${headerColor}"/>
+      
+      <text 
+        x="80" 
+        y="420" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="120" 
+        font-weight="900"
+        letter-spacing="-3"
+        fill="white">
+        ${companyUpper}
+      </text>
+      
+      <text 
+        x="80" 
+        y="600" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="180" 
+        font-weight="900"
+        letter-spacing="-4"
+        fill="white">
+        ${percentOffText}
+      </text>
+      
+      ${headerInfoText ? `
+      <text 
+        x="80" 
+        y="720" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="48" 
+        font-weight="700"
+        letter-spacing="2"
+        fill="white">
+        ${headerInfoText.split('\n')[0]}
+      </text>
+      ${headerInfoText.split('\n')[1] ? `
+      <text 
+        x="80" 
+        y="790" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="48" 
+        font-weight="700"
+        letter-spacing="2"
+        fill="white">
+        ${headerInfoText.split('\n')[1]}
+      </text>
+      ` : ''}
+      ` : ''}
+    </svg>
+  `;
+  
+  const finalImage = await sharp(Buffer.from(svg))
+    .png()
+    .toBuffer();
+  
+  const today = new Date().toISOString().split('T')[0];
+  const filename = `${company.replace(/[^a-zA-Z0-9]/g, '-')}-${percentOff}off-header.png`;
+  
+  console.log(`   📤 Uploading to Google Drive...`);
+  const driveResult = await uploadToGoogleDrive({
+    fileName: filename,
+    mimeType: 'image/png',
+    fileBuffer: finalImage,
+    folderPath: `Product Images/Featured Sales/${today}`
+  });
+  
+  console.log(`   ✅ Uploaded header-only asset: ${filename}`);
+  
+  // Update Airtable with asset URL
+  try {
+    const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
+    await fetch(updateUrl, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          FeaturedAssetURL: driveResult.webViewLink,
+          FeaturedAssetDate: new Date().toISOString().split('T')[0]
+        }
+      })
+    });
+    console.log(`   ✅ Updated Airtable with asset URL`);
+  } catch (error) {
+    console.error(`   ⚠️  Failed to update Airtable: ${error.message}`);
+  }
+  
+  return {
+    success: true,
+    filename,
+    driveFileId: driveResult.fileId,
+    driveUrl: driveResult.webViewLink
+  };
+}
+
+// Generate asset with specific picks
+export async function generateAssetWithPicks(saleId, pickIds) {
+  console.log(`🎨 Generating asset with ${pickIds.length} specific picks for sale: ${saleId}`);
+  
+  const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
+  const saleResponse = await fetch(saleUrl, {
+    headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+  });
+  
+  if (!saleResponse.ok) {
+    throw new Error(`Failed to fetch sale: ${saleResponse.statusText}`);
+  }
+  
+  const saleData = await saleResponse.json();
+  const sale = saleData.fields;
+  
+  const company = sale.Company || 'Sale';
+  const percentOff = sale.PercentOff || 0;
+  const endDate = sale.EndDate ? new Date(sale.EndDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : null;
+  const discountCode = sale.DiscountCode || sale.PromoCode || null;
+  
+  // Fetch the specific picks
+  const picks = [];
+  for (const pickId of pickIds.slice(0, 3)) {
+    const pickUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Picks/${pickId}`;
+    const pickResponse = await fetch(pickUrl, {
+      headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+    });
+    if (pickResponse.ok) {
+      const pickData = await pickResponse.json();
+      picks.push({ id: pickId, fields: pickData.fields });
+    }
+  }
+  
+  if (picks.length === 0) {
+    throw new Error('No valid picks found');
+  }
+  
+  const headerColor = getRandomColor();
+  const headerHeight = 450;
+  const productAreaHeight = ASSET_HEIGHT - headerHeight;
+  const productImageSize = Math.floor(ASSET_WIDTH / 3);
+  
+  const companyUpper = company.toUpperCase();
+  const percentOffText = `${percentOff}% OFF`;
+  
+  let headerInfoText = '';
+  if (endDate && discountCode) {
+    headerInfoText = `UNTIL ${endDate}\nPROMO CODE: ${discountCode}`;
+  } else if (endDate) {
+    headerInfoText = `UNTIL ${endDate}`;
+  } else if (discountCode) {
+    headerInfoText = `PROMO CODE: ${discountCode}`;
+  }
+  
+  const headerSvg = `
+    <svg width="${ASSET_WIDTH}" height="${headerHeight}">
+      <rect width="100%" height="100%" fill="${headerColor}"/>
+      
+      <text 
+        x="60" 
+        y="120" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="90" 
+        font-weight="900"
+        letter-spacing="-2"
+        fill="white">
+        ${companyUpper}
+      </text>
+      
+      <text 
+        x="60" 
+        y="240" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="110" 
+        font-weight="900"
+        letter-spacing="-2"
+        fill="white">
+        ${percentOffText}
+      </text>
+      
+      ${headerInfoText ? `
+      <text 
+        x="60" 
+        y="310" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="32" 
+        font-weight="700"
+        letter-spacing="1"
+        fill="white">
+        ${headerInfoText.split('\n')[0]}
+      </text>
+      ${headerInfoText.split('\n')[1] ? `
+      <text 
+        x="60" 
+        y="355" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="32" 
+        font-weight="700"
+        letter-spacing="1"
+        fill="white">
+        ${headerInfoText.split('\n')[1]}
+      </text>
+      ` : ''}
+      ` : ''}
+    </svg>
+  `;
+  
+  let canvas = sharp({
+    create: {
+      width: ASSET_WIDTH,
+      height: ASSET_HEIGHT,
+      channels: 4,
+      background: { r: 240, g: 240, b: 240, alpha: 1 }
+    }
+  });
+  
+  const compositeArray = [
+    {
+      input: Buffer.from(headerSvg),
+      top: 0,
+      left: 0
+    }
+  ];
+  
+  for (let i = 0; i < picks.length; i++) {
+    const pick = picks[i].fields;
+    const imageUrl = pick.ImageURL;
+    
+    if (!imageUrl) continue;
+    
+    try {
+      const imageBuffer = await fetchImageAsBuffer(imageUrl, pick.ProductURL);
+      
+      const productImage = await sharp(imageBuffer)
+        .resize(productImageSize, productAreaHeight, {
+          fit: 'cover',
+          position: 'center'
+        })
+        .toBuffer();
+      
+      const xPosition = i * productImageSize;
+      
+      compositeArray.push({
+        input: productImage,
+        top: headerHeight,
+        left: xPosition
+      });
+      
+      const productName = pick.ProductName || 'Product';
+      const salePrice = pick.SalePrice;
+      const originalPrice = pick.OriginalPrice;
+      
+      let priceText = '';
+      if (salePrice && originalPrice && originalPrice > salePrice) {
+        priceText = `$${salePrice} vs. $${originalPrice}`;
+      } else if (salePrice) {
+        priceText = `$${salePrice}`;
+      }
+      
+      const labelHeight = 120;
+      const labelY = headerHeight + productAreaHeight - labelHeight;
+      
+      const labelSvg = `
+        <svg width="${productImageSize}" height="${labelHeight}">
+          <rect width="100%" height="100%" fill="rgba(0, 0, 0, 0.85)"/>
+          
+          <text 
+            x="15" 
+            y="35" 
+            font-family="DejaVu Sans, Arial, sans-serif" 
+            font-size="14" 
+            font-weight="400"
+            fill="white">
+            ${productName.length > 30 ? productName.substring(0, 30) + '...' : productName}
+          </text>
+          
+          ${priceText ? `
+          <text 
+            x="15" 
+            y="70" 
+            font-family="DejaVu Sans, Arial, sans-serif" 
+            font-size="18" 
+            font-weight="700"
+            fill="white">
+            ${priceText}
+          </text>
+          ` : ''}
+        </svg>
+      `;
+      
+      compositeArray.push({
+        input: Buffer.from(labelSvg),
+        top: labelY,
+        left: xPosition
+      });
+      
+    } catch (error) {
+      console.log(`   ⚠️  Failed to process pick: ${error.message}`);
+    }
+  }
+  
+  const finalImage = await canvas
+    .composite(compositeArray)
+    .png()
+    .toBuffer();
+  
+  const today = new Date().toISOString().split('T')[0];
+  const filename = `${company.replace(/[^a-zA-Z0-9]/g, '-')}-${percentOff}off-picks.png`;
+  
+  console.log(`   📤 Uploading to Google Drive...`);
+  const driveResult = await uploadToGoogleDrive({
+    fileName: filename,
+    mimeType: 'image/png',
+    fileBuffer: finalImage,
+    folderPath: `Product Images/Featured Sales/${today}`
+  });
+  
+  console.log(`   ✅ Uploaded asset with picks: ${filename}`);
+  
+  // Update Airtable
+  try {
+    const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
+    await fetch(updateUrl, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          FeaturedAssetURL: driveResult.webViewLink,
+          FeaturedAssetDate: new Date().toISOString().split('T')[0]
+        }
+      })
+    });
+  } catch (error) {
+    console.error(`   ⚠️  Failed to update Airtable: ${error.message}`);
+  }
+  
+  return {
+    success: true,
+    filename,
+    driveFileId: driveResult.fileId,
+    driveUrl: driveResult.webViewLink
+  };
+}
+
+// Story dimensions
+const STORY_WIDTH = 1080;
+const STORY_HEIGHT = 1920;
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Generate a story image with custom copy overlay
+export async function generatePickStoryWithCopy(pickId, customCopy = '') {
+  console.log(`🎨 Generating story for pick: ${pickId}`);
+  
+  const pickUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Picks/${pickId}`;
+  const pickResponse = await fetch(pickUrl, {
+    headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+  });
+  
+  if (!pickResponse.ok) {
+    throw new Error(`Failed to fetch pick: ${pickResponse.statusText}`);
+  }
+  
+  const pickData = await pickResponse.json();
+  const pick = pickData.fields;
+  
+  const imageUrl = pick.ImageURL;
+  if (!imageUrl) {
+    throw new Error('Pick has no image URL');
+  }
+  
+  const imageBuffer = await fetchImageAsBuffer(imageUrl, pick.ProductURL);
+  
+  const backgroundImage = await sharp(Buffer.from(imageBuffer))
+    .resize(STORY_WIDTH, STORY_HEIGHT, {
+      fit: 'cover',
+      position: 'center'
+    })
+    .toBuffer();
+  
+  const productName = pick.ProductName || 'Product';
+  const brand = pick.Brand || '';
+  const company = pick.Company?.[0] || '';
+  const salePrice = pick.SalePrice;
+  const originalPrice = pick.OriginalPrice;
+  
+  let priceText = '';
+  if (originalPrice && originalPrice > 0 && salePrice && salePrice > 0) {
+    priceText = `$${salePrice} vs. $${originalPrice}`;
+  } else if (salePrice && salePrice > 0) {
+    priceText = `$${salePrice}`;
+  }
+  
+  const fontSize = 48;
+  const textPadding = 20;
+  const charWidth = fontSize * 0.6;
+  const maxBoxWidth = STORY_WIDTH - 80;
+  const lineGap = 10;
+  
+  const compositeArray = [];
+  
+  // Bottom-left text overlays (price, name, brand)
+  const basePositionY = STORY_HEIGHT - 100;
+  let currentY = basePositionY;
+  
+  const showBrand = brand && company && brand !== company;
+  
+  if (showBrand) {
+    const brandBoxWidth = Math.min(Math.ceil(brand.length * charWidth) + (textPadding * 4), maxBoxWidth);
+    const brandBoxHeight = fontSize + (textPadding * 2);
+    
+    const brandSvg = `
+      <svg width="${brandBoxWidth}" height="${brandBoxHeight}">
+        <rect width="100%" height="100%" fill="black"/>
+        <text 
+          x="${textPadding * 2}" 
+          y="${textPadding + fontSize * 0.8}" 
+          font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+          font-size="${fontSize}" 
+          font-weight="400" 
+          fill="white">
+          ${escapeHtml(brand)}
+        </text>
+      </svg>
+    `;
+    
+    const nameBoxWidth = Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth);
+    const nameBoxHeight = fontSize + (textPadding * 2);
+    
+    const nameSvg = `
+      <svg width="${nameBoxWidth}" height="${nameBoxHeight}">
+        <rect width="100%" height="100%" fill="black"/>
+        <text 
+          x="${textPadding * 2}" 
+          y="${textPadding + fontSize * 0.8}" 
+          font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+          font-size="${fontSize}" 
+          font-weight="400" 
+          fill="white">
+          ${escapeHtml(productName)}
+        </text>
+      </svg>
+    `;
+    
+    if (priceText) {
+      const priceBoxWidth = Math.min(Math.ceil(priceText.length * charWidth) + (textPadding * 4), maxBoxWidth);
+      const priceBoxHeight = fontSize + (textPadding * 2);
+      
+      const priceSvg = `
+        <svg width="${priceBoxWidth}" height="${priceBoxHeight}">
+          <rect width="100%" height="100%" fill="black"/>
+          <text 
+            x="${textPadding * 2}" 
+            y="${textPadding + fontSize * 0.8}" 
+            font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+            font-size="${fontSize}" 
+            font-weight="400" 
+            fill="white">
+            ${escapeHtml(priceText)}
+          </text>
+        </svg>
+      `;
+      
+      const brandPositionY = currentY;
+      const namePositionY = brandPositionY - brandBoxHeight - lineGap;
+      const pricePositionY = namePositionY - nameBoxHeight - lineGap;
+      
+      compositeArray.push(
+        { input: Buffer.from(priceSvg), top: pricePositionY, left: 40 },
+        { input: Buffer.from(nameSvg), top: namePositionY, left: 40 },
+        { input: Buffer.from(brandSvg), top: brandPositionY, left: 40 }
+      );
+    }
+  } else {
+    const nameBoxWidth = Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth);
+    const nameBoxHeight = fontSize + (textPadding * 2);
+    
+    const nameSvg = `
+      <svg width="${nameBoxWidth}" height="${nameBoxHeight}">
+        <rect width="100%" height="100%" fill="black"/>
+        <text 
+          x="${textPadding * 2}" 
+          y="${textPadding + fontSize * 0.8}" 
+          font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+          font-size="${fontSize}" 
+          font-weight="400" 
+          fill="white">
+          ${escapeHtml(productName)}
+        </text>
+      </svg>
+    `;
+    
+    if (priceText) {
+      const priceBoxWidth = Math.min(Math.ceil(priceText.length * charWidth) + (textPadding * 4), maxBoxWidth);
+      const priceBoxHeight = fontSize + (textPadding * 2);
+      
+      const priceSvg = `
+        <svg width="${priceBoxWidth}" height="${priceBoxHeight}">
+          <rect width="100%" height="100%" fill="black"/>
+          <text 
+            x="${textPadding * 2}" 
+            y="${textPadding + fontSize * 0.8}" 
+            font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+            font-size="${fontSize}" 
+            font-weight="400" 
+            fill="white">
+            ${escapeHtml(priceText)}
+          </text>
+        </svg>
+      `;
+      
+      const pricePositionY = currentY;
+      const namePositionY = pricePositionY - priceBoxHeight - lineGap;
+      
+      compositeArray.push(
+        { input: Buffer.from(nameSvg), top: namePositionY, left: 40 },
+        { input: Buffer.from(priceSvg), top: pricePositionY, left: 40 }
+      );
+    }
+  }
+  
+  // Add custom copy overlay in top-right if provided
+  if (customCopy && customCopy.trim()) {
+    const copyLines = customCopy.trim().split('\n').slice(0, 3); // Max 3 lines
+    const copyFontSize = 36;
+    const copyPadding = 16;
+    const copyLineHeight = copyFontSize + 8;
+    
+    // Calculate box dimensions
+    let maxLineWidth = 0;
+    for (const line of copyLines) {
+      const lineWidth = line.length * copyFontSize * 0.55;
+      if (lineWidth > maxLineWidth) maxLineWidth = lineWidth;
+    }
+    
+    const copyBoxWidth = Math.min(maxLineWidth + (copyPadding * 4), STORY_WIDTH - 80);
+    const copyBoxHeight = (copyLines.length * copyLineHeight) + (copyPadding * 2);
+    
+    let copyTextElements = '';
+    copyLines.forEach((line, index) => {
+      copyTextElements += `
+        <text 
+          x="${copyPadding * 2}" 
+          y="${copyPadding + (index + 1) * copyLineHeight - 8}" 
+          font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+          font-size="${copyFontSize}" 
+          font-weight="400" 
+          fill="white">
+          ${escapeHtml(line)}
+        </text>
+      `;
+    });
+    
+    const copySvg = `
+      <svg width="${copyBoxWidth}" height="${copyBoxHeight}">
+        <rect width="100%" height="100%" fill="black"/>
+        ${copyTextElements}
+      </svg>
+    `;
+    
+    // Position in top-right with same margin as bottom-left
+    const copyX = STORY_WIDTH - copyBoxWidth - 40;
+    const copyY = 80;
+    
+    compositeArray.push({
+      input: Buffer.from(copySvg),
+      top: copyY,
+      left: copyX
+    });
+  }
+  
+  const finalImage = await sharp(backgroundImage)
+    .composite(compositeArray)
+    .jpeg({ quality: 90 })
+    .toBuffer();
+  
+  const today = new Date().toISOString().split('T')[0];
+  const sanitizedName = productName.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 30);
+  const filename = `${sanitizedName}-story.jpg`;
+  
+  console.log(`   📤 Uploading story to Google Drive...`);
+  const driveResult = await uploadToGoogleDrive({
+    fileName: filename,
+    mimeType: 'image/jpeg',
+    fileBuffer: finalImage,
+    folderPath: `Product Images/Stories/${today}`
+  });
+  
+  console.log(`   ✅ Uploaded story: ${filename}`);
+  
+  return {
+    success: true,
+    filename,
+    driveFileId: driveResult.fileId,
+    driveUrl: driveResult.webViewLink
+  };
+}

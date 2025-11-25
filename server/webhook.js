@@ -10,7 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeTelegramBot, sendAlertToTelegram, sendSaleApprovalAlert } from './telegram-bot.js';
 import { scrapeGemItems } from './gem-scraper.js';
-import { generateMultipleFeaturedAssets } from './featured-assets-generator.js';
+import { generateMultipleFeaturedAssets, generateHeaderOnlyAsset, generateAssetWithPicks, generatePickStoryWithCopy } from './featured-assets-generator.js';
 import { 
   addPendingSale, 
   getPendingSales, 
@@ -2148,6 +2148,122 @@ app.post('/admin/generate-featured-assets', async (req, res) => {
       success: false, 
       message: error.message 
     });
+  }
+});
+
+// Get picks for a specific sale
+app.get('/admin/sale/:saleId/picks', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { saleId } = req.params;
+    
+    const filterFormula = `FIND("${saleId}",{SaleRecordIDs}&'')`;
+    const fields = ['ProductName', 'ImageURL', 'OriginalPrice', 'SalePrice', 'PercentOff', 'Brand'];
+    
+    const params = new URLSearchParams({
+      filterByFormula: filterFormula,
+      'fields[]': fields.join(',')
+    });
+    
+    fields.forEach(field => {
+      params.append('fields[]', field);
+    });
+    
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Airtable error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    const picks = (data.records || []).map(record => ({
+      id: record.id,
+      productName: record.fields.ProductName || 'Untitled',
+      imageUrl: record.fields.ImageURL || '',
+      originalPrice: record.fields.OriginalPrice || 0,
+      salePrice: record.fields.SalePrice || 0,
+      percentOff: record.fields.PercentOff || 0,
+      brand: record.fields.Brand || ''
+    }));
+    
+    res.json({ success: true, picks });
+    
+  } catch (error) {
+    console.error('Error fetching sale picks:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Generate custom assets with configuration
+app.post('/admin/generate-custom-assets', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { saleId, mainAsset, storyPicks } = req.body;
+    
+    if (!saleId) {
+      return res.status(400).json({ success: false, message: 'Sale ID required' });
+    }
+    
+    console.log(`\n📸 Generating custom assets for sale ${saleId}...`);
+    const results = [];
+    
+    // Generate main asset if requested
+    if (mainAsset) {
+      try {
+        if (mainAsset.type === 'without-picks') {
+          // Generate header-only asset
+          const result = await generateHeaderOnlyAsset(saleId);
+          results.push({ type: 'main-header', success: true, ...result });
+        } else if (mainAsset.type === 'with-picks' && mainAsset.pickIds?.length > 0) {
+          // Generate asset with specific picks
+          const result = await generateAssetWithPicks(saleId, mainAsset.pickIds);
+          results.push({ type: 'main-picks', success: true, ...result });
+        }
+      } catch (error) {
+        console.error('Main asset generation error:', error);
+        results.push({ type: 'main', success: false, error: error.message });
+      }
+    }
+    
+    // Generate individual story images
+    if (storyPicks && storyPicks.length > 0) {
+      for (const pickConfig of storyPicks) {
+        try {
+          const result = await generatePickStoryWithCopy(pickConfig.pickId, pickConfig.customCopy || '');
+          results.push({ type: 'story', pickId: pickConfig.pickId, success: true, ...result });
+        } catch (error) {
+          console.error(`Story generation error for pick ${pickConfig.pickId}:`, error);
+          results.push({ type: 'story', pickId: pickConfig.pickId, success: false, error: error.message });
+        }
+      }
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    const totalCount = results.length;
+    
+    res.json({
+      success: true,
+      message: `Generated ${successCount}/${totalCount} assets`,
+      results
+    });
+    
+  } catch (error) {
+    console.error('Custom assets generation error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

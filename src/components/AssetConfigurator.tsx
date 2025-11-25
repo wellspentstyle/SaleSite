@@ -202,10 +202,6 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
             <Loader2 className="h-6 w-6 animate-spin" />
             <span className="ml-2">Loading picks...</span>
           </div>
-        ) : picks.length === 0 ? (
-          <div className="py-12 text-center text-gray-500">
-            No picks found for this sale
-          </div>
         ) : (
           <div className="space-y-8">
             <section className="space-y-4">
@@ -245,21 +241,24 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
                       </div>
                     </button>
                     <button
-                      onClick={() => setMainAssetType('with-picks')}
+                      onClick={() => picks.length > 0 && setMainAssetType('with-picks')}
+                      disabled={picks.length === 0}
                       className={`flex-1 p-4 border-2 rounded-lg transition-all ${
-                        mainAssetType === 'with-picks'
-                          ? 'border-black bg-gray-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                        picks.length === 0 
+                          ? 'opacity-50 cursor-not-allowed border-gray-200'
+                          : mainAssetType === 'with-picks'
+                            ? 'border-black bg-gray-50'
+                            : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       <div className="font-medium">With Picks</div>
                       <div className="text-sm text-gray-500 mt-1">
-                        Header + product images below
+                        {picks.length === 0 ? 'No picks available' : 'Header + product images below'}
                       </div>
                     </button>
                   </div>
 
-                  {mainAssetType === 'with-picks' && (
+                  {mainAssetType === 'with-picks' && picks.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium">
                         Select up to 3 picks to feature ({selectedMainPicks.size}/3):
@@ -300,21 +299,23 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
               )}
             </section>
 
-            <div className="border-t border-gray-200" />
+            {picks.length > 0 && (
+              <>
+                <div className="border-t border-gray-200" />
 
-            <section className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <ImagePlus className="h-5 w-5" />
-                  Individual Pick Stories (1080x1920)
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Select picks to generate story images with optional custom copy
-                </p>
-              </div>
+                <section className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <ImagePlus className="h-5 w-5" />
+                      Individual Pick Stories (1080x1920)
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Select picks to generate story images with optional custom copy
+                    </p>
+                  </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {picks.map((pick) => {
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {picks.map((pick) => {
                   const isSelected = selectedStoryPicks.has(pick.id);
                   return (
                     <div
@@ -367,9 +368,11 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
                       )}
                     </div>
                   );
-                })}
-              </div>
-            </section>
+                    })}
+                  </div>
+                </section>
+              </>
+            )}
 
             <div className="border-t pt-4 flex items-center justify-between">
               <div className="text-sm text-gray-500">
