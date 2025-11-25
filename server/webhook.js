@@ -396,11 +396,31 @@ app.post('/admin/pending-brands/:id/approve', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Brand not found' });
     }
     
+    // Handle values - could be string or array
+    let valuesArray = [];
+    if (brand.values) {
+      if (Array.isArray(brand.values)) {
+        valuesArray = brand.values;
+      } else if (typeof brand.values === 'string') {
+        valuesArray = brand.values.split(', ').filter(v => v.trim());
+      }
+    }
+    
+    // Handle category - could be string or array
+    let categoryArray = [];
+    if (brand.category) {
+      if (Array.isArray(brand.category)) {
+        categoryArray = brand.category;
+      } else if (typeof brand.category === 'string') {
+        categoryArray = brand.category.split(', ').filter(c => c.trim());
+      }
+    }
+    
     const updateData = {
       Type: brand.type,
       PriceRange: brand.priceRange,
-      Category: brand.category,
-      Values: brand.values?.split(', ') || [],
+      Category: categoryArray,
+      Values: valuesArray,
       MaxWomensSize: brand.maxWomensSize,
       SizingSource: brand.sizingSource,
       Description: brand.description,
