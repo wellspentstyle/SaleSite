@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const REJECTED_EMAILS_FILE = path.join(__dirname, 'rejected-emails.json');
-const MAX_REJECTED_EMAILS = 20; // Store last 20, show 5 by default
+const MAX_REJECTED_EMAILS = 50; // Store last 50 rejected emails
 
 export async function getRejectedEmails() {
   try {

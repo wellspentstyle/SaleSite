@@ -67,7 +67,7 @@ export function SalesApprovals() {
         fetch(`${API_BASE}/approval-settings`, {
           headers: { 'auth': auth }
         }),
-        fetch(`${API_BASE}/rejected-emails`, {
+        fetch(`${API_BASE}/rejected-emails?limit=50`, {
           headers: { 'auth': auth }
         })
       ]);
@@ -454,10 +454,10 @@ export function SalesApprovals() {
           ) : (
             <Card>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <div className="overflow-auto max-h-[400px]">
                   <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
+                    <thead className="sticky top-0 bg-muted/50">
+                      <tr className="border-b">
                         <th className="text-left p-3 font-medium">Brand</th>
                         <th className="text-left p-3 font-medium">Subject</th>
                         <th className="text-left p-3 font-medium">Reason</th>
@@ -488,7 +488,7 @@ export function SalesApprovals() {
             </Card>
           )}
           <p className="text-xs text-muted-foreground">
-            Shows the last 5 emails that were rejected from the approval queue
+            Shows recent emails that were rejected from the approval queue
           </p>
         </div>
       </div>

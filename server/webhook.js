@@ -3779,6 +3779,12 @@ async function checkForIncompleteBrands() {
           if (researchResponse.ok) {
             const result = await researchResponse.json();
             
+            // Check if research was successful and returned brand data
+            if (!result.success || !result.brand) {
+              console.log(`⚠️  Research for ${name} returned no data: ${result.error || 'Unknown error'}`);
+              continue;
+            }
+            
             await addPendingBrand({
               name: name,
               airtableRecordId: company.id,
