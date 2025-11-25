@@ -160,7 +160,7 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
         });
       }
 
-      // Expanded resale/marketplace domains to block
+      // Expanded resale/marketplace domains to block (only when NOT researching that retailer)
       const resaleDomains = [
         'therealreal.com', 'vestiairecollective.com', 'poshmark.com', 'ebay.com',
         'tradesy.com', 'etsy.com', 'depop.com', 'grailed.com', 'mercari.com',
@@ -174,25 +174,71 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
         'walmart.com', 'target.com', 'shopual.com'
       ];
 
+      // Helper: Normalize brand name (remove accents, special chars)
+      const normalizeForDomain = (name) => {
+        return name
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents (ï→i, é→e)
+          .replace(/[^a-z0-9]/g, ''); // Remove non-alphanumeric
+      };
+
       // Find official brand domain
-      const brandNameLower = brandName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const brandNameNorm = normalizeForDomain(brandName);
       let officialDomain = null;
+
+      // Check if we're researching a retailer itself (allow their domain)
+      const isResearchingRetailer = resaleDomains.some(resale => {
+        const resaleNorm = normalizeForDomain(resale.replace('.com', ''));
+        return brandNameNorm.includes(resaleNorm) || resaleNorm.includes(brandNameNorm);
+      });
 
       for (const result of domainSearchData.organic.slice(0, 10)) {
         if (!result.link) continue;
 
-        const hostname = new URL(result.link).hostname.replace('www.', '').toLowerCase();
+        try {
+          const hostname = new URL(result.link).hostname.replace('www.', '').toLowerCase();
+          const domainBase = hostname.split('.')[0].replace(/[-_]/g, '');
+          const domainNorm = normalizeForDomain(domainBase);
 
-        // Skip resale/marketplace domains
-        if (resaleDomains.some(resale => hostname.includes(resale))) {
+          // Skip resale domains UNLESS we're researching that retailer
+          if (!isResearchingRetailer && resaleDomains.some(resale => hostname.includes(resale))) {
+            continue;
+          }
+
+          // Flexible matching: check if brand is in domain or domain is in brand
+          // Also handle cases like "matches" matching "matchesfashion"
+          if (domainNorm.includes(brandNameNorm) || brandNameNorm.includes(domainNorm) ||
+              (brandNameNorm.length >= 4 && domainNorm.startsWith(brandNameNorm.slice(0, 4)))) {
+            officialDomain = hostname;
+            console.log(`   ✅ Matched domain: ${hostname} (brand: ${brandNameNorm}, domain: ${domainNorm})`);
+            break;
+          }
+        } catch (e) {
+          // Skip invalid URLs
           continue;
         }
+      }
 
-        // Check if domain contains brand name
-        const domainParts = hostname.split('.')[0].replace(/[-_]/g, '');
-        if (domainParts.includes(brandNameLower) || brandNameLower.includes(domainParts)) {
-          officialDomain = hostname;
-          break;
+      if (!officialDomain) {
+        // Fallback: Take first non-blocked result if it looks like an official site
+        for (const result of domainSearchData.organic.slice(0, 5)) {
+          if (!result.link) continue;
+          try {
+            const hostname = new URL(result.link).hostname.replace('www.', '').toLowerCase();
+            if (!isResearchingRetailer && resaleDomains.some(resale => hostname.includes(resale))) {
+              continue;
+            }
+            // Check if result title/snippet suggests it's the official site
+            const title = (result.title || '').toLowerCase();
+            if (title.includes('official') || title.includes(brandName.toLowerCase()) || 
+                title.includes('home') || title.includes('women')) {
+              officialDomain = hostname;
+              console.log(`   ℹ️  Fallback domain: ${hostname} (from title match)`);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
         }
       }
 
@@ -260,32 +306,39 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
       // Extract brand name from official domain (e.g., "everlane" from "everlane.com")
       const domainBrand = officialDomain.split('.')[0].toLowerCase();
 
-      // Helper: Normalize brand names for matching (remove spaces, punctuation)
+      // Helper: Normalize brand names for matching (remove accents, spaces, punctuation)
       const normalizeBrand = (name) => {
         return name
           .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents (ï→i, é→e)
           .replace(/[.\s&'-]/g, '') // Remove spaces, dots, ampersands, apostrophes, hyphens
           .trim();
       };
 
       const normalizedDomainBrand = normalizeBrand(domainBrand);
+      const normalizedBrandName = normalizeBrand(brandName); // Also normalize original brand name for matching
 
       sortedSources.forEach(([source, count]) => {
         const normalizedSource = normalizeBrand(source);
+        // Match against both domain brand AND original brand name
         const isMatch = normalizedSource.includes(normalizedDomainBrand) || 
-                       normalizedDomainBrand.includes(normalizedSource);
+                       normalizedDomainBrand.includes(normalizedSource) ||
+                       normalizedSource.includes(normalizedBrandName) ||
+                       normalizedBrandName.includes(normalizedSource);
         console.log(`      ${isMatch ? '✅' : '❌'} ${source}: ${count} products`);
       });
       console.log('');
 
-      // Filter to official source only (match by brand name)
+      // Filter to official source only (match by brand name OR domain)
       const officialProducts = shoppingResults.filter(product => {
         if (!product.source) return false;
 
         const normalizedSource = normalizeBrand(product.source);
-        // Accept if source contains brand name or vice versa (after normalization)
+        // Accept if source matches domain OR original brand name
         return normalizedSource.includes(normalizedDomainBrand) || 
-               normalizedDomainBrand.includes(normalizedSource);
+               normalizedDomainBrand.includes(normalizedSource) ||
+               normalizedSource.includes(normalizedBrandName) ||
+               normalizedBrandName.includes(normalizedSource);
       });
 
       console.log(`✅ Filtered to ${officialProducts.length} products from official domain`);
