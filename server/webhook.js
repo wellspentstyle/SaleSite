@@ -3162,10 +3162,10 @@ ${emailContent.substring(0, 4000)}`
     }
     
     // Check if approvals are enabled
-    if (isApprovalsEnabled()) {
+    if (await isApprovalsEnabled()) {
       console.log('⏸️  Approvals enabled - adding to pending sales');
       
-      const pendingSale = addPendingSale({
+      const pendingSale = await addPendingSale({
         company: saleData.company,
         percentOff: saleData.percentOff,
         saleUrl: saleData.saleUrl,
@@ -3365,7 +3365,7 @@ app.post('/webhook/airtable-story', async (req, res) => {
 // ==================== PENDING SALES APPROVAL API ====================
 
 // Get all pending sales
-app.get('/pending-sales', (req, res) => {
+app.get('/pending-sales', async (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3373,7 +3373,7 @@ app.get('/pending-sales', (req, res) => {
   }
   
   try {
-    const pending = getPendingSales();
+    const pending = await getPendingSales();
     res.json({ success: true, sales: pending });
   } catch (error) {
     console.error('Error getting pending sales:', error);
@@ -3400,7 +3400,7 @@ app.get('/rejected-emails', async (req, res) => {
 });
 
 // Add a manual pending sale
-app.post('/pending-sales/manual', (req, res) => {
+app.post('/pending-sales/manual', async (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3414,7 +3414,7 @@ app.post('/pending-sales/manual', (req, res) => {
       return res.status(400).json({ success: false, error: 'Company and percentOff are required' });
     }
     
-    const pendingSale = addPendingSale({
+    const pendingSale = await addPendingSale({
       company,
       percentOff,
       saleUrl: saleUrl || null,
@@ -3450,7 +3450,7 @@ app.post('/check-duplicates/:id', async (req, res) => {
   
   try {
     const { id } = req.params;
-    const pendingSales = getPendingSales();
+    const pendingSales = await getPendingSales();
     const pendingSale = pendingSales.find(s => s.id === id);
     
     if (!pendingSale) {
@@ -3516,7 +3516,7 @@ app.post('/approve-sale/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { replaceSaleId } = req.body;
-    const pendingSale = removePendingSale(id);
+    const pendingSale = await removePendingSale(id);
     
     if (!pendingSale) {
       return res.status(404).json({ success: false, error: 'Sale not found' });
@@ -3620,7 +3620,7 @@ app.post('/approve-sale/:id', async (req, res) => {
 });
 
 // Reject a pending sale (delete it)
-app.post('/reject-sale/:id', (req, res) => {
+app.post('/reject-sale/:id', async (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3629,7 +3629,7 @@ app.post('/reject-sale/:id', (req, res) => {
   
   try {
     const { id } = req.params;
-    const pendingSale = removePendingSale(id);
+    const pendingSale = await removePendingSale(id);
     
     if (!pendingSale) {
       return res.status(404).json({ success: false, error: 'Sale not found' });
@@ -3650,7 +3650,7 @@ app.post('/reject-sale/:id', (req, res) => {
 });
 
 // Get approval settings
-app.get('/approval-settings', (req, res) => {
+app.get('/approval-settings', async (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3658,7 +3658,7 @@ app.get('/approval-settings', (req, res) => {
   }
   
   try {
-    const settings = getApprovalSettings();
+    const settings = await getApprovalSettings();
     res.json({ success: true, settings });
   } catch (error) {
     console.error('Error getting approval settings:', error);
@@ -3667,7 +3667,7 @@ app.get('/approval-settings', (req, res) => {
 });
 
 // Update approval settings
-app.post('/approval-settings', (req, res) => {
+app.post('/approval-settings', async (req, res) => {
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
@@ -3684,7 +3684,7 @@ app.post('/approval-settings', (req, res) => {
       });
     }
     
-    setApprovalsEnabled(approvalsEnabled);
+    await setApprovalsEnabled(approvalsEnabled);
     console.log(`⚙️  Approval mode ${approvalsEnabled ? 'ENABLED' : 'DISABLED'}`);
     
     res.json({ 
@@ -3918,11 +3918,20 @@ async function checkForIncompleteBrands() {
     const pendingBrands = await getPendingBrands();
     const pendingNames = new Set(pendingBrands.map(b => b.name.toLowerCase()));
     
+    // Also check rejected brands to avoid re-researching them
+    const rejectedBrands = await getRejectedBrands();
+    const rejectedNames = new Set(rejectedBrands.map(b => b.name.toLowerCase()));
+    
     for (const company of companies) {
       const fields = company.fields;
       const name = fields.Name;
       
       if (!name || pendingNames.has(name.toLowerCase())) continue;
+      
+      // Skip rejected brands - don't re-research
+      if (rejectedNames.has(name.toLowerCase())) {
+        continue;
+      }
       
       // Skip shops - only auto-research brands
       const companyType = fields.Type;
