@@ -2,6 +2,9 @@ import { scrapeProduct as fastScrape } from './fast-scraper.js';
 import { scrapeWithPlaywright } from '../playwright-scraper.js';
 import { scrapeWithProxy } from './proxy-scraper.js';
 
+// Confidence threshold for fallback decisions
+const CONFIDENCE_THRESHOLD = 60;
+
 // Detect if URL is from a department store that needs proxy
 function isDepartmentStore(url) {
   const hostname = new URL(url).hostname.toLowerCase();
@@ -27,33 +30,33 @@ function determineErrorType(...results) {
     .filter(r => !r.success)
     .map(r => r.errorType || 'UNKNOWN')
     .filter(t => t !== 'UNKNOWN');
-  
+
   if (errorTypes.length === 0) {
     return 'UNKNOWN';
   }
-  
+
   // If ANY scraper had a RETRYABLE error, consider the whole thing RETRYABLE
   // This allows other URLs from the same domain to be attempted
   if (errorTypes.includes('RETRYABLE')) {
     return 'RETRYABLE';
   }
-  
+
   // If ANY scraper had a FATAL error but not all, also RETRYABLE
   // (one scraper's fatal error doesn't mean the domain is blocked)
   if (errorTypes.includes('FATAL') && errorTypes.includes('BLOCKING')) {
     return 'RETRYABLE';
   }
-  
+
   // Only return BLOCKING if ALL scrapers returned BLOCKING
   if (errorTypes.every(t => t === 'BLOCKING')) {
     return 'BLOCKING';
   }
-  
+
   // Only return FATAL if ALL scrapers returned FATAL
   if (errorTypes.every(t => t === 'FATAL')) {
     return 'FATAL';
   }
-  
+
   // Default to RETRYABLE to give other URLs a chance
   return 'RETRYABLE';
 }
@@ -62,7 +65,8 @@ export async function scrapeProduct(url, options = {}) {
   const {
     openai,
     enableTestMetadata = false,
-    logger = console
+    logger = console,
+    shouldAutofillBrand = () => true
   } = options;
 
   const startTime = Date.now();
@@ -76,10 +80,11 @@ export async function scrapeProduct(url, options = {}) {
       logger.log('⚡ [Orchestrator] Attempting fast scraper...');
       const result = await fastScrape(url, {
         openai,
-        serperApiKey: process.env.SERPER_API_KEY,
+        scraperApiKey: process.env.SCRAPER_API_KEY,
         fetchImpl: fetch,
         enableTestMetadata,
-        logger
+        logger,
+        shouldAutofillBrand
       });
 
       attempts.push({
@@ -173,7 +178,7 @@ export async function scrapeProduct(url, options = {}) {
     const product = result.product;
     const confidence = result.meta?.confidence || 0;
 
-    if (confidence < 60) {
+    if (confidence < CONFIDENCE_THRESHOLD) {
       logger.log(`⚠️  [Orchestrator] Low confidence (${confidence}%), will try proxy`);
       return true;
     }
@@ -195,7 +200,7 @@ export async function scrapeProduct(url, options = {}) {
     const product = result.product;
     const confidence = result.meta?.confidence || 0;
 
-    if (confidence < 60) {
+    if (confidence < CONFIDENCE_THRESHOLD) {
       logger.log(`⚠️  [Orchestrator] Low confidence (${confidence}%), will try Playwright`);
       return true;
     }
@@ -221,7 +226,7 @@ export async function scrapeProduct(url, options = {}) {
   // For regular sites: fast -> playwright
   if (useDepartmentStoreProxy && shouldFallbackToProxy(fastResult)) {
     logger.log('🔄 [Orchestrator] Falling back to proxy scraper...');
-    
+
     const proxyResult = await attemptProxyScraper();
 
     if (proxyResult.success) {
@@ -242,7 +247,7 @@ export async function scrapeProduct(url, options = {}) {
     // If proxy fails, try Playwright as last resort
     if (shouldFallbackToPlaywright(proxyResult)) {
       logger.log('🔄 [Orchestrator] Proxy failed, trying Playwright as last resort...');
-      
+
       const playwrightResult = await attemptPlaywrightScraper();
 
       if (playwrightResult.success) {
@@ -293,7 +298,7 @@ export async function scrapeProduct(url, options = {}) {
   // For non-department stores, use the original logic (fast -> playwright)
   if (shouldFallbackToPlaywright(fastResult)) {
     logger.log('🔄 [Orchestrator] Falling back to Playwright...');
-    
+
     const playwrightResult = await attemptPlaywrightScraper();
 
     if (playwrightResult.success) {

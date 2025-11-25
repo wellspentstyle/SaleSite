@@ -28,62 +28,7 @@ export async function scrapeProduct(url, options = {}) {
         logger.log(`🔍 [Scraper] Starting: ${url}`);
 
         // ============================================
-        // STEP 1: AI INFERS PRODUCT INFO FROM URL
-        // ============================================
-        const urlInfo = await inferProductFromUrl(url, openai, logger);
-        logger.log(`🤖 [AI] Inferred: "${urlInfo.productName}" ${urlInfo.color ? `(${urlInfo.color})` : ''}`);
-
-        // ============================================
-        // STEP 2: TRY GOOGLE SHOPPING
-        // ============================================
-        if (scraperApiKey && urlInfo.productName) {
-          const googleResult = await tryGoogleShopping(
-            url, 
-            urlInfo, 
-            scraperApiKey, 
-            fetchImpl, 
-            logger
-          );
-
-          if (googleResult) {
-            testMetadata.phaseUsed = 'google-shopping';
-
-            const product = {
-              name: googleResult.name,
-              brand: shouldAutofillBrand(url) ? googleResult.brand : null,
-              imageUrl: googleResult.imageUrl,
-              originalPrice: googleResult.originalPrice || googleResult.currentPrice,
-              salePrice: googleResult.currentPrice,
-              percentOff: 0,
-              color: urlInfo.color || null,
-              url: url,
-              confidence: 90
-            };
-
-            if (product.originalPrice && product.originalPrice > product.salePrice) {
-              product.percentOff = Math.round(
-                ((product.originalPrice - product.salePrice) / product.originalPrice) * 100
-              );
-            }
-
-            logger.log(`✅ [Google Shopping] Success (confidence: ${product.confidence}%)`);
-
-            return {
-              success: true,
-              product,
-              meta: {
-                method: 'simplified',
-                phase: testMetadata.phaseUsed,
-                confidence: product.confidence,
-                durationMs: Date.now() - startTime,
-                testMetadata: enableTestMetadata ? testMetadata : undefined
-              }
-            };
-          }
-        }
-
-        // ============================================
-        // STEP 3: FALLBACK - FETCH PAGE HTML
+        // STEP 1: FETCH PAGE HTML
         // ============================================
         logger.log('📄 [Scraper] Fetching page HTML...');
 
@@ -108,13 +53,11 @@ export async function scrapeProduct(url, options = {}) {
         logger.log(`📄 [Scraper] Fetched ${html.length} characters`);
 
         // ============================================
-        // STEP 4: TRY JSON-LD EXTRACTION
+        // STEP 2: TRY JSON-LD EXTRACTION
         // ============================================
         const jsonLdResult = await extractFromJsonLd(html, url, logger);
 
         if (jsonLdResult?.complete) {
-          // Add color from URL inference
-          jsonLdResult.color = urlInfo.color || null;
           testMetadata.phaseUsed = 'json-ld';
 
           return {
@@ -131,7 +74,7 @@ export async function scrapeProduct(url, options = {}) {
         }
 
         // ============================================
-        // STEP 5: FINAL FALLBACK - AI EXTRACTION
+        // STEP 3: TRY AI EXTRACTION
         // ============================================
         logger.log('🤖 [AI] Using AI extraction...');
 
@@ -140,12 +83,113 @@ export async function scrapeProduct(url, options = {}) {
           url, 
           openai, 
           logger, 
-          jsonLdResult,
-          urlInfo.color
+          jsonLdResult
         );
 
         testMetadata.phaseUsed = 'ai-extraction';
 
+        // If AI extraction has good confidence, return it
+        if (aiResult.confidence >= 60) {
+          logger.log(`✅ [AI] Success with confidence ${aiResult.confidence}%`);
+
+          return {
+            success: true,
+            product: aiResult,
+            meta: {
+              method: 'simplified',
+              phase: testMetadata.phaseUsed,
+              confidence: aiResult.confidence,
+              durationMs: Date.now() - startTime,
+              testMetadata: enableTestMetadata ? testMetadata : undefined
+            }
+          };
+        }
+
+        // ============================================
+        // STEP 4: FALLBACK - GOOGLE SHOPPING
+        // ============================================
+        logger.log(`⚠️  [AI] Low confidence (${aiResult.confidence}%), trying Google Shopping backup...`);
+
+        if (!scraperApiKey) {
+          logger.log('⚠️  [Google Shopping] No ScraperAPI key, returning low-confidence AI result');
+          return {
+            success: true,
+            product: aiResult,
+            meta: {
+              method: 'simplified',
+              phase: testMetadata.phaseUsed,
+              confidence: aiResult.confidence,
+              durationMs: Date.now() - startTime,
+              testMetadata: enableTestMetadata ? testMetadata : undefined
+            }
+          };
+        }
+
+        // Infer product name from URL for Google Shopping search
+        const urlInfo = await inferProductFromUrl(url, openai, logger);
+        logger.log(`🤖 [AI] Inferred from URL: "${urlInfo.productName}" ${urlInfo.color ? `(${urlInfo.color})` : ''}`);
+
+        if (!urlInfo.productName) {
+          logger.log('⚠️  [Google Shopping] Could not infer product name, returning AI result');
+          return {
+            success: true,
+            product: aiResult,
+            meta: {
+              method: 'simplified',
+              phase: testMetadata.phaseUsed,
+              confidence: aiResult.confidence,
+              durationMs: Date.now() - startTime,
+              testMetadata: enableTestMetadata ? testMetadata : undefined
+            }
+          };
+        }
+
+        const googleResult = await tryGoogleShopping(
+          url, 
+          urlInfo, 
+          scraperApiKey, 
+          fetchImpl, 
+          logger
+        );
+
+        if (googleResult) {
+          testMetadata.phaseUsed = 'google-shopping-backup';
+
+          const product = {
+            name: googleResult.name,
+            brand: shouldAutofillBrand(url) ? googleResult.brand : null,
+            imageUrl: googleResult.imageUrl,
+            originalPrice: googleResult.originalPrice || googleResult.currentPrice,
+            salePrice: googleResult.currentPrice,
+            percentOff: 0,
+            color: urlInfo.color || googleResult.color || null,
+            url: url,
+            confidence: 85
+          };
+
+          if (product.originalPrice && product.originalPrice > product.salePrice) {
+            product.percentOff = Math.round(
+              ((product.originalPrice - product.salePrice) / product.originalPrice) * 100
+            );
+          }
+
+          logger.log(`✅ [Google Shopping] Backup success (confidence: ${product.confidence}%)`);
+
+          return {
+            success: true,
+            product,
+            meta: {
+              method: 'simplified',
+              phase: testMetadata.phaseUsed,
+              confidence: product.confidence,
+              durationMs: Date.now() - startTime,
+              testMetadata: enableTestMetadata ? testMetadata : undefined
+            }
+          };
+        }
+
+        // Google Shopping failed too, return the AI result (even with low confidence)
+        logger.log('⚠️  [Google Shopping] Failed, returning AI result');
         return {
           success: true,
           product: aiResult,
@@ -633,7 +677,7 @@ async function extractFromJsonLd(html, url, logger) {
 // STEP 5: AI EXTRACTION
 // ============================================
 
-async function extractWithAI(html, url, openai, logger, jsonLdResult = null, inferredColor = null) {
+async function extractWithAI(html, url, openai, logger, jsonLdResult = null) {
   // Pre-extract og:image
   let preExtractedImage = null;
   const ogImageMatch = html.match(/<meta[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
@@ -717,9 +761,6 @@ Rules:
   if (preExtractedImage) {
     userPrompt += `\n\nPre-extracted og:image: ${preExtractedImage}`;
   }
-  if (inferredColor) {
-    userPrompt += `\n\nInferred color from URL: ${inferredColor}`;
-  }
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -778,8 +819,7 @@ Rules:
     }
   }
 
-  // Use inferred color if AI didn't find one
-  const color = productData.color || inferredColor || null;
+  const color = productData.color || null;
 
   logger.log(`✅ [AI] Extracted product (confidence: ${confidence}%)`);
 
