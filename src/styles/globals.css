@@ -200,3 +200,46 @@
 html {
   font-size: var(--font-size);
 }
+
+/* ===========================================
+   ADMIN PAGE STYLES
+   All admin pages should use DM Sans (sans-serif)
+   for consistent, professional appearance.
+   =========================================== */
+
+/* Admin container - apply to admin page wrappers */
+.admin-page {
+  font-family: 'DM Sans', sans-serif;
+}
+
+.admin-page label,
+.admin-page input,
+.admin-page textarea,
+.admin-page select,
+.admin-page button,
+.admin-page p,
+.admin-page span,
+.admin-page th,
+.admin-page td {
+  font-family: 'DM Sans', sans-serif;
+}
+
+.admin-page input::placeholder,
+.admin-page textarea::placeholder {
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Admin form field styling */
+.admin-page .form-label {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.admin-page .form-input {
+  font-size: 0.875rem;
+}
+
+.admin-page .form-helper {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}

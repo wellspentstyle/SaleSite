@@ -6,6 +6,30 @@ A React + Vite web application showcasing upcoming designer sales and deals. Its
 ## User Preferences
 I prefer simple language and clear, concise explanations. I want iterative development with frequent, small updates. Ask for my approval before making any major architectural changes or introducing new third-party dependencies. I prefer functional components in React and a modular file structure.
 
+## Style Guidelines
+**Fonts:**
+- **DM Sans** (sans-serif): Used for all admin pages, headings, buttons, form labels, form inputs, and UI elements
+- **Crimson Pro** (serif): Used for public-facing body text only
+
+**Admin Pages:**
+- Add `admin-page` class to the outermost wrapper div (e.g., `<div className="p-8 admin-page">`)
+- This class automatically applies DM Sans to all text elements within the admin page
+- Standard layout: `p-8` padding, `max-w-7xl mx-auto space-y-6` for centered content
+- Headers: `text-3xl font-bold` for page titles
+- Subtitles: `text-gray-600 mt-1` for descriptions
+
+**Buttons:**
+- Primary actions: Default Button component (black background, white text)
+- Secondary actions: `variant="outline"` for less prominent actions
+- All buttons use DM Sans font automatically
+
+**Forms:**
+- Labels inherit DM Sans from admin-page class
+- Inputs inherit DM Sans from admin-page class
+- Helper text: `text-xs text-muted-foreground`
+
+**Global CSS Location:** `src/styles/globals.css` - contains admin-page class and font definitions
+
 ## System Architecture
 The application uses React 18, TypeScript, and Vite for development. Tailwind CSS v3 handles styling, complemented by Radix UI for accessible components. State management relies on React hooks.
 

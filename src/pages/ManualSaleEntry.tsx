@@ -120,7 +120,7 @@ export function ManualSaleEntry() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-8 admin-page">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <Button
@@ -142,7 +142,7 @@ export function ManualSaleEntry() {
 
         <Card>
           <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="company">Brand/Company Name *</Label>
                 <Input
@@ -150,7 +150,6 @@ export function ManualSaleEntry() {
                   value={formData.company}
                   onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                   placeholder="e.g., Everlane, Madewell"
-                  required
                 />
               </div>
 
@@ -164,7 +163,6 @@ export function ManualSaleEntry() {
                   value={formData.percentOff}
                   onChange={(e) => setFormData({ ...formData, percentOff: e.target.value ? Number(e.target.value) : '' })}
                   placeholder="e.g., 25"
-                  required
                 />
               </div>
 
@@ -189,7 +187,6 @@ export function ManualSaleEntry() {
                   value={formData.discountCode}
                   onChange={(e) => setFormData({ ...formData, discountCode: e.target.value })}
                   placeholder="e.g., SAVE25"
-                  className="font-mono"
                 />
               </div>
 
@@ -253,7 +250,7 @@ export function ManualSaleEntry() {
                   )}
                 </Button>
               </div>
-            </form>
+            </div>
           </CardContent>
         </Card>
       </div>
