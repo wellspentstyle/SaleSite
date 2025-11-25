@@ -390,7 +390,7 @@ export function AddBrands() {
     toast.success('Table and input cleared');
   };
 
-  const handleEditSave = (index: number, updatedData: BrandResult) => {
+  const handleEditSave = (index: number, updatedData: Partial<BrandResult>) => {
     setResults(prev => prev.map((r, idx) => {
       if (idx === index) {
         const merged = { ...r, ...updatedData };

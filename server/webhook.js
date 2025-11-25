@@ -1147,7 +1147,7 @@ app.post('/admin/update-brand-in-airtable', async (req, res) => {
       Notes: brandData.notes || '',
       Values: valuesArray,
       Description: brandData.description || '',
-      URL: brandData.url || ''
+      Website: brandData.url || ''
     };
     
     let result;
