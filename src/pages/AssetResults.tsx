@@ -46,9 +46,7 @@ export function AssetResults() {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<Set<number>>(new Set());
-  const [caption, setCaption] = useState('');
-  const [postToFeed, setPostToFeed] = useState(true);
-  const [postStories, setPostStories] = useState(true);
+  const [postToStories, setPostToStories] = useState(true);
   const [showDevWarning, setShowDevWarning] = useState(false);
 
   useEffect(() => {
@@ -82,7 +80,6 @@ export function AssetResults() {
             if (r.success) successfulIndices.add(i);
           });
           setSelectedAssets(successfulIndices);
-          setCaption(`${data.saleName} - check out these deals!\n\n#designersale #fashion #sale`);
         } else {
           // No assets found, redirect
           navigate('/admin/assets');
@@ -152,67 +149,50 @@ export function AssetResults() {
     const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
+      // Order: main sale image first, then product stories in order
       const mainAsset = selectedResults.find(r => r.type === 'main');
       const storyAssets = selectedResults.filter(r => r.type === 'story');
+      
+      // Build ordered list: main first, then stories
+      const orderedAssets: AssetResult[] = [];
+      if (mainAsset) orderedAssets.push(mainAsset);
+      orderedAssets.push(...storyAssets);
 
       let postedCount = 0;
       const errors: string[] = [];
 
-      if (mainAsset && postToFeed && mainAsset.driveUrl) {
-        try {
-          const response = await fetch(`${API_BASE}/admin/instagram/post`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'auth': auth
-            },
-            body: JSON.stringify({
-              imageUrl: getDirectDownloadUrl(mainAsset.driveUrl),
-              caption,
-              isStory: false
-            })
-          });
-          const data = await response.json();
-          if (data.success) {
-            postedCount++;
-          } else {
-            errors.push(`Feed post: ${data.error || 'Failed'}`);
-          }
-        } catch (error) {
-          errors.push('Feed post failed');
-        }
-      }
-
-      if (postStories && storyAssets.length > 0) {
-        for (const story of storyAssets) {
-          if (story.driveUrl) {
-            try {
-              const response = await fetch(`${API_BASE}/admin/instagram/post`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'auth': auth
-                },
-                body: JSON.stringify({
-                  imageUrl: getDirectDownloadUrl(story.driveUrl),
-                  isStory: true
-                })
-              });
-              const data = await response.json();
-              if (data.success) {
-                postedCount++;
-              } else {
-                errors.push(`Story: ${data.error || 'Failed'}`);
-              }
-            } catch (error) {
-              errors.push('Story post failed');
+      // Post all assets to Stories in order
+      for (let i = 0; i < orderedAssets.length; i++) {
+        const asset = orderedAssets[i];
+        if (asset.driveUrl) {
+          try {
+            const response = await fetch(`${API_BASE}/admin/instagram/post`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'auth': auth
+              },
+              body: JSON.stringify({
+                imageUrl: getDirectDownloadUrl(asset.driveUrl),
+                isStory: true
+              })
+            });
+            const data = await response.json();
+            if (data.success) {
+              postedCount++;
+            } else {
+              const assetLabel = asset.type === 'main' ? 'Main image' : `Story ${i}`;
+              errors.push(`${assetLabel}: ${data.error || 'Failed'}`);
             }
+          } catch (error) {
+            const assetLabel = asset.type === 'main' ? 'Main image' : `Story ${i}`;
+            errors.push(`${assetLabel} failed`);
           }
         }
       }
 
       if (postedCount > 0) {
-        toast.success(`Posted ${postedCount} asset${postedCount > 1 ? 's' : ''} to Instagram!`);
+        toast.success(`Posted ${postedCount} story${postedCount > 1 ? ' images' : ''} to Instagram!`);
       }
       if (errors.length > 0) {
         toast.error(errors.join(', '));
@@ -254,11 +234,7 @@ export function AssetResults() {
 
   const successfulAssets = resultsData.results.filter(r => r.success);
   const failedAssets = resultsData.results.filter(r => !r.success);
-  const mainAsset = resultsData.results.find(r => r.type === 'main' && r.success);
-  const storyAssets = resultsData.results.filter(r => r.type === 'story' && r.success);
   
-  const selectedMain = mainAsset && selectedAssets.has(resultsData.results.indexOf(mainAsset));
-  const selectedStoryCount = storyAssets.filter(s => selectedAssets.has(resultsData.results.indexOf(s))).length;
 
   return (
     <div className="p-8 admin-page">
@@ -357,7 +333,7 @@ export function AssetResults() {
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <Instagram className="h-5 w-5" />
-                  Post to Instagram
+                  Post to Instagram Stories
                   {isDevelopment && (
                     <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
                       DEV MODE
@@ -369,51 +345,24 @@ export function AssetResults() {
                 </span>
               </div>
 
-              <div className="flex gap-6">
-                {mainAsset && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox 
-                      checked={postToFeed}
-                      onCheckedChange={(checked) => setPostToFeed(checked === true)}
-                      disabled={!selectedMain}
-                    />
-                    <span className={`text-sm ${!selectedMain ? 'text-gray-400' : ''}`}>
-                      Post main image to feed
-                    </span>
-                  </label>
-                )}
-                {storyAssets.length > 0 && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox 
-                      checked={postStories}
-                      onCheckedChange={(checked) => setPostStories(checked === true)}
-                      disabled={selectedStoryCount === 0}
-                    />
-                    <span className={`text-sm ${selectedStoryCount === 0 ? 'text-gray-400' : ''}`}>
-                      Post {selectedStoryCount} story{selectedStoryCount !== 1 ? ' images' : ''} to stories
-                    </span>
-                  </label>
-                )}
-              </div>
+              <p className="text-sm text-gray-600">
+                Posts will appear in order: main sale image first, then product picks.
+              </p>
 
-              {postToFeed && selectedMain && (
-                <div>
-                  <label className="block">
-                    <span className="text-sm font-medium text-gray-700">Caption for Feed Post</span>
-                    <textarea
-                      value={caption}
-                      onChange={(e) => setCaption(e.target.value)}
-                      placeholder="Enter your caption with hashtags..."
-                      className="mt-1 w-full text-sm p-3 border border-gray-200 rounded-lg resize-none"
-                      rows={4}
-                    />
-                  </label>
-                </div>
-              )}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox 
+                  checked={postToStories}
+                  onCheckedChange={(checked) => setPostToStories(checked === true)}
+                  disabled={selectedAssets.size === 0}
+                />
+                <span className={`text-sm ${selectedAssets.size === 0 ? 'text-gray-400' : ''}`}>
+                  Post {selectedAssets.size} image{selectedAssets.size !== 1 ? 's' : ''} to Stories
+                </span>
+              </label>
 
               <Button
                 onClick={initiatePostToInstagram}
-                disabled={posting || selectedAssets.size === 0 || (!postToFeed && !postStories)}
+                disabled={posting || selectedAssets.size === 0 || !postToStories}
                 className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
               >
                 {posting ? (
@@ -424,7 +373,7 @@ export function AssetResults() {
                 ) : (
                   <>
                     <Instagram className="mr-2 h-4 w-4" />
-                    Post to Instagram
+                    Post to Stories
                   </>
                 )}
               </Button>
