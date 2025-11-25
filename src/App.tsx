@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { HomePage } from './pages/HomePage';
 import { BrandsPage } from './pages/BrandsPage';
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -15,9 +16,20 @@ import { SalesApprovals } from './pages/SalesApprovals';
 import { ManualSaleEntry } from './pages/ManualSaleEntry';
 import { Toaster } from './components/ui/sonner';
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/brands" element={<BrandsPage />} />
