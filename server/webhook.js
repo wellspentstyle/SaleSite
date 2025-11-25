@@ -2842,7 +2842,7 @@ Return this JSON structure for VALID PROMOTIONAL SALES:
 {
   "company": "Brand Name (as it appears in email)",
   "percentOff": 30,
-  "saleUrl": "https://example.com/sale",
+  "saleUrl": "https://actual-url-from-email.com/sale",
   "discountCode": "CODE123",
   "startDate": "2025-11-22",
   "endDate": "2025-11-25",
@@ -2859,7 +2859,7 @@ Confidence scoring:
 Rules:
 - company: Extract exact brand name from email
 - percentOff: Extract percentage as number (estimate if range like "up to 30%", use midpoint)
-- saleUrl: Main shopping/sale link (prefer link labeled "Shop Sale" over homepage)
+- saleUrl: ONLY use a URL that ACTUALLY appears in the email content. If no sale URL is found in the email, return null. NEVER make up or guess a URL. Do not use example.com or placeholder URLs.
 - discountCode: Only if explicitly mentioned (use null if auto-applied at checkout)
 - startDate: Use today's date (2025-11-22) in YYYY-MM-DD format
 - endDate: Extract if mentioned, otherwise null
@@ -2947,11 +2947,76 @@ ${emailContent.substring(0, 4000)}`
       });
     }
     
-    // Validate required fields
-    if (!saleData.company || !saleData.saleUrl || !saleData.percentOff) {
+    // Check for placeholder/example URLs
+    const isPlaceholderUrl = (url) => {
+      if (!url) return true;
+      const placeholderPatterns = [
+        /example\.com/i,
+        /placeholder/i,
+        /test\.com/i,
+        /sample\.com/i,
+        /fake/i,
+        /^https?:\/\/(www\.)?[a-z]+\.com\/sale$/i // Generic patterns like "brand.com/sale"
+      ];
+      return placeholderPatterns.some(p => p.test(url));
+    };
+    
+    // Flag for missing/placeholder URL
+    let missingUrl = false;
+    let urlSource = 'email';
+    
+    // Detect and handle missing/placeholder URLs
+    if (!saleData.saleUrl || isPlaceholderUrl(saleData.saleUrl)) {
+      console.log('⚠️ Missing or placeholder URL detected, searching for brand homepage...');
+      missingUrl = true;
+      
+      // Try to find brand homepage from Company table
+      if (saleData.company) {
+        try {
+          const normalizedBrandName = saleData.company
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9\s]/g, '')
+            .trim();
+          
+          const companiesResponse = await fetch(
+            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}?fields[]=Name&fields[]=Website`,
+            {
+              headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+            }
+          );
+          
+          if (companiesResponse.ok) {
+            const companiesData = await companiesResponse.json();
+            
+            // Find matching company
+            const match = companiesData.records.find(record => {
+              const companyName = (record.fields.Name || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9\s]/g, '')
+                .trim();
+              return companyName === normalizedBrandName;
+            });
+            
+            if (match && match.fields.Website) {
+              console.log(`✅ Found brand homepage: ${match.fields.Website}`);
+              saleData.saleUrl = match.fields.Website;
+              urlSource = 'brand_homepage';
+            }
+          }
+        } catch (error) {
+          console.error('Error looking up brand homepage:', error.message);
+        }
+      }
+    }
+    
+    // Validate required fields (company and percentOff required, URL can be null with flag)
+    if (!saleData.company || !saleData.percentOff) {
       console.log('❌ Missing required fields:', {
         hasCompany: !!saleData.company,
-        hasSaleUrl: !!saleData.saleUrl,
         hasPercentOff: !!saleData.percentOff
       });
       
@@ -2959,7 +3024,7 @@ ${emailContent.substring(0, 4000)}`
       await addRejectedEmail({
         brand: saleData.company || 'Unknown',
         subject: subject,
-        reason: 'Missing required fields (company, URL, or discount)',
+        reason: 'Missing required fields (company or discount)',
         from: from
       });
       
@@ -2969,6 +3034,10 @@ ${emailContent.substring(0, 4000)}`
         extractedData: saleData
       });
     }
+    
+    // Add missing URL flag to sale data for approval UI
+    saleData.missingUrl = missingUrl;
+    saleData.urlSource = urlSource;
     
     // IMPROVED: Lower confidence threshold and log borderline cases
     const confidenceThreshold = 60; // Lowered from 70
@@ -3108,7 +3177,9 @@ ${emailContent.substring(0, 4000)}`
         reasoning: saleData.reasoning,
         companyRecordId: companyRecordId,
         emailFrom: from,
-        emailSubject: subject
+        emailSubject: subject,
+        missingUrl: saleData.missingUrl,
+        urlSource: saleData.urlSource
       });
       
       return res.status(200).json({

@@ -28,6 +28,8 @@ interface PendingSale {
   emailFrom: string;
   emailSubject: string;
   receivedAt: string;
+  missingUrl?: boolean;
+  urlSource?: string;
 }
 
 interface DuplicateSale {
@@ -326,6 +328,12 @@ export function SalesApprovals() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
+                          {sale.missingUrl && (
+                            <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              URL {sale.urlSource === 'brand_homepage' ? 'from homepage' : 'missing'}
+                            </span>
+                          )}
                           <span className={`px-2 py-1 rounded text-xs ${
                             sale.confidence >= 85
                               ? 'bg-green-100 text-green-800'
@@ -350,16 +358,28 @@ export function SalesApprovals() {
                         </div>
                         <div>
                           <span className="text-muted-foreground">Sale URL:</span>
-                          <a 
-                            href={sale.cleanUrl || sale.saleUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline flex items-center gap-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            Visit Sale Page
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
+                          {(sale.cleanUrl || sale.saleUrl) ? (
+                            <div className="flex items-center gap-2">
+                              <a 
+                                href={sale.cleanUrl || sale.saleUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {sale.missingUrl && sale.urlSource === 'brand_homepage' ? 'Visit Brand Homepage' : 'Visit Sale Page'}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                              {sale.missingUrl && sale.urlSource === 'brand_homepage' && (
+                                <span className="text-xs text-orange-600">(auto-filled)</span>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-red-600 font-medium flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              No URL found - please add manually
+                            </p>
+                          )}
                         </div>
                         {sale.discountCode && (
                           <div>
