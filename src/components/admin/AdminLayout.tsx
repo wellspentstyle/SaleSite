@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -17,6 +17,42 @@ export function AdminLayout() {
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [totalBadgeCount, setTotalBadgeCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const fetchCounts = async () => {
+      try {
+        const auth = sessionStorage.getItem('adminAuth') || '';
+        
+        const [salesRes, draftsRes, brandsRes] = await Promise.all([
+          fetch(`${API_BASE}/pending-sales`, { headers: { 'auth': auth } }),
+          fetch(`${API_BASE}/admin/finalize-drafts`, { headers: { 'auth': auth } }),
+          fetch(`${API_BASE}/admin/pending-brands`, { headers: { 'auth': auth } })
+        ]);
+        
+        const salesData = await salesRes.json();
+        const draftsData = await draftsRes.json();
+        const brandsData = await brandsRes.json();
+        
+        let total = 0;
+        if (salesData.success && salesData.sales) total += salesData.sales.length;
+        if (draftsData.success && draftsData.drafts) total += draftsData.drafts.length;
+        if (brandsData.success && brandsData.brands) {
+          total += brandsData.brands.filter((b: any) => b.hasActiveSales).length;
+        }
+        
+        setTotalBadgeCount(total);
+      } catch (error) {
+        console.error('Error fetching badge counts:', error);
+      }
+    };
+    
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,12 +199,17 @@ export function AdminLayout() {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Mobile hamburger menu */}
+              {/* Mobile hamburger menu with badge */}
               <button 
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="md:hidden p-2 hover:bg-gray-100 rounded-md"
+                className="md:hidden p-2 hover:bg-gray-100 rounded-md relative"
               >
                 <Menu className="h-5 w-5" />
+                {totalBadgeCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
+                    {totalBadgeCount > 9 ? '9+' : totalBadgeCount}
+                  </span>
+                )}
               </button>
               <img 
                 src="/logo.png" 

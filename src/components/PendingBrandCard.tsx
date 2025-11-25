@@ -132,12 +132,12 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
   };
 
   return (
-    <div className="border border-gray-300 bg-white rounded-lg p-6 space-y-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-      <div className="flex items-start justify-between">
+    <div className="border border-gray-300 bg-white rounded-lg p-4 md:p-6 space-y-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-xl font-bold" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.name}</h3>
-            <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg md:text-xl font-bold" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.name}</h3>
+            <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full whitespace-nowrap" style={{ fontFamily: 'DM Sans, sans-serif' }}>
               Auto-researched
             </span>
           </div>
@@ -145,7 +145,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
             Quality Score: {brand.qualityScore}%
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {!isEditing ? (
             <>
               <Button
@@ -153,6 +153,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
                 variant="outline"
                 onClick={() => setIsEditing(true)}
                 disabled={isProcessing}
+                className="flex-1 md:flex-none"
               >
                 <Edit2 className="h-4 w-4 mr-1" />
                 Edit
@@ -161,7 +162,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
                 size="sm"
                 onClick={handleApprove}
                 disabled={isProcessing}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 flex-1 md:flex-none"
               >
                 {isProcessing ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -175,6 +176,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
                 variant="destructive"
                 onClick={handleReject}
                 disabled={isProcessing}
+                className="flex-1 md:flex-none"
               >
                 <X className="h-4 w-4 mr-1" />
                 Reject
@@ -185,6 +187,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
               size="sm"
               onClick={handleSaveEdit}
               disabled={isProcessing}
+              className="flex-1 md:flex-none"
             >
               {isProcessing ? (
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
