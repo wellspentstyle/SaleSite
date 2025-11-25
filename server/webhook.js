@@ -3440,6 +3440,113 @@ app.post('/pending-sales/manual', async (req, res) => {
   }
 });
 
+// Add a sale directly to Airtable (bypasses pending queue)
+app.post('/sales/add-direct', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { company, percentOff, saleUrl, discountCode, startDate, endDate } = req.body;
+    
+    if (!company || !percentOff) {
+      return res.status(400).json({ success: false, error: 'Company and percentOff are required' });
+    }
+    
+    console.log(`💾 Adding sale directly to Airtable: ${company} - ${percentOff}% off`);
+    
+    // Look up company record ID
+    let companyRecordId = null;
+    try {
+      const normalizedName = company.toLowerCase().trim();
+      const companiesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}?filterByFormula=${encodeURIComponent(`LOWER({Name}) = "${normalizedName}"`)}`;
+      
+      const companyResponse = await fetch(companiesUrl, {
+        headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+      });
+      
+      if (companyResponse.ok) {
+        const companyData = await companyResponse.json();
+        if (companyData.records && companyData.records.length > 0) {
+          companyRecordId = companyData.records[0].id;
+          console.log(`✅ Found company record: ${companyRecordId}`);
+        }
+      }
+    } catch (error) {
+      console.error('⚠️  Company lookup failed:', error.message);
+    }
+    
+    // Create Airtable record
+    const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const saleStartDate = startDate || today;
+    const isLive = saleStartDate <= today ? 'YES' : 'NO';
+    
+    const fields = {
+      OriginalCompanyName: company,
+      PercentOff: Number(percentOff),
+      StartDate: saleStartDate,
+      Confidence: 100,
+      Live: isLive,
+      Description: JSON.stringify({
+        source: 'manual',
+        addedAt: new Date().toISOString()
+      })
+    };
+    
+    if (saleUrl) {
+      fields.SaleURL = saleUrl;
+      fields.CleanURL = saleUrl;
+    }
+    
+    if (companyRecordId) {
+      fields.Company = [companyRecordId];
+    }
+    
+    if (discountCode) {
+      fields.PromoCode = discountCode;
+    }
+    
+    if (endDate) {
+      fields.EndDate = endDate;
+    }
+    
+    const airtableResponse = await fetch(airtableUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ fields })
+    });
+    
+    if (!airtableResponse.ok) {
+      const errorText = await airtableResponse.text();
+      console.error('❌ Airtable error:', errorText);
+      throw new Error(`Failed to create Airtable record: ${errorText}`);
+    }
+    
+    const airtableData = await airtableResponse.json();
+    console.log('✅ Created Airtable record:', airtableData.id);
+    
+    // Clear sales cache
+    clearSalesCache();
+    
+    res.json({ 
+      success: true, 
+      message: 'Sale added to site',
+      recordId: airtableData.id
+    });
+    
+  } catch (error) {
+    console.error('Error adding sale directly:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Check for duplicate sales in Airtable
 app.post('/check-duplicates/:id', async (req, res) => {
   const { auth } = req.headers;

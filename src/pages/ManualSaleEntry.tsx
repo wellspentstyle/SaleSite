@@ -20,7 +20,8 @@ interface SaleFormData {
 
 export function ManualSaleEntry() {
   const navigate = useNavigate();
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingToSite, setIsSavingToSite] = useState(false);
+  const [isSavingToPending, setIsSavingToPending] = useState(false);
   const [formData, setFormData] = useState<SaleFormData>({
     company: '',
     percentOff: '',
@@ -30,18 +31,61 @@ export function ManualSaleEntry() {
     endDate: ''
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const validateForm = () => {
     if (!formData.company || !formData.percentOff) {
       toast.error('Brand name and discount percentage are required');
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleAddToSite = async () => {
+    if (!validateForm()) return;
+    
+    const auth = sessionStorage.getItem('adminAuth') || '';
+    
+    try {
+      setIsSavingToSite(true);
+      
+      const response = await fetch(`${API_BASE}/sales/add-direct`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'auth': auth
+        },
+        body: JSON.stringify({
+          company: formData.company,
+          percentOff: Number(formData.percentOff),
+          saleUrl: formData.saleUrl || null,
+          discountCode: formData.discountCode || null,
+          startDate: formData.startDate,
+          endDate: formData.endDate || null
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Sale added to site');
+        navigate('/admin/sales-approvals');
+      } else {
+        toast.error(data.error || 'Failed to add sale');
+      }
+    } catch (error) {
+      console.error('Error adding sale:', error);
+      toast.error('Failed to add sale');
+    } finally {
+      setIsSavingToSite(false);
+    }
+  };
+
+  const handleAddToPending = async () => {
+    if (!validateForm()) return;
 
     const auth = sessionStorage.getItem('adminAuth') || '';
     
     try {
-      setIsSaving(true);
+      setIsSavingToPending(true);
       
       const response = await fetch(`${API_BASE}/pending-sales/manual`, {
         method: 'POST',
@@ -71,7 +115,7 @@ export function ManualSaleEntry() {
       console.error('Error adding sale:', error);
       toast.error('Failed to add sale');
     } finally {
-      setIsSaving(false);
+      setIsSavingToPending(false);
     }
   };
 
@@ -179,14 +223,33 @@ export function ManualSaleEntry() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving ? (
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  disabled={isSavingToSite || isSavingToPending}
+                  onClick={handleAddToPending}
+                >
+                  {isSavingToPending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       Adding...
                     </>
                   ) : (
                     'Add to Pending Sales'
+                  )}
+                </Button>
+                <Button 
+                  type="button" 
+                  disabled={isSavingToSite || isSavingToPending}
+                  onClick={handleAddToSite}
+                >
+                  {isSavingToSite ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Adding...
+                    </>
+                  ) : (
+                    'Add to Site'
                   )}
                 </Button>
               </div>

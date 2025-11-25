@@ -570,54 +570,6 @@ export function AddBrands() {
           </div>
         )}
 
-        {/* Recently Rejected Brands Section */}
-        {rejectedBrands.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-600" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-              Recently Rejected ({rejectedBrands.length})
-            </h2>
-            <div className="bg-gray-50 rounded-lg border max-h-[300px] overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-gray-100 border-b">
-                  <tr>
-                    <th className="text-left p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Brand</th>
-                    <th className="text-left p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Type</th>
-                    <th className="text-left p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Rejected</th>
-                    <th className="text-right p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rejectedBrands.map((brand) => (
-                    <tr key={brand.id} className="border-b last:border-0 hover:bg-gray-100">
-                      <td className="p-3" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.name}</td>
-                      <td className="p-3 text-gray-500" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.type || '-'}</td>
-                      <td className="p-3 text-gray-500" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                        {new Date(brand.rejectedAt).toLocaleDateString()}
-                      </td>
-                      <td className="p-3 text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleRestoreBrand(brand.id)}
-                          disabled={isRestoringBrand === brand.id}
-                          style={{ fontFamily: 'DM Sans, sans-serif' }}
-                        >
-                          {isRestoringBrand === brand.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <RotateCcw className="h-3 w-3 mr-1" />
-                          )}
-                          Restore
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {/* Input Form */}
         <form onSubmit={handleSubmit}>
             <div className="space-y-2" style={{ marginBottom: '32px' }}>
@@ -920,6 +872,54 @@ export function AddBrands() {
                 </tbody>
               </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Recently Rejected Brands Section */}
+        {rejectedBrands.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold text-gray-600" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Recently Rejected ({rejectedBrands.length})
+            </h2>
+            <div className="bg-gray-50 rounded-lg border max-h-[300px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-gray-100 border-b">
+                  <tr>
+                    <th className="text-left p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Brand</th>
+                    <th className="text-left p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Type</th>
+                    <th className="text-left p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Rejected</th>
+                    <th className="text-right p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rejectedBrands.map((brand) => (
+                    <tr key={brand.id} className="border-b last:border-0 hover:bg-gray-100">
+                      <td className="p-3" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.name}</td>
+                      <td className="p-3 text-gray-500" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.type || '-'}</td>
+                      <td className="p-3 text-gray-500" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                        {new Date(brand.rejectedAt).toLocaleDateString()}
+                      </td>
+                      <td className="p-3 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRestoreBrand(brand.id)}
+                          disabled={isRestoringBrand === brand.id}
+                          style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        >
+                          {isRestoringBrand === brand.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                          )}
+                          Restore
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
