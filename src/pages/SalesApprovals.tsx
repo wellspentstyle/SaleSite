@@ -347,14 +347,14 @@ export function SalesApprovals() {
                       </div>
 
                       {/* Sale Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm" style={{ fontFamily: 'system-ui, sans-serif' }}>
-                        <div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm overflow-hidden" style={{ fontFamily: 'system-ui, sans-serif' }}>
+                        <div className="min-w-0">
                           <span className="text-muted-foreground">Email From:</span>
-                          <p className="font-medium">{sale.emailFrom}</p>
+                          <p className="font-medium truncate" title={sale.emailFrom}>{sale.emailFrom}</p>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <span className="text-muted-foreground">Subject:</span>
-                          <p className="font-medium">{sale.emailSubject}</p>
+                          <p className="font-medium truncate" title={sale.emailSubject}>{sale.emailSubject}</p>
                         </div>
                         <div>
                           <span className="text-muted-foreground">Sale URL:</span>
