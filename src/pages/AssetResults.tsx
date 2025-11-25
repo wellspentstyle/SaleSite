@@ -55,23 +55,7 @@ export function AssetResults() {
     const loadAssets = async () => {
       const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
       
-      // First check sessionStorage for freshly generated assets
-      const stored = sessionStorage.getItem('assetResults');
-      if (stored) {
-        const data = JSON.parse(stored) as ResultsData;
-        setResultsData(data);
-        
-        const successfulIndices = new Set<number>();
-        data.results.forEach((r, i) => {
-          if (r.success) successfulIndices.add(i);
-        });
-        setSelectedAssets(successfulIndices);
-        setCaption(`${data.saleName} - check out these deals!\n\n#designersale #fashion #sale`);
-        setLoading(false);
-        return;
-      }
-      
-      // Otherwise load from database (most recent assets)
+      // Always load from database - assets are persisted there
       try {
         const response = await fetch(`${API_BASE}/admin/generated-assets`, {
           headers: { 'auth': auth }
@@ -250,7 +234,6 @@ export function AssetResults() {
         method: 'DELETE',
         headers: { 'auth': auth }
       });
-      sessionStorage.removeItem('assetResults');
       toast.success('Assets cleared');
       navigate('/admin/assets');
     } catch (error) {

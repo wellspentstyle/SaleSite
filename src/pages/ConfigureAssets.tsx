@@ -187,12 +187,8 @@ export function ConfigureAssets() {
                 completedSteps: [...completedSteps]
               }));
             } else if (data.type === 'complete') {
-              sessionStorage.setItem('assetResults', JSON.stringify({
-                saleName: data.saleName,
-                saleId: data.saleId,
-                results: data.results,
-                generatedAt: new Date().toISOString()
-              }));
+              // Assets are already saved to database by the backend
+              // Just navigate to results page which will fetch from DB
               setGenerating(false);
               setProgress(null);
               navigate('/admin/assets/results');
