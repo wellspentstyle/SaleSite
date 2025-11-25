@@ -8,7 +8,7 @@ import { scrapeProduct } from './scrapers/index.js';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initializeTelegramBot, sendAlertToTelegram } from './telegram-bot.js';
+import { initializeTelegramBot, sendAlertToTelegram, sendSaleApprovalAlert } from './telegram-bot.js';
 import { scrapeGemItems } from './gem-scraper.js';
 import { generateMultipleFeaturedAssets } from './featured-assets-generator.js';
 import { 
@@ -3200,15 +3200,17 @@ ${emailContent.substring(0, 4000)}`
         urlSource: saleData.urlSource
       });
       
-      // Send Telegram alert for new pending sale
+      // Send Telegram alert with approve/reject buttons
       if (TELEGRAM_CHAT_ID) {
-        const alertMessage = `🛍️ *New Sale to Approve*\n\n` +
-          `*${saleData.company}* - ${saleData.percentOff}% off\n` +
-          `Confidence: ${saleData.confidence}%\n` +
-          (saleData.discountCode ? `Code: \`${saleData.discountCode}\`\n` : '') +
-          `\n_From: ${from}_`;
-        
-        sendAlertToTelegram(TELEGRAM_CHAT_ID, alertMessage).catch(err => {
+        sendSaleApprovalAlert(TELEGRAM_CHAT_ID, {
+          id: pendingSale.id,
+          company: saleData.company,
+          percentOff: saleData.percentOff,
+          confidence: saleData.confidence,
+          discountCode: saleData.discountCode,
+          saleUrl: cleanUrl || saleData.saleUrl,
+          emailFrom: from
+        }).catch(err => {
           console.error('Failed to send Telegram alert:', err.message);
         });
       }
@@ -4157,7 +4159,93 @@ app.listen(PORT, '0.0.0.0', () => {
   
   if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
     console.log('📱 Initializing Telegram bot...');
-    initializeTelegramBot(TELEGRAM_BOT_TOKEN);
+    
+    // Handler for Telegram button callbacks (approve/reject sales)
+    const handleTelegramApproval = async (action, saleId) => {
+      try {
+        console.log(`📱 Telegram ${action} request for sale: ${saleId}`);
+        
+        if (action === 'approve') {
+          // Get the pending sale
+          const pendingSales = await getPendingSales();
+          const sale = pendingSales.find(s => s.id === saleId);
+          
+          if (!sale) {
+            return { success: false, error: 'Sale not found or already processed' };
+          }
+          
+          // Add to Airtable
+          const today = new Date().toISOString().split('T')[0];
+          const isLive = sale.startDate <= today ? 'YES' : 'NO';
+          
+          const fields = {
+            OriginalCompanyName: sale.company,
+            PercentOff: sale.percentOff,
+            StartDate: sale.startDate,
+            Confidence: sale.confidence || 100,
+            Live: isLive,
+            Description: JSON.stringify({
+              source: 'email',
+              approvedVia: 'telegram',
+              approvedAt: new Date().toISOString()
+            })
+          };
+          
+          if (sale.saleUrl) {
+            fields.SaleURL = sale.saleUrl;
+            fields.CleanURL = sale.cleanUrl || sale.saleUrl;
+          }
+          if (sale.companyRecordId) {
+            fields.Company = [sale.companyRecordId];
+          }
+          if (sale.discountCode) {
+            fields.PromoCode = sale.discountCode;
+          }
+          if (sale.endDate) {
+            fields.EndDate = sale.endDate;
+          }
+          
+          const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
+          const response = await fetch(airtableUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${AIRTABLE_PAT}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ fields })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            return { success: false, error: errorText };
+          }
+          
+          // Remove from pending
+          await removePendingSale(saleId);
+          clearSalesCache();
+          
+          console.log(`✅ Sale approved via Telegram: ${sale.company}`);
+          return { success: true };
+          
+        } else if (action === 'reject') {
+          // Just remove from pending
+          const sale = await removePendingSale(saleId);
+          if (!sale) {
+            return { success: false, error: 'Sale not found or already processed' };
+          }
+          
+          console.log(`❌ Sale rejected via Telegram: ${sale.company}`);
+          return { success: true };
+        }
+        
+        return { success: false, error: 'Unknown action' };
+      } catch (error) {
+        console.error('Telegram approval error:', error);
+        return { success: false, error: error.message };
+      }
+    };
+    
+    initializeTelegramBot(TELEGRAM_BOT_TOKEN, handleTelegramApproval);
     console.log('📸 Story generation via webhook: /webhook/airtable-story');
     console.log('   (Polling disabled - use Airtable Automation to trigger)');
     // Polling watcher disabled - now using webhook-based triggering from Airtable
