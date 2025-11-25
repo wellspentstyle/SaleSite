@@ -802,6 +802,7 @@ export async function generateMainSaleStory(saleId, customNote = '') {
   const percentOff = sale.PercentOff || 0;
   const endDate = sale.EndDate ? new Date(sale.EndDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : null;
   const discountCode = sale.DiscountCode || sale.PromoCode || null;
+  const saleLink = sale.SaleURL || sale.ShopMyURL || '';
   
   const headerColor = getRandomColor();
   const companyUpper = company.toUpperCase();
@@ -813,13 +814,20 @@ export async function generateMainSaleStory(saleId, customNote = '') {
   const companyFontSize = calculateFontSize(companyUpper, baseFontSize, maxWidth, 0.7);
   
   let headerInfoText = '';
+  let headerInfoLines = 0;
   if (endDate && discountCode) {
     headerInfoText = `UNTIL ${endDate}\nPROMO CODE: ${discountCode}`;
+    headerInfoLines = 2;
   } else if (endDate) {
     headerInfoText = `UNTIL ${endDate}`;
+    headerInfoLines = 1;
   } else if (discountCode) {
     headerInfoText = `PROMO CODE: ${discountCode}`;
+    headerInfoLines = 1;
   }
+  
+  // Calculate link position based on header info lines
+  const linkYPosition = headerInfoLines === 2 ? 1260 : (headerInfoLines === 1 ? 1180 : 1020);
   
   // Create the full-height story with colored background
   const svg = `
@@ -871,6 +879,17 @@ export async function generateMainSaleStory(saleId, customNote = '') {
         ${escapeHtml(headerInfoText.split('\n')[1])}
       </text>
       ` : ''}
+      ` : ''}
+      
+      ${saleLink ? `
+      <text 
+        x="80" 
+        y="${linkYPosition}" 
+        font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif" 
+        font-size="64" 
+        fill="white">
+        🔗🔗🔗
+      </text>
       ` : ''}
     </svg>
   `;
