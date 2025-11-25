@@ -107,8 +107,9 @@ export function AssetResults() {
 
   const getThumbnailUrl = (driveUrl: string) => {
     const fileId = driveUrl.match(/\/d\/([^\/]+)/)?.[1];
-    // Use Google Drive's thumbnail API for better CORS compatibility
-    return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w500` : driveUrl;
+    // Use Google Drive's export URL which works better across environments
+    // Fall back to lh3.googleusercontent.com format which is CORS-friendly
+    return fileId ? `https://lh3.googleusercontent.com/d/${fileId}=w500` : driveUrl;
   };
 
   const getDirectDownloadUrl = (driveUrl: string) => {

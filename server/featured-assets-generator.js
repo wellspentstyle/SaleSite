@@ -221,7 +221,7 @@ export async function generateFeaturedSaleAsset(saleId) {
         const productImage = await sharp(imageBuffer)
           .resize(productImageSize, productAreaHeight, {
             fit: 'cover',
-            position: 'center'
+            position: 'top'
           })
           .toBuffer();
         
@@ -658,7 +658,7 @@ export async function generateAssetWithPicks(saleId, pickIds) {
       const productImage = await sharp(imageBuffer)
         .resize(productImageSize, productAreaHeight, {
           fit: 'cover',
-          position: 'center'
+          position: 'top'
         })
         .toBuffer();
       
@@ -1036,12 +1036,57 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
   
   const imageBuffer = await fetchImageAsBuffer(imageUrl, pick.ProductURL);
   
-  const backgroundImage = await sharp(Buffer.from(imageBuffer))
-    .resize(STORY_WIDTH, STORY_HEIGHT, {
-      fit: 'cover',
-      position: 'center'
+  // Get original image metadata to determine best positioning
+  const originalMeta = await sharp(Buffer.from(imageBuffer)).metadata();
+  const originalAspect = (originalMeta.width || 1) / (originalMeta.height || 1);
+  const storyAspect = STORY_WIDTH / STORY_HEIGHT;
+  
+  let backgroundImage;
+  
+  if (originalAspect < storyAspect * 0.7) {
+    // Very tall/narrow image - use contain to show full image
+    // First create white background, then composite the resized image on top
+    const resizedImage = await sharp(Buffer.from(imageBuffer))
+      .resize(STORY_WIDTH, STORY_HEIGHT, {
+        fit: 'contain',
+        background: { r: 255, g: 255, b: 255, alpha: 1 }
+      })
+      .toBuffer();
+    backgroundImage = resizedImage;
+  } else if (originalAspect > storyAspect * 1.5) {
+    // Very wide image - fit width, position at top
+    const resizedImage = await sharp(Buffer.from(imageBuffer))
+      .resize(STORY_WIDTH, null, { fit: 'inside' })
+      .toBuffer();
+    
+    const resizedMeta = await sharp(resizedImage).metadata();
+    const resizedHeight = resizedMeta.height || STORY_HEIGHT;
+    
+    // Create white background and composite image at top
+    backgroundImage = await sharp({
+      create: {
+        width: STORY_WIDTH,
+        height: STORY_HEIGHT,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 1 }
+      }
     })
+    .composite([{
+      input: resizedImage,
+      top: 0,
+      left: 0
+    }])
+    .jpeg({ quality: 95 })
     .toBuffer();
+  } else {
+    // Normal aspect ratio - use cover but position at top to avoid cutting off product
+    backgroundImage = await sharp(Buffer.from(imageBuffer))
+      .resize(STORY_WIDTH, STORY_HEIGHT, {
+        fit: 'cover',
+        position: 'top'
+      })
+      .toBuffer();
+  }
   
   const productName = pick.ProductName || 'Product';
   const brand = pick.Brand || '';
