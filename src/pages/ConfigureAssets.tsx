@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Checkbox } from '../components/ui/checkbox';
@@ -30,11 +30,15 @@ interface PickConfig {
   customCopy: string;
 }
 
-interface GenerationProgress {
-  current: number;
+interface JobStatus {
+  id: number;
+  saleId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
   total: number;
-  message: string;
-  completedSteps: { type: string; success: boolean }[];
+  currentStep: string;
+  results?: any;
+  error?: string;
 }
 
 export function ConfigureAssets() {
@@ -44,14 +48,100 @@ export function ConfigureAssets() {
   const [sale, setSale] = useState<Sale | null>(null);
   const [picks, setPicks] = useState<Pick[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [progress, setProgress] = useState<GenerationProgress | null>(null);
+  const [activeJob, setActiveJob] = useState<JobStatus | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   
   const [generateMainAsset, setGenerateMainAsset] = useState(true);
   const [mainAssetNote, setMainAssetNote] = useState('');
   
   const [selectedStoryPicks, setSelectedStoryPicks] = useState<Set<string>>(new Set());
   const [pickConfigs, setPickConfigs] = useState<Record<string, PickConfig>>({});
+
+  const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+
+  // Save config to server whenever it changes
+  const saveConfig = useCallback(async () => {
+    if (!saleId) return;
+    
+    const config = {
+      generateMainAsset,
+      mainAssetNote,
+      selectedStoryPicks: Array.from(selectedStoryPicks),
+      pickConfigs
+    };
+    
+    try {
+      await fetch(`${API_BASE}/admin/asset-config/${saleId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'auth': auth },
+        body: JSON.stringify(config)
+      });
+    } catch (e) {
+      console.error('Failed to save config:', e);
+    }
+  }, [saleId, generateMainAsset, mainAssetNote, selectedStoryPicks, pickConfigs, auth]);
+
+  // Debounced save
+  useEffect(() => {
+    if (!loading && saleId) {
+      const timer = setTimeout(saveConfig, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [generateMainAsset, mainAssetNote, selectedStoryPicks, pickConfigs, loading, saleId, saveConfig]);
+
+  // Poll for job status
+  const pollJobStatus = useCallback(async (jobId: number) => {
+    try {
+      const response = await fetch(`${API_BASE}/admin/asset-jobs/${jobId}`, {
+        headers: { 'auth': auth }
+      });
+      const data = await response.json();
+      
+      if (data.success && data.job) {
+        setActiveJob(data.job);
+        
+        if (data.job.status === 'completed') {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          toast.success('Assets generated successfully!');
+          navigate('/admin/assets/results');
+        } else if (data.job.status === 'failed') {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          toast.error(data.job.error || 'Asset generation failed');
+          setActiveJob(null);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to poll job:', e);
+    }
+  }, [auth, navigate]);
+
+  // Check for active job on mount
+  useEffect(() => {
+    if (saleId) {
+      const checkActiveJob = async () => {
+        try {
+          const response = await fetch(`${API_BASE}/admin/asset-jobs/active/${saleId}`, {
+            headers: { 'auth': auth }
+          });
+          const data = await response.json();
+          
+          if (data.success && data.hasActiveJob) {
+            setActiveJob(data.job);
+            // Start polling
+            pollingRef.current = setInterval(() => pollJobStatus(data.job.id), 1000);
+          }
+        } catch (e) {
+          console.error('Failed to check active job:', e);
+        }
+      };
+      
+      checkActiveJob();
+    }
+    
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [saleId, auth, pollJobStatus]);
 
   useEffect(() => {
     if (saleId) {
@@ -61,16 +151,17 @@ export function ConfigureAssets() {
 
   const fetchSaleAndPicks = async (id: string) => {
     setLoading(true);
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
-      const [salesResponse, picksResponse] = await Promise.all([
+      const [salesResponse, picksResponse, configResponse] = await Promise.all([
         fetch(`${API_BASE}/admin/sales`, { headers: { 'auth': auth } }),
-        fetch(`${API_BASE}/admin/sale/${id}/picks`, { headers: { 'auth': auth } })
+        fetch(`${API_BASE}/admin/sale/${id}/picks`, { headers: { 'auth': auth } }),
+        fetch(`${API_BASE}/admin/asset-config/${id}`, { headers: { 'auth': auth } })
       ]);
       
       const salesData = await salesResponse.json();
       const picksData = await picksResponse.json();
+      const configData = await configResponse.json();
       
       if (salesData.success) {
         const foundSale = salesData.sales.find((s: any) => s.id === id);
@@ -87,10 +178,28 @@ export function ConfigureAssets() {
       if (picksData.success) {
         setPicks(picksData.picks || []);
         
+        // Initialize pick configs
         const configs: Record<string, PickConfig> = {};
         (picksData.picks || []).forEach((pick: Pick) => {
           configs[pick.id] = { pickId: pick.id, customCopy: '' };
         });
+        
+        // Restore saved config if exists
+        if (configData.success && configData.hasConfig) {
+          const saved = configData.config;
+          if (saved.generateMainAsset !== undefined) setGenerateMainAsset(saved.generateMainAsset);
+          if (saved.mainAssetNote) setMainAssetNote(saved.mainAssetNote);
+          if (saved.selectedStoryPicks) setSelectedStoryPicks(new Set(saved.selectedStoryPicks));
+          if (saved.pickConfigs) {
+            // Merge saved configs with defaults
+            Object.keys(saved.pickConfigs).forEach(pickId => {
+              if (configs[pickId]) {
+                configs[pickId] = saved.pickConfigs[pickId];
+              }
+            });
+          }
+        }
+        
         setPickConfigs(configs);
       }
     } catch (error) {
@@ -129,10 +238,6 @@ export function ConfigureAssets() {
       return;
     }
 
-    setGenerating(true);
-    setProgress({ current: 0, total: (hasMainAsset ? 1 : 0) + selectedStoryPicks.size, message: 'Starting...', completedSteps: [] });
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
-
     try {
       const requestBody = {
         saleId: sale.id,
@@ -145,7 +250,7 @@ export function ConfigureAssets() {
         }))
       };
 
-      const response = await fetch(`${API_BASE}/admin/generate-custom-assets-stream`, {
+      const response = await fetch(`${API_BASE}/admin/asset-jobs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -154,61 +259,27 @@ export function ConfigureAssets() {
         body: JSON.stringify(requestBody)
       });
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      const completedSteps: { type: string; success: boolean }[] = [];
+      const data = await response.json();
 
-      if (!reader) {
-        throw new Error('Stream not available');
-      }
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const text = decoder.decode(value, { stream: true });
-        const lines = text.split('\n').filter(line => line.startsWith('data: '));
-
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            
-            if (data.type === 'start' || data.type === 'progress') {
-              setProgress(prev => ({
-                ...prev!,
-                current: data.current,
-                total: data.total,
-                message: data.message
-              }));
-            } else if (data.type === 'step_complete') {
-              completedSteps.push({ type: data.stepType, success: data.success });
-              setProgress(prev => ({
-                ...prev!,
-                completedSteps: [...completedSteps]
-              }));
-            } else if (data.type === 'complete') {
-              // Assets are already saved to database by the backend
-              // Just navigate to results page which will fetch from DB
-              setGenerating(false);
-              setProgress(null);
-              navigate('/admin/assets/results');
-              return;
-            } else if (data.type === 'error') {
-              toast.error(data.message || 'Failed to generate assets');
-              setGenerating(false);
-              setProgress(null);
-              return;
-            }
-          } catch (e) {
-            console.error('Error parsing SSE data:', e);
-          }
-        }
+      if (data.success) {
+        toast.success('Asset generation started!');
+        setActiveJob({
+          id: data.jobId,
+          saleId: sale.id,
+          status: 'pending',
+          progress: 0,
+          total: (hasMainAsset ? 1 : 0) + selectedStoryPicks.size,
+          currentStep: 'Starting...'
+        });
+        
+        // Start polling
+        pollingRef.current = setInterval(() => pollJobStatus(data.jobId), 1000);
+      } else {
+        toast.error(data.message || 'Failed to start generation');
       }
     } catch (error) {
       console.error('Generation error:', error);
-      toast.error('Failed to generate assets');
-      setGenerating(false);
-      setProgress(null);
+      toast.error('Failed to start asset generation');
     }
   };
 
@@ -235,6 +306,8 @@ export function ConfigureAssets() {
       </div>
     );
   }
+
+  const isGenerating = activeJob && (activeJob.status === 'pending' || activeJob.status === 'processing');
 
   return (
     <div className="p-8 admin-page">
@@ -268,6 +341,7 @@ export function ConfigureAssets() {
               <Checkbox 
                 checked={generateMainAsset}
                 onCheckedChange={(checked) => setGenerateMainAsset(checked === true)}
+                disabled={isGenerating}
               />
               <span className="text-sm">Generate</span>
             </label>
@@ -285,6 +359,7 @@ export function ConfigureAssets() {
                   placeholder="Add a note (e.g. 'Free shipping over $100')"
                   className="w-full p-3 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-black focus:border-transparent"
                   rows={2}
+                  disabled={isGenerating}
                 />
                 <p className="text-xs text-gray-500">
                   Appears in a black bar at the bottom-left of the image
@@ -317,8 +392,8 @@ export function ConfigureAssets() {
                     }`}
                   >
                     <div
-                      onClick={() => toggleStoryPick(pick.id)}
-                      className="cursor-pointer relative"
+                      onClick={() => !isGenerating && toggleStoryPick(pick.id)}
+                      className={`cursor-pointer relative ${isGenerating ? 'opacity-50' : ''}`}
                     >
                       <div className="aspect-[9/16] bg-gray-100 relative">
                         <img
@@ -351,6 +426,7 @@ export function ConfigureAssets() {
                             placeholder="e.g. 'My favorite find!' or 'Perfect for summer'"
                             className="mt-1 w-full text-sm p-2 border border-gray-200 rounded resize-none"
                             rows={2}
+                            disabled={isGenerating}
                           />
                           <span className="text-xs text-gray-400">
                             Appears in top-right corner
@@ -366,34 +442,19 @@ export function ConfigureAssets() {
         )}
 
         <div className="bg-gray-50 border border-gray-200 p-6 rounded-lg sticky bottom-4 space-y-4">
-          {generating && progress ? (
+          {isGenerating && activeJob ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{progress.message}</span>
-                <span className="text-sm text-gray-500">{progress.current}/{progress.total}</span>
+                <span className="text-sm font-medium flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {activeJob.currentStep}
+                </span>
+                <span className="text-sm text-gray-500">{activeJob.progress}/{activeJob.total}</span>
               </div>
-              <Progress value={(progress.current / progress.total) * 100} className="h-2" />
-              {progress.completedSteps.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {progress.completedSteps.map((step, idx) => (
-                    <div 
-                      key={idx}
-                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
-                        step.success 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {step.success ? (
-                        <CheckCircle2 className="h-3 w-3" />
-                      ) : (
-                        <XCircle className="h-3 w-3" />
-                      )}
-                      <span>{step.type === 'main' ? 'Main Story' : 'Pick Story'}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <Progress value={(activeJob.progress / activeJob.total) * 100} className="h-2" />
+              <p className="text-xs text-gray-500">
+                Generation continues in the background - you can navigate away and come back
+              </p>
             </div>
           ) : (
             <div className="flex items-center justify-between">
@@ -407,13 +468,12 @@ export function ConfigureAssets() {
                 <Button
                   variant="outline"
                   onClick={() => navigate('/admin/assets')}
-                  disabled={generating}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleGenerate}
-                  disabled={generating || (!generateMainAsset && selectedStoryPicks.size === 0)}
+                  disabled={!generateMainAsset && selectedStoryPicks.size === 0}
                 >
                   Generate Assets
                 </Button>

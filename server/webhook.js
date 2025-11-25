@@ -2210,8 +2210,313 @@ app.get('/admin/sale/:saleId/picks', async (req, res) => {
   }
 });
 
+// ============== Background Job System for Asset Generation ==============
+
+// In-memory tracking of running jobs (for the current process)
+const runningJobs = new Map();
+
+// Process a job in the background
+async function processAssetJob(jobId) {
+  try {
+    // Get job from database
+    const jobResult = await pool.query('SELECT * FROM asset_jobs WHERE id = $1', [jobId]);
+    if (jobResult.rows.length === 0) return;
+    
+    const job = jobResult.rows[0];
+    // Parse config from JSON if it's a string (PostgreSQL JSONB should auto-parse, but be safe)
+    const config = typeof job.config === 'string' ? JSON.parse(job.config) : job.config;
+    const { saleId, mainAsset, storyPicks } = config;
+    
+    // Update status to processing
+    await pool.query(
+      'UPDATE asset_jobs SET status = $1, updated_at = NOW() WHERE id = $2',
+      ['processing', jobId]
+    );
+    
+    console.log(`\n📸 [Job ${jobId}] Processing asset generation for sale ${saleId}...`);
+    const results = [];
+    
+    const totalSteps = (mainAsset ? 1 : 0) + (storyPicks?.length || 0);
+    let currentStep = 0;
+    
+    // Generate main asset if requested
+    if (mainAsset) {
+      currentStep++;
+      await pool.query(
+        'UPDATE asset_jobs SET progress = $1, total = $2, current_step = $3, updated_at = NOW() WHERE id = $4',
+        [currentStep, totalSteps, 'Generating main sale story...', jobId]
+      );
+      
+      try {
+        const customNote = mainAsset.customNote || '';
+        const result = await generateMainSaleStory(saleId, customNote);
+        results.push({ type: 'main', success: true, ...result });
+      } catch (error) {
+        console.error(`[Job ${jobId}] Main asset generation error:`, error);
+        results.push({ type: 'main', success: false, error: error.message });
+      }
+    }
+    
+    // Generate individual story images
+    if (storyPicks && storyPicks.length > 0) {
+      for (let i = 0; i < storyPicks.length; i++) {
+        const pickConfig = storyPicks[i];
+        currentStep++;
+        await pool.query(
+          'UPDATE asset_jobs SET progress = $1, total = $2, current_step = $3, updated_at = NOW() WHERE id = $4',
+          [currentStep, totalSteps, `Generating story ${i + 1} of ${storyPicks.length}...`, jobId]
+        );
+        
+        try {
+          const result = await generatePickStoryWithCopy(pickConfig.pickId, pickConfig.customCopy || '');
+          results.push({ type: 'story', pickId: pickConfig.pickId, success: true, ...result });
+        } catch (error) {
+          console.error(`[Job ${jobId}] Story generation error for pick ${pickConfig.pickId}:`, error);
+          results.push({ type: 'story', pickId: pickConfig.pickId, success: false, error: error.message });
+        }
+      }
+    }
+    
+    // Get sale name for display
+    let saleName = 'Unknown Sale';
+    try {
+      const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
+      const saleRes = await fetch(saleUrl, {
+        headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+      });
+      if (saleRes.ok) {
+        const saleData = await saleRes.json();
+        saleName = saleData.fields.OriginalCompanyName || saleData.fields.CompanyName || 'Unknown Sale';
+      }
+    } catch (e) { 
+      console.log(`[Job ${jobId}] Could not fetch sale name:`, e.message);
+    }
+    
+    // Save results to generated_assets table
+    try {
+      await pool.query('DELETE FROM generated_assets WHERE sale_id = $1', [saleId]);
+      
+      for (const result of results) {
+        await pool.query(
+          `INSERT INTO generated_assets (sale_id, sale_name, asset_type, pick_id, filename, drive_file_id, drive_url, success, error)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            saleId,
+            saleName,
+            result.type === 'story' ? 'story' : 'main',
+            result.pickId || null,
+            result.filename || null,
+            result.driveFileId || null,
+            result.driveUrl || null,
+            result.success,
+            result.error || null
+          ]
+        );
+      }
+      console.log(`[Job ${jobId}] 💾 Saved ${results.length} assets to database`);
+    } catch (dbError) {
+      console.error(`[Job ${jobId}] Failed to save assets to database:`, dbError.message);
+    }
+    
+    // Mark job as completed
+    const successCount = results.filter(r => r.success).length;
+    await pool.query(
+      'UPDATE asset_jobs SET status = $1, progress = $2, total = $3, current_step = $4, results = $5, updated_at = NOW() WHERE id = $6',
+      ['completed', totalSteps, totalSteps, `Generated ${successCount}/${results.length} assets`, JSON.stringify({ saleName, saleId, results }), jobId]
+    );
+    
+    console.log(`[Job ${jobId}] ✅ Completed: ${successCount}/${results.length} assets generated`);
+    runningJobs.delete(jobId);
+    
+  } catch (error) {
+    console.error(`[Job ${jobId}] Fatal error:`, error);
+    await pool.query(
+      'UPDATE asset_jobs SET status = $1, error = $2, updated_at = NOW() WHERE id = $3',
+      ['failed', error.message, jobId]
+    );
+    runningJobs.delete(jobId);
+  }
+}
+
+// Start a new asset generation job
+app.post('/admin/asset-jobs', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { saleId, mainAsset, storyPicks } = req.body;
+    
+    if (!saleId) {
+      return res.status(400).json({ success: false, message: 'Sale ID required' });
+    }
+    
+    const totalSteps = (mainAsset ? 1 : 0) + (storyPicks?.length || 0);
+    
+    // Create job in database
+    const result = await pool.query(
+      `INSERT INTO asset_jobs (sale_id, status, config, progress, total, current_step)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [saleId, 'pending', JSON.stringify({ saleId, mainAsset, storyPicks }), 0, totalSteps, 'Queued...']
+    );
+    
+    const jobId = result.rows[0].id;
+    console.log(`📋 Created asset job ${jobId} for sale ${saleId}`);
+    
+    // Start processing in the background (don't await)
+    runningJobs.set(jobId, true);
+    processAssetJob(jobId).catch(err => {
+      console.error(`Job ${jobId} failed:`, err);
+    });
+    
+    res.json({ success: true, jobId, message: 'Job started' });
+    
+  } catch (error) {
+    console.error('Error creating asset job:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get active job for a sale (MUST come before /:jobId to avoid route conflict)
+app.get('/admin/asset-jobs/active/:saleId', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { saleId } = req.params;
+    
+    // Find active or recent job for this sale
+    const result = await pool.query(
+      `SELECT * FROM asset_jobs 
+       WHERE sale_id = $1 AND status IN ('pending', 'processing')
+       ORDER BY created_at DESC LIMIT 1`,
+      [saleId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.json({ success: true, hasActiveJob: false });
+    }
+    
+    const job = result.rows[0];
+    res.json({
+      success: true,
+      hasActiveJob: true,
+      job: {
+        id: job.id,
+        saleId: job.sale_id,
+        status: job.status,
+        progress: job.progress,
+        total: job.total,
+        currentStep: job.current_step,
+        createdAt: job.created_at
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching active job:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get job status by ID
+app.get('/admin/asset-jobs/:jobId', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { jobId } = req.params;
+    const result = await pool.query('SELECT * FROM asset_jobs WHERE id = $1', [jobId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+    
+    const job = result.rows[0];
+    res.json({
+      success: true,
+      job: {
+        id: job.id,
+        saleId: job.sale_id,
+        status: job.status,
+        progress: job.progress,
+        total: job.total,
+        currentStep: job.current_step,
+        results: job.results,
+        error: job.error,
+        createdAt: job.created_at,
+        updatedAt: job.updated_at
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching job:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Save asset configuration for a sale
+app.post('/admin/asset-config/:saleId', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { saleId } = req.params;
+    const config = req.body;
+    
+    await pool.query(
+      `INSERT INTO asset_configs (sale_id, config, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (sale_id) DO UPDATE SET config = $2, updated_at = NOW()`,
+      [saleId, JSON.stringify(config)]
+    );
+    
+    res.json({ success: true, message: 'Config saved' });
+    
+  } catch (error) {
+    console.error('Error saving config:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get asset configuration for a sale
+app.get('/admin/asset-config/:saleId', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { saleId } = req.params;
+    const result = await pool.query('SELECT * FROM asset_configs WHERE sale_id = $1', [saleId]);
+    
+    if (result.rows.length === 0) {
+      return res.json({ success: true, hasConfig: false });
+    }
+    
+    res.json({ success: true, hasConfig: true, config: result.rows[0].config });
+    
+  } catch (error) {
+    console.error('Error fetching config:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============== End Background Job System ==============
+
 // Generate custom assets with configuration
-// SSE endpoint for asset generation with progress updates
+// SSE endpoint for asset generation with progress updates (legacy - kept for compatibility)
 app.post('/admin/generate-custom-assets-stream', async (req, res) => {
   const { auth } = req.headers;
   
