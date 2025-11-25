@@ -461,9 +461,8 @@ app.post('/admin/pending-brands/:id/approve', async (req, res) => {
       Category: categoryArray,
       Values: valuesArray,
       MaxWomensSize: brand.maxWomensSize,
-      SizingSource: brand.sizingSource,
       Description: brand.description,
-      URL: brand.url,
+      Website: brand.url,
       Priority: 'High'
     };
     
