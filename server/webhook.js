@@ -383,14 +383,19 @@ app.put('/admin/pending-brands/:id', async (req, res) => {
 
 // Approve a pending brand - update Airtable and remove from pending
 app.post('/admin/pending-brands/:id/approve', async (req, res) => {
+  console.log('🔄 Approve brand request received for ID:', req.params.id);
+  
   const { auth } = req.headers;
   if (auth !== ADMIN_PASSWORD) {
+    console.log('❌ Unauthorized - invalid auth header');
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   
   try {
     const brands = await getPendingBrands();
+    console.log(`📋 Found ${brands.length} pending brands`);
     const brand = brands.find(b => b.id === req.params.id);
+    console.log('🔍 Looking for brand:', brand ? brand.name : 'NOT FOUND');
     
     if (!brand) {
       return res.status(404).json({ success: false, error: 'Brand not found' });
@@ -434,6 +439,9 @@ app.post('/admin/pending-brands/:id/approve', async (req, res) => {
         delete updateData[key];
       }
     });
+    
+    console.log('📝 Update data for Airtable:', JSON.stringify(updateData, null, 2));
+    console.log('🔗 Airtable record ID:', brand.airtableRecordId);
     
     const updateResponse = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}/${brand.airtableRecordId}`, {
       method: 'PATCH',
