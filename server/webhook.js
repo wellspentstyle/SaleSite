@@ -3638,6 +3638,10 @@ async function checkForIncompleteBrands() {
       
       if (!name || pendingNames.has(name.toLowerCase())) continue;
       
+      // Skip brands that are already approved (Priority = 'High')
+      const isAlreadyApproved = fields.Priority === 'High';
+      if (isAlreadyApproved) continue;
+      
       const isIncomplete = !fields.PriceRange || !fields.Category || !fields.Description;
       
       if (isIncomplete) {
