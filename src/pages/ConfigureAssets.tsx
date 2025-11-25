@@ -395,7 +395,7 @@ export function ConfigureAssets() {
                   disabled={isGenerating}
                 />
                 <p className="text-xs text-gray-500">
-                  Appears in a black bar at the bottom-left of the image
+                  Appears in a black bar near the top of the image
                 </p>
               </div>
             </div>
