@@ -2319,17 +2319,13 @@ app.post('/admin/generate-custom-assets', async (req, res) => {
   }
 });
 
-// Get generated assets for a sale (or most recent)
-app.get('/admin/generated-assets/:saleId?', async (req, res) => {
-  const { auth } = req.headers;
-  
+// Helper function for fetching generated assets
+async function fetchGeneratedAssets(saleId, res, auth, ADMIN_PASSWORD, pool) {
   if (auth !== ADMIN_PASSWORD) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   
   try {
-    const { saleId } = req.params;
-    
     let result;
     if (saleId) {
       result = await pool.query(
@@ -2376,6 +2372,19 @@ app.get('/admin/generated-assets/:saleId?', async (req, res) => {
     console.error('Error fetching generated assets:', error);
     res.status(500).json({ success: false, error: error.message });
   }
+}
+
+// Get generated assets for a specific sale
+app.get('/admin/generated-assets/:saleId', async (req, res) => {
+  const { auth } = req.headers;
+  const { saleId } = req.params;
+  return fetchGeneratedAssets(saleId, res, auth, ADMIN_PASSWORD, pool);
+});
+
+// Get most recent generated assets
+app.get('/admin/generated-assets', async (req, res) => {
+  const { auth } = req.headers;
+  return fetchGeneratedAssets(null, res, auth, ADMIN_PASSWORD, pool);
 });
 
 // Clear generated assets for a sale

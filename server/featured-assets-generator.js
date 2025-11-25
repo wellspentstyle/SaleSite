@@ -960,15 +960,15 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
     const copyPadding = 16;
     const copyLineHeight = copyFontSize + 8;
     
-    // Calculate box dimensions
+    // Calculate box dimensions - ensure integer values for Sharp
     let maxLineWidth = 0;
     for (const line of copyLines) {
-      const lineWidth = line.length * copyFontSize * 0.55;
+      const lineWidth = Math.ceil(line.length * copyFontSize * 0.55);
       if (lineWidth > maxLineWidth) maxLineWidth = lineWidth;
     }
     
-    const copyBoxWidth = Math.min(maxLineWidth + (copyPadding * 4), STORY_WIDTH - 80);
-    const copyBoxHeight = (copyLines.length * copyLineHeight) + (copyPadding * 2);
+    const copyBoxWidth = Math.round(Math.min(maxLineWidth + (copyPadding * 4), STORY_WIDTH - 80));
+    const copyBoxHeight = Math.round((copyLines.length * copyLineHeight) + (copyPadding * 2));
     
     let copyTextElements = '';
     copyLines.forEach((line, index) => {
@@ -992,8 +992,8 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
       </svg>
     `;
     
-    // Position in top-right with same margin as bottom-left
-    const copyX = STORY_WIDTH - copyBoxWidth - 40;
+    // Position in top-right with same margin as bottom-left - ensure integers for Sharp
+    const copyX = Math.round(STORY_WIDTH - copyBoxWidth - 40);
     const copyY = 80;
     
     compositeArray.push({
