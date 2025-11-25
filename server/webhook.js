@@ -2262,15 +2262,137 @@ app.post('/admin/generate-custom-assets', async (req, res) => {
     const successCount = results.filter(r => r.success).length;
     const totalCount = results.length;
     
+    // Get sale name for display
+    let saleName = 'Unknown Sale';
+    try {
+      const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
+      const saleRes = await fetch(saleUrl, {
+        headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+      });
+      if (saleRes.ok) {
+        const saleData = await saleRes.json();
+        saleName = saleData.fields.OriginalCompanyName || saleData.fields.CompanyName || 'Unknown Sale';
+      }
+    } catch (e) { 
+      console.log('Could not fetch sale name:', e.message);
+    }
+    
+    // Save results to database for persistence
+    try {
+      // Clear previous assets for this sale
+      await pool.query('DELETE FROM generated_assets WHERE sale_id = $1', [saleId]);
+      
+      // Insert new results
+      for (const result of results) {
+        await pool.query(
+          `INSERT INTO generated_assets (sale_id, sale_name, asset_type, pick_id, filename, drive_file_id, drive_url, success, error)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            saleId,
+            saleName,
+            result.type === 'story' ? 'story' : 'main',
+            result.pickId || null,
+            result.filename || null,
+            result.driveFileId || null,
+            result.driveUrl || null,
+            result.success,
+            result.error || null
+          ]
+        );
+      }
+      console.log(`💾 Saved ${results.length} assets to database for sale ${saleId}`);
+    } catch (dbError) {
+      console.error('Failed to save assets to database:', dbError.message);
+    }
+    
     res.json({
       success: true,
       message: `Generated ${successCount}/${totalCount} assets`,
+      saleName,
+      saleId,
       results
     });
     
   } catch (error) {
     console.error('Custom assets generation error:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get generated assets for a sale (or most recent)
+app.get('/admin/generated-assets/:saleId?', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { saleId } = req.params;
+    
+    let result;
+    if (saleId) {
+      result = await pool.query(
+        `SELECT * FROM generated_assets WHERE sale_id = $1 ORDER BY created_at DESC`,
+        [saleId]
+      );
+    } else {
+      // Get most recent sale's assets
+      result = await pool.query(
+        `SELECT * FROM generated_assets 
+         WHERE sale_id = (SELECT sale_id FROM generated_assets ORDER BY created_at DESC LIMIT 1)
+         ORDER BY created_at DESC`
+      );
+    }
+    
+    if (result.rows.length === 0) {
+      return res.json({ success: true, hasAssets: false, results: [] });
+    }
+    
+    const saleName = result.rows[0].sale_name;
+    const saleIdResult = result.rows[0].sale_id;
+    
+    const assets = result.rows.map(row => ({
+      type: row.asset_type,
+      pickId: row.pick_id,
+      filename: row.filename,
+      driveFileId: row.drive_file_id,
+      driveUrl: row.drive_url,
+      success: row.success,
+      error: row.error,
+      createdAt: row.created_at
+    }));
+    
+    res.json({
+      success: true,
+      hasAssets: true,
+      saleName,
+      saleId: saleIdResult,
+      generatedAt: result.rows[0].created_at,
+      results: assets
+    });
+    
+  } catch (error) {
+    console.error('Error fetching generated assets:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Clear generated assets for a sale
+app.delete('/admin/generated-assets/:saleId', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { saleId } = req.params;
+    await pool.query('DELETE FROM generated_assets WHERE sale_id = $1', [saleId]);
+    res.json({ success: true, message: 'Assets cleared' });
+  } catch (error) {
+    console.error('Error clearing assets:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

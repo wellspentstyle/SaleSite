@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
-import { Loader2, ArrowLeft, Download, Instagram, ExternalLink, Check, X, AlertTriangle } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, Instagram, ExternalLink, Check, X, AlertTriangle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE = '/api';
@@ -43,6 +43,7 @@ const isDevelopment = window.location.hostname.includes('replit.dev') ||
 export function AssetResults() {
   const navigate = useNavigate();
   const [resultsData, setResultsData] = useState<ResultsData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<Set<number>>(new Set());
   const [caption, setCaption] = useState('');
@@ -51,21 +52,66 @@ export function AssetResults() {
   const [showDevWarning, setShowDevWarning] = useState(false);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('assetResults');
-    if (stored) {
-      const data = JSON.parse(stored) as ResultsData;
-      setResultsData(data);
+    const loadAssets = async () => {
+      const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
       
-      const successfulIndices = new Set<number>();
-      data.results.forEach((r, i) => {
-        if (r.success) successfulIndices.add(i);
-      });
-      setSelectedAssets(successfulIndices);
+      // First check sessionStorage for freshly generated assets
+      const stored = sessionStorage.getItem('assetResults');
+      if (stored) {
+        const data = JSON.parse(stored) as ResultsData;
+        setResultsData(data);
+        
+        const successfulIndices = new Set<number>();
+        data.results.forEach((r, i) => {
+          if (r.success) successfulIndices.add(i);
+        });
+        setSelectedAssets(successfulIndices);
+        setCaption(`${data.saleName} - check out these deals!\n\n#designersale #fashion #sale`);
+        setLoading(false);
+        return;
+      }
       
-      setCaption(`${data.saleName} - check out these deals!\n\n#designersale #fashion #sale`);
-    } else {
-      navigate('/admin/assets');
-    }
+      // Otherwise load from database (most recent assets)
+      try {
+        const response = await fetch(`${API_BASE}/admin/generated-assets`, {
+          headers: { 'auth': auth }
+        });
+        const data = await response.json();
+        
+        if (data.success && data.hasAssets) {
+          const resultsWithType = data.results.map((r: AssetResult) => ({
+            ...r,
+            type: r.type === 'main' ? 'main' : 'story'
+          }));
+          
+          const formattedData: ResultsData = {
+            saleName: data.saleName,
+            saleId: data.saleId,
+            results: resultsWithType,
+            generatedAt: data.generatedAt
+          };
+          
+          setResultsData(formattedData);
+          
+          const successfulIndices = new Set<number>();
+          formattedData.results.forEach((r, i) => {
+            if (r.success) successfulIndices.add(i);
+          });
+          setSelectedAssets(successfulIndices);
+          setCaption(`${data.saleName} - check out these deals!\n\n#designersale #fashion #sale`);
+        } else {
+          // No assets found, redirect
+          navigate('/admin/assets');
+        }
+      } catch (error) {
+        console.error('Failed to load assets:', error);
+        navigate('/admin/assets');
+      }
+      
+      setLoading(false);
+    };
+    
+    loadAssets();
   }, [navigate]);
 
   const toggleAsset = (index: number) => {
@@ -76,6 +122,12 @@ export function AssetResults() {
       newSet.add(index);
     }
     setSelectedAssets(newSet);
+  };
+
+  const getThumbnailUrl = (driveUrl: string) => {
+    const fileId = driveUrl.match(/\/d\/([^\/]+)/)?.[1];
+    // Use Google Drive's thumbnail API for better CORS compatibility
+    return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w500` : driveUrl;
   };
 
   const getDirectDownloadUrl = (driveUrl: string) => {
@@ -189,12 +241,29 @@ export function AssetResults() {
     }
   };
 
-  if (!resultsData) {
+  const handleClearAssets = async () => {
+    if (!resultsData) return;
+    
+    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    try {
+      await fetch(`${API_BASE}/admin/generated-assets/${resultsData.saleId}`, {
+        method: 'DELETE',
+        headers: { 'auth': auth }
+      });
+      sessionStorage.removeItem('assetResults');
+      toast.success('Assets cleared');
+      navigate('/admin/assets');
+    } catch (error) {
+      toast.error('Failed to clear assets');
+    }
+  };
+
+  if (loading || !resultsData) {
     return (
       <div className="p-8 admin-page">
         <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin" />
-          <span className="ml-2">Loading...</span>
+          <span className="ml-2">Loading assets...</span>
         </div>
       </div>
     );
@@ -262,7 +331,7 @@ export function AssetResults() {
                       <div className={`bg-gray-100 ${asset.type === 'main' ? 'aspect-[4/5]' : 'aspect-[9/16]'}`}>
                         {asset.driveUrl && (
                           <img
-                            src={getDirectDownloadUrl(asset.driveUrl)}
+                            src={getThumbnailUrl(asset.driveUrl)}
                             alt={asset.filename || 'Generated asset'}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -410,6 +479,10 @@ export function AssetResults() {
           </Button>
           <Button variant="outline" onClick={() => navigate(`/admin/assets/configure/${resultsData.saleId}`)}>
             Generate More
+          </Button>
+          <Button variant="outline" onClick={handleClearAssets} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+            <Trash2 className="h-4 w-4 mr-1" />
+            Clear Assets
           </Button>
         </div>
       </div>
