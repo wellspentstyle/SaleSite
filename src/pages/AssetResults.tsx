@@ -243,6 +243,13 @@ export function AssetResults() {
   const successfulAssets = resultsData.results.filter(r => r.success);
   const failedAssets = resultsData.results.filter(r => !r.success);
   
+  // Sort results: main first, then stories
+  const sortedResults = [...resultsData.results].sort((a, b) => {
+    if (a.type === 'main' && b.type !== 'main') return -1;
+    if (a.type !== 'main' && b.type === 'main') return 1;
+    return 0;
+  });
+  
 
   return (
     <div className="p-4 md:p-8 admin-page">
@@ -281,14 +288,16 @@ export function AssetResults() {
               <h2 className="text-lg font-semibold">Select assets to post or download</h2>
               
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {resultsData.results.map((asset, index) => {
+                {sortedResults.map((asset) => {
                   if (!asset.success) return null;
-                  const isSelected = selectedAssets.has(index);
+                  // Find original index for selection tracking
+                  const originalIndex = resultsData.results.indexOf(asset);
+                  const isSelected = selectedAssets.has(originalIndex);
                   
                   return (
                     <div
-                      key={index}
-                      onClick={() => toggleAsset(index)}
+                      key={originalIndex}
+                      onClick={() => toggleAsset(originalIndex)}
                       className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
                         isSelected
                           ? 'border-black ring-2 ring-black ring-offset-1'
