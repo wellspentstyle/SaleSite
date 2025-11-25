@@ -120,8 +120,8 @@ export function ManualSaleEntry() {
   };
 
   return (
-    <div className="p-8 admin-page">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 admin-page">
+      <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -134,8 +134,8 @@ export function ManualSaleEntry() {
         </div>
 
         <div>
-          <h1 className="text-3xl font-bold">Add Sale Manually</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl md:text-3xl font-bold">Add Sale Manually</h1>
+          <p className="text-gray-600 mt-1 text-sm md:text-base">
             Add a sale that wasn't captured from email
           </p>
         </div>

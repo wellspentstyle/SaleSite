@@ -655,15 +655,14 @@ export function FinalizePicks() {
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 34px' }}>
+    <div className="admin-page px-4 md:px-8 py-6 md:py-12 max-w-6xl mx-auto">
       {/* Page Title */}
-      <div style={{ marginBottom: '40px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+      <div className="mb-6 md:mb-10">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-2">
             <h1 
+              className="text-2xl md:text-3xl font-bold"
               style={{ 
                 fontFamily: 'DM Sans, sans-serif', 
-                fontSize: '34px',
-                fontWeight: 700,
                 color: '#000'
               }}
             >
@@ -671,22 +670,11 @@ export function FinalizePicks() {
             </h1>
             <button
               onClick={() => setShowCalculator(true)}
+              className="w-full md:w-auto px-4 py-2 text-sm bg-white border border-gray-200 rounded hover:border-black transition-colors flex items-center justify-center gap-2"
               style={{
                 fontFamily: 'DM Sans, sans-serif',
-                fontSize: '14px',
-                fontWeight: 400,
-                padding: '8px 16px',
-                backgroundColor: '#fff',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'border-color 0.2s'
+                fontWeight: 400
               }}
-              onMouseEnter={(e) => e.currentTarget.style.borderColor = '#000'}
-              onMouseLeave={(e) => e.currentTarget.style.borderColor = '#ddd'}
             >
               <Calculator style={{ width: '16px', height: '16px' }} />
               Price Calculator

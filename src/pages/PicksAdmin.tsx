@@ -398,32 +398,32 @@ export function PicksAdmin() {
   });
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 admin-page">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {currentView === 'sales-list' ? (
           <>
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <h1 className="text-3xl font-bold">Add Picks to Sales</h1>
-                <p className="text-gray-600 mt-1">Select a sale to add curated product picks</p>
+                <h1 className="text-2xl md:text-3xl font-bold">Add Picks to Sales</h1>
+                <p className="text-gray-600 mt-1 text-sm md:text-base">Select a sale to add curated product picks</p>
               </div>
               <Button
                 variant="outline"
                 onClick={() => setCurrentView('drafts')}
+                className="w-full md:w-auto"
                 style={{ fontFamily: 'DM Sans, sans-serif' }}
               >
                 View Drafts {drafts.length > 0 && `(${drafts.length})`}
               </Button>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setFilterType('active-no-picks')}
+                className="text-xs md:text-sm px-2 py-1.5 md:px-4 md:py-2"
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
-                  fontSize: '14px',
-                  padding: '8px 16px',
                   backgroundColor: filterType === 'active-no-picks' ? '#000' : '#fff',
                   color: filterType === 'active-no-picks' ? '#fff' : '#000',
                   border: '1px solid',
@@ -449,10 +449,9 @@ export function PicksAdmin() {
               
               <button
                 onClick={() => setFilterType('active-with-picks')}
+                className="text-xs md:text-sm px-2 py-1.5 md:px-4 md:py-2"
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
-                  fontSize: '14px',
-                  padding: '8px 16px',
                   backgroundColor: filterType === 'active-with-picks' ? '#000' : '#fff',
                   color: filterType === 'active-with-picks' ? '#fff' : '#000',
                   border: '1px solid',
@@ -478,10 +477,9 @@ export function PicksAdmin() {
               
               <button
                 onClick={() => setFilterType('inactive')}
+                className="text-xs md:text-sm px-2 py-1.5 md:px-4 md:py-2"
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
-                  fontSize: '14px',
-                  padding: '8px 16px',
                   backgroundColor: filterType === 'inactive' ? '#000' : '#fff',
                   color: filterType === 'inactive' ? '#fff' : '#000',
                   border: '1px solid',
@@ -507,10 +505,9 @@ export function PicksAdmin() {
               
               <button
                 onClick={() => setCurrentView('drafts')}
+                className="text-xs md:text-sm px-2 py-1.5 md:px-4 md:py-2"
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
-                  fontSize: '14px',
-                  padding: '8px 16px',
                   backgroundColor: '#fff',
                   color: '#000',
                   border: '1px solid #ddd',

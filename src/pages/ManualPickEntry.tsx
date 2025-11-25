@@ -315,8 +315,8 @@ export function ManualPickEntry() {
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div className="mb-6">
+    <div className="admin-page p-4 md:p-8 max-w-6xl mx-auto">
+      <div className="mb-4 md:mb-6">
         <Button
           variant="ghost"
           size="sm"
@@ -328,14 +328,7 @@ export function ManualPickEntry() {
           Back to Sales List
         </Button>
 
-        <h2
-          style={{
-            fontFamily: 'DM Sans, sans-serif',
-            fontWeight: 700,
-            fontSize: '24px',
-            marginBottom: '4px'
-          }}
-        >
+        <h2 className="text-xl md:text-2xl font-bold mb-1">
           Manual Entry: {state.saleName}
         </h2>
         <p className="text-sm text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>

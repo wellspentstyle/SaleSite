@@ -488,21 +488,19 @@ export function AddBrands() {
   const failedCount = results.filter(r => r.status === 'failed').length;
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 admin-page">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Add Brands</h1>
-            <p className="text-gray-600 mt-1">Research fashion brands using AI to automatically categorize pricing, values, and size ranges</p>
-          </div>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Add Brands</h1>
+          <p className="text-gray-600 mt-1 text-sm md:text-base">Research fashion brands using AI to automatically categorize pricing, values, and size ranges</p>
         </div>
 
         {/* Pending Approvals Section */}
         {pendingBrands.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              <h2 className="text-lg md:text-xl font-bold" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                 Pending Approvals ({pendingBrands.length})
               </h2>
               <Button
@@ -520,11 +518,11 @@ export function AddBrands() {
             </div>
             
             <Tabs defaultValue="high-priority" className="w-full">
-              <TabsList style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                <TabsTrigger value="high-priority">
+              <TabsList className="w-full md:w-auto flex" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                <TabsTrigger value="high-priority" className="flex-1 md:flex-initial text-xs md:text-sm">
                   High Priority ({pendingBrands.filter(b => b.hasActiveSales).length})
                 </TabsTrigger>
-                <TabsTrigger value="other">
+                <TabsTrigger value="other" className="flex-1 md:flex-initial text-xs md:text-sm">
                   Other ({pendingBrands.filter(b => !b.hasActiveSales).length})
                 </TabsTrigger>
               </TabsList>

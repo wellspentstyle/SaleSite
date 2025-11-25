@@ -76,22 +76,22 @@ export function GenerateAssets() {
   ];
 
   return (
-    <div className="p-8 admin-page">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 admin-page">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Generate Assets</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl md:text-3xl font-bold">Generate Assets</h1>
+          <p className="text-gray-600 mt-1 text-sm md:text-base">
             Click on a sale to configure and generate social media assets
           </p>
         </div>
 
-        <div className="border-b border-border">
-          <nav className="flex gap-6">
+        <div className="border-b border-border overflow-x-auto">
+          <nav className="flex gap-4 md:gap-6 min-w-max">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`pb-3 text-sm font-medium transition-colors relative ${
+                className={`pb-3 text-xs md:text-sm font-medium transition-colors relative whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'text-black border-b-2 border-black'
                     : 'text-gray-500 hover:text-gray-700'
@@ -99,7 +99,7 @@ export function GenerateAssets() {
               >
                 {tab.label}
                 {tab.count > 0 && (
-                  <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                  <span className={`ml-1.5 md:ml-2 px-1.5 md:px-2 py-0.5 text-xs rounded-full ${
                     activeTab === tab.id ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'
                   }`}>
                     {tab.count}

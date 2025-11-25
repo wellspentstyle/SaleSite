@@ -224,7 +224,7 @@ export function AssetResults() {
 
   if (loading || !resultsData) {
     return (
-      <div className="p-8 admin-page">
+      <div className="p-4 md:p-8 admin-page">
         <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span className="ml-2">Loading assets...</span>
@@ -238,8 +238,8 @@ export function AssetResults() {
   
 
   return (
-    <div className="p-8 admin-page">
-      <div className="max-w-5xl mx-auto space-y-8">
+    <div className="p-4 md:p-8 admin-page">
+      <div className="max-w-5xl mx-auto space-y-4 md:space-y-8">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => navigate('/admin/assets')}>
             <ArrowLeft className="h-4 w-4 mr-1" />
@@ -248,8 +248,8 @@ export function AssetResults() {
         </div>
 
         <div>
-          <h1 className="text-3xl font-bold">Generated Assets</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl md:text-3xl font-bold">Generated Assets</h1>
+          <p className="text-gray-600 mt-1 text-sm md:text-base">
             {resultsData.saleName} - {successfulAssets.length} asset{successfulAssets.length !== 1 ? 's' : ''} generated
           </p>
         </div>

@@ -309,7 +309,7 @@ export function ConfigureAssets() {
 
   if (loading) {
     return (
-      <div className="p-8 admin-page">
+      <div className="p-4 md:p-8 admin-page">
         <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span className="ml-2">Loading sale...</span>
@@ -320,7 +320,7 @@ export function ConfigureAssets() {
 
   if (!sale) {
     return (
-      <div className="p-8 admin-page">
+      <div className="p-4 md:p-8 admin-page">
         <div className="max-w-4xl mx-auto text-center py-20">
           <p className="text-gray-600">Sale not found</p>
           <Button variant="outline" onClick={() => navigate('/admin/assets')} className="mt-4">
@@ -334,8 +334,8 @@ export function ConfigureAssets() {
   const isGenerating = activeJob && (activeJob.status === 'pending' || activeJob.status === 'processing');
 
   return (
-    <div className="p-8 admin-page">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="p-4 md:p-8 admin-page">
+      <div className="max-w-4xl mx-auto space-y-4 md:space-y-8">
         <div className="flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={() => navigate('/admin/assets')}>
             <ArrowLeft className="h-4 w-4 mr-1" />
@@ -353,8 +353,8 @@ export function ConfigureAssets() {
         </div>
 
         <div>
-          <h1 className="text-3xl font-bold">Configure Assets</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl md:text-3xl font-bold">Configure Assets</h1>
+          <p className="text-gray-600 mt-1 text-sm md:text-base">
             {sale.saleName} - {sale.percentOff}% Off
           </p>
         </div>

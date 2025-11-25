@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Menu } from 'lucide-react';
 import { AdminSidebar } from './AdminSidebar';
 
 const API_BASE = '/api';
@@ -16,6 +16,7 @@ export function AdminLayout() {
   });
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,54 +64,52 @@ export function AdminLayout() {
               <img 
                 src="/logo.png" 
                 alt="Well Spent Style" 
-                className="h-16 cursor-pointer"
+                className="h-12 md:h-16 cursor-pointer"
                 onClick={handleBackToSite}
               />
             </div>
           </div>
         </header>
 
-        <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
-          <div style={{ width: '100%', maxWidth: '448px' }}>
-            <div className="border border-border bg-white" style={{ padding: '48px' }}>
+        <main className="flex-1 flex items-center justify-center p-4 md:p-20">
+          <div className="w-full max-w-md">
+            <div className="border border-border bg-white p-6 md:p-12">
               <h1 
-                className="mb-2 tracking-tight" 
-                style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '31px' }}
+                className="mb-2 tracking-tight text-2xl md:text-3xl" 
+                style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700 }}
               >
                 Admin Access
               </h1>
               <p 
-                className="text-muted-foreground mb-10" 
+                className="text-muted-foreground mb-6 md:mb-10" 
                 style={{ fontFamily: 'Crimson Pro, serif' }}
               >
                 Enter your password to manage sales and content.
               </p>
 
               <form onSubmit={handleSignIn}>
-                <div className="space-y-2" style={{ marginBottom: '32px' }}>
+                <div className="space-y-2 mb-6 md:mb-8">
                   <Label 
                     htmlFor="password"
                     style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px' }}
                   >
                     Password
                   </Label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div className="flex items-center gap-3">
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
-                      className="h-12"
-                      style={{ flex: 1 }}
+                      className="h-12 flex-1"
                       required
                       disabled={loading}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      style={{ color: '#9ca3af', flexShrink: 0 }}
-                      className="hover:opacity-70"
+                      className="text-gray-400 hover:opacity-70 flex-shrink-0"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -118,12 +117,12 @@ export function AdminLayout() {
                 </div>
 
                 {authError && (
-                  <p className="text-sm text-red-600" style={{ fontFamily: 'DM Sans, sans-serif', marginTop: '16px' }}>
+                  <p className="text-sm text-red-600 mt-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                     {authError}
                   </p>
                 )}
 
-                <div style={{ marginTop: '24px' }}>
+                <div className="mt-6">
                   <Button 
                     type="submit" 
                     className="w-full h-12"
@@ -160,18 +159,28 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border">
+      <header className="border-b border-border sticky top-0 bg-white z-30">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <img 
-              src="/logo.png" 
-              alt="Well Spent Style" 
-              className="h-16 cursor-pointer"
-              onClick={handleBackToSite}
-            />
+            <div className="flex items-center gap-3">
+              {/* Mobile hamburger menu */}
+              <button 
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="md:hidden p-2 hover:bg-gray-100 rounded-md"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <img 
+                src="/logo.png" 
+                alt="Well Spent Style" 
+                className="h-12 md:h-16 cursor-pointer"
+                onClick={handleBackToSite}
+              />
+            </div>
             <Button 
               variant="outline" 
               onClick={handleSignOut}
+              className="text-sm md:text-base"
               style={{ fontFamily: 'DM Sans, sans-serif' }}
             >
               Sign Out
@@ -181,8 +190,8 @@ export function AdminLayout() {
       </header>
 
       <div className="flex flex-1">
-        <AdminSidebar />
-        <main className="flex-1" style={{ backgroundColor: '#f9fafb' }}>
+        <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <main className="flex-1 w-full overflow-x-hidden" style={{ backgroundColor: '#f9fafb' }}>
           <Outlet />
         </main>
       </div>

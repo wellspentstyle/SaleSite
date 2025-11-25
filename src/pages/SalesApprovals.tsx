@@ -250,15 +250,15 @@ export function SalesApprovals() {
   };
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 admin-page">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Sales Approvals</h1>
-            <p className="text-gray-600 mt-1">Review and approve incoming sales before they're added to Airtable</p>
+            <h1 className="text-2xl md:text-3xl font-bold">Sales Approvals</h1>
+            <p className="text-gray-600 mt-1 text-sm md:text-base">Review and approve incoming sales before they're added to Airtable</p>
           </div>
-          <Button onClick={() => navigate('/admin/sales-approvals/manual')}>
+          <Button onClick={() => navigate('/admin/sales-approvals/manual')} className="w-full md:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Sale
           </Button>
@@ -266,8 +266,8 @@ export function SalesApprovals() {
       
         {/* Settings Card */}
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+          <CardContent className="pt-4 md:pt-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="space-y-1">
                 <Label htmlFor="approvals-toggle" className="text-base" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                   Require Manual Approval

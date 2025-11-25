@@ -261,15 +261,15 @@ export function Freshness() {
   };
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 admin-page">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Freshness Tracking</h1>
-            <p className="text-gray-600 mt-1">Manage product availability and freshness</p>
+            <h1 className="text-2xl md:text-3xl font-bold">Freshness Tracking</h1>
+            <p className="text-gray-600 mt-1 text-sm md:text-base">Manage product availability and freshness</p>
           </div>
-          <Button onClick={handleNightlyCheck} disabled={isRefreshing}>
+          <Button onClick={handleNightlyCheck} disabled={isRefreshing} className="w-full md:w-auto">
             {isRefreshing ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
@@ -280,43 +280,43 @@ export function Freshness() {
         </div>
 
         {/* Stats Dashboard */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-          <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold">{stats.total}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 md:gap-4">
+          <div className="bg-white p-3 md:p-4 rounded-lg border">
+            <div className="text-xl md:text-2xl font-bold">{stats.total}</div>
             <div className="text-xs text-gray-600">Total Picks</div>
           </div>
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <div className="text-2xl font-bold text-green-700">{stats.inStock}</div>
+          <div className="bg-green-50 p-3 md:p-4 rounded-lg border border-green-200">
+            <div className="text-xl md:text-2xl font-bold text-green-700">{stats.inStock}</div>
             <div className="text-xs text-green-600">In Stock</div>
           </div>
-          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-            <div className="text-2xl font-bold text-yellow-700">{stats.low}</div>
+          <div className="bg-yellow-50 p-3 md:p-4 rounded-lg border border-yellow-200">
+            <div className="text-xl md:text-2xl font-bold text-yellow-700">{stats.low}</div>
             <div className="text-xs text-yellow-600">Low Stock</div>
           </div>
-          <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-            <div className="text-2xl font-bold text-red-700">{stats.soldOut}</div>
+          <div className="bg-red-50 p-3 md:p-4 rounded-lg border border-red-200">
+            <div className="text-xl md:text-2xl font-bold text-red-700">{stats.soldOut}</div>
             <div className="text-xs text-red-600">Sold Out</div>
           </div>
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <div className="text-2xl font-bold text-gray-700">{stats.unknown}</div>
+          <div className="bg-gray-50 p-3 md:p-4 rounded-lg border border-gray-200">
+            <div className="text-xl md:text-2xl font-bold text-gray-700">{stats.unknown}</div>
             <div className="text-xs text-gray-600">Unknown</div>
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <div className="text-2xl font-bold text-blue-700">{stats.active}</div>
+          <div className="bg-blue-50 p-3 md:p-4 rounded-lg border border-blue-200">
+            <div className="text-xl md:text-2xl font-bold text-blue-700">{stats.active}</div>
             <div className="text-xs text-blue-600">Active Sales</div>
           </div>
-          <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-            <div className="text-2xl font-bold text-orange-700">{stats.stale}</div>
+          <div className="bg-orange-50 p-3 md:p-4 rounded-lg border border-orange-200">
+            <div className="text-xl md:text-2xl font-bold text-orange-700">{stats.stale}</div>
             <div className="text-xs text-orange-600">Stale (&gt;14d)</div>
           </div>
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-            <div className="text-2xl font-bold text-purple-700">{stats.overdue}</div>
+          <div className="bg-purple-50 p-3 md:p-4 rounded-lg border border-purple-200">
+            <div className="text-xl md:text-2xl font-bold text-purple-700">{stats.overdue}</div>
             <div className="text-xs text-purple-600">Overdue</div>
           </div>
         </div>
 
         {/* Filters and Actions */}
-        <div className="bg-white p-6 rounded-lg border space-y-4">
+        <div className="bg-white p-4 md:p-6 rounded-lg border space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label>Status</Label>
