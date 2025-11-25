@@ -2,7 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Checkbox } from '../components/ui/checkbox';
-import { Loader2, ArrowLeft, Download, Instagram, ExternalLink, Check, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
+import { Loader2, ArrowLeft, Download, Instagram, ExternalLink, Check, X, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE = '/api';
@@ -26,6 +36,10 @@ interface ResultsData {
   generatedAt: string;
 }
 
+const isDevelopment = window.location.hostname.includes('replit.dev') || 
+                       window.location.hostname === 'localhost' ||
+                       window.location.hostname.includes('.dev.');
+
 export function AssetResults() {
   const navigate = useNavigate();
   const [resultsData, setResultsData] = useState<ResultsData | null>(null);
@@ -34,6 +48,7 @@ export function AssetResults() {
   const [caption, setCaption] = useState('');
   const [postToFeed, setPostToFeed] = useState(true);
   const [postStories, setPostStories] = useState(true);
+  const [showDevWarning, setShowDevWarning] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('assetResults');
@@ -68,8 +83,27 @@ export function AssetResults() {
     return fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : driveUrl;
   };
 
+  const initiatePostToInstagram = () => {
+    if (!resultsData) return;
+    
+    const selectedResults = resultsData.results.filter((_, i) => selectedAssets.has(i) && resultsData.results[i].success);
+    
+    if (selectedResults.length === 0) {
+      toast.error('No assets selected for posting');
+      return;
+    }
+
+    if (isDevelopment) {
+      setShowDevWarning(true);
+      return;
+    }
+
+    handlePostToInstagram();
+  };
+
   const handlePostToInstagram = async () => {
     if (!resultsData) return;
+    setShowDevWarning(false);
     
     const selectedResults = resultsData.results.filter((_, i) => selectedAssets.has(i) && resultsData.results[i].success);
     
@@ -272,6 +306,11 @@ export function AssetResults() {
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <Instagram className="h-5 w-5" />
                   Post to Instagram
+                  {isDevelopment && (
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                      DEV MODE
+                    </span>
+                  )}
                 </h3>
                 <span className="text-sm text-gray-500">
                   {selectedAssets.size} selected
@@ -321,7 +360,7 @@ export function AssetResults() {
               )}
 
               <Button
-                onClick={handlePostToInstagram}
+                onClick={initiatePostToInstagram}
                 disabled={posting || selectedAssets.size === 0 || (!postToFeed && !postStories)}
                 className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
               >
@@ -374,6 +413,37 @@ export function AssetResults() {
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={showDevWarning} onOpenChange={setShowDevWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Development Environment Warning
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                You're about to post to your <strong>real Instagram account</strong> from the development environment.
+              </p>
+              <p className="text-amber-600 font-medium">
+                This will publish content to your live Instagram profile, visible to all your followers.
+              </p>
+              <p>
+                Are you sure you want to continue?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handlePostToInstagram}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+            >
+              Yes, Post to Instagram
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
