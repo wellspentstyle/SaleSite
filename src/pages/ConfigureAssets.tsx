@@ -228,10 +228,16 @@ export function ConfigureAssets() {
   };
 
   const handleGenerate = async () => {
-    if (!sale) return;
+    console.log('handleGenerate called');
+    console.log('sale:', sale);
+    if (!sale) {
+      console.log('No sale, returning');
+      return;
+    }
 
     const hasMainAsset = generateMainAsset;
     const hasStoryPicks = selectedStoryPicks.size > 0;
+    console.log('hasMainAsset:', hasMainAsset, 'hasStoryPicks:', hasStoryPicks);
 
     if (!hasMainAsset && !hasStoryPicks) {
       toast.error('Please select at least one asset to generate');
@@ -250,6 +256,9 @@ export function ConfigureAssets() {
         }))
       };
 
+      console.log('Making POST request to:', `${API_BASE}/admin/asset-jobs`);
+      console.log('Request body:', requestBody);
+
       const response = await fetch(`${API_BASE}/admin/asset-jobs`, {
         method: 'POST',
         headers: {
@@ -259,7 +268,9 @@ export function ConfigureAssets() {
         body: JSON.stringify(requestBody)
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (data.success) {
         toast.success('Asset generation started!');
@@ -275,6 +286,7 @@ export function ConfigureAssets() {
         // Start polling
         pollingRef.current = setInterval(() => pollJobStatus(data.jobId), 1000);
       } else {
+        console.log('Generation failed:', data.message);
         toast.error(data.message || 'Failed to start generation');
       }
     } catch (error) {

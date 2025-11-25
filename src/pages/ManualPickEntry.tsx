@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -83,6 +83,67 @@ export function ManualPickEntry() {
 
     loadDraft();
   }, [state?.draftId]);
+
+  // Auto-save functionality
+  const isInitializedRef = useRef(false);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const autoSaveDraft = useCallback(async () => {
+    // Only auto-save if there's at least one pick with a URL
+    const hasContent = picks.some(p => p.url && p.url.trim());
+    if (!hasContent || !state?.selectedSaleId) return;
+
+    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/manual-picks/drafts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'auth': auth
+        },
+        body: JSON.stringify({
+          id: currentDraftId,
+          saleId: state.selectedSaleId,
+          saleName: state.saleName,
+          salePercentOff: state.salePercentOff,
+          picks
+        })
+      });
+
+      const data = await response.json();
+      if (data.success && data.draft?.id) {
+        setCurrentDraftId(data.draft.id);
+      }
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+    }
+  }, [picks, currentDraftId, state?.selectedSaleId, state?.saleName, state?.salePercentOff]);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    // Skip auto-save during initial load
+    if (!isInitializedRef.current) {
+      isInitializedRef.current = true;
+      return;
+    }
+
+    // Clear existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Debounce auto-save by 2 seconds
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      autoSaveDraft();
+    }, 2000);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [picks, autoSaveDraft]);
 
   if (!state?.selectedSaleId) {
     return <Navigate to="/admin/picks" replace />;

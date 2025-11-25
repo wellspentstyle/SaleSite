@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Loader2, Trash2, ExternalLink, Edit2, Calculator } from 'lucide-react';
 import { ManualEntryForm, ManualProductData } from '../components/ManualEntryForm';
@@ -141,6 +141,74 @@ export function FinalizePicks() {
       scrapeProgressively(state.urlsToScrape);
     }
   }, [state?.startScraping, state?.urlsToScrape]);
+
+  // Track if initial load is complete to avoid auto-saving on mount
+  const isInitializedRef = useRef(false);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-save draft whenever picks or other state changes
+  const autoSaveDraft = useCallback(async () => {
+    if (!selectedSaleId || picks.length === 0) return;
+    
+    const auth = sessionStorage.getItem('adminAuth');
+    try {
+      const response = await fetch(`${API_BASE}/admin/finalize-drafts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'auth': auth || ''
+        },
+        body: JSON.stringify({
+          id: draftId,
+          saleId: selectedSaleId,
+          saleName: saleName || 'Sale',
+          salePercentOff,
+          picks,
+          manualEntries: Array.from(manualEntries.values()),
+          failedUrls,
+          customPercentOff,
+          individualCustomPercent: Object.fromEntries(individualCustomPercent)
+        })
+      });
+
+      const data = await response.json();
+      if (data.success && data.draft?.id) {
+        setDraftId(data.draft.id);
+      }
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+    }
+  }, [selectedSaleId, saleName, salePercentOff, picks, manualEntries, failedUrls, customPercentOff, individualCustomPercent, draftId]);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    // Skip auto-save during initial load
+    if (!isInitializedRef.current) {
+      if (selectedSaleId && picks.length >= 0) {
+        isInitializedRef.current = true;
+      }
+      return;
+    }
+
+    // Don't auto-save while scraping is in progress
+    if (scrapingProgress.isScrapingNow) return;
+
+    // Clear existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Debounce auto-save by 2 seconds
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      autoSaveDraft();
+    }, 2000);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [picks, manualEntries, failedUrls, customPercentOff, individualCustomPercent, autoSaveDraft, scrapingProgress.isScrapingNow]);
 
   // Helper function to extract domain from URL
   const extractDomain = (url: string): string => {
