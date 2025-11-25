@@ -300,6 +300,27 @@ export async function generateFeaturedSaleAsset(saleId) {
     
     console.log(`   ✅ Uploaded to Google Drive: ${filename}`);
     
+    // Mark sale as having assets generated in Airtable
+    try {
+      const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
+      await fetch(updateUrl, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fields: {
+            FeaturedAssetURL: driveResult.webViewLink,
+            FeaturedAssetDate: new Date().toISOString().split('T')[0]
+          }
+        })
+      });
+      console.log(`   ✅ Updated Airtable with asset URL`);
+    } catch (error) {
+      console.error(`   ⚠️  Failed to update Airtable: ${error.message}`);
+    }
+    
     return {
       success: true,
       filename,

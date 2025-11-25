@@ -1031,7 +1031,9 @@ app.get('/admin/sales', async (req, res) => {
       endDate: record.fields.EndDate,
       live: record.fields.Live,
       saleUrl: record.fields.SaleURL || record.fields.CleanURL,
-      picksCount: picksCountBySale.get(record.id) || 0
+      picksCount: picksCountBySale.get(record.id) || 0,
+      featuredAssetUrl: record.fields.FeaturedAssetURL || null,
+      featuredAssetDate: record.fields.FeaturedAssetDate || null
     }));
     
     res.json({ success: true, sales });
