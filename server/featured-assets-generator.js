@@ -1040,6 +1040,7 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
   const company = pick.Company?.[0] || '';
   const salePrice = pick.SalePrice;
   const originalPrice = pick.OriginalPrice;
+  const shopMyUrl = pick.ShopMyURL || pick.ProductURL || '';
   
   let priceText = '';
   if (originalPrice && originalPrice > 0 && salePrice && salePrice > 0) {
@@ -1056,7 +1057,7 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
   
   const compositeArray = [];
   
-  // Bottom-left text overlays (price, name, brand)
+  // Bottom-left text overlays (price, name, brand, link)
   const basePositionY = STORY_HEIGHT - 100;
   let currentY = basePositionY;
   
@@ -1127,6 +1128,30 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
         { input: Buffer.from(nameSvg), top: namePositionY, left: 40 },
         { input: Buffer.from(brandSvg), top: brandPositionY, left: 40 }
       );
+      
+      // Add ShopMy link below brand (bottom element)
+      if (shopMyUrl) {
+        const linkText = '🔗🔗🔗';
+        const linkFontSize = 40;
+        const linkBoxWidth = Math.round(180);
+        const linkBoxHeight = Math.round(linkFontSize + (textPadding * 2));
+        const linkPositionY = Math.round(brandPositionY + brandBoxHeight + lineGap);
+        
+        const linkSvg = `
+          <svg width="${linkBoxWidth}" height="${linkBoxHeight}">
+            <rect width="100%" height="100%" fill="black"/>
+            <text 
+              x="${textPadding * 2}" 
+              y="${textPadding + linkFontSize * 0.8}" 
+              font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif" 
+              font-size="${linkFontSize}" 
+              fill="white">
+              ${linkText}
+            </text>
+          </svg>
+        `;
+        compositeArray.push({ input: Buffer.from(linkSvg), top: linkPositionY, left: 40 });
+      }
     }
   } else {
     const nameBoxWidth = Math.round(Math.min(Math.ceil(productName.length * charWidth) + (textPadding * 4), maxBoxWidth));
@@ -1173,6 +1198,30 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
         { input: Buffer.from(nameSvg), top: namePositionY, left: 40 },
         { input: Buffer.from(priceSvg), top: pricePositionY, left: 40 }
       );
+      
+      // Add ShopMy link below price (bottom element)
+      if (shopMyUrl) {
+        const linkText = '🔗🔗🔗';
+        const linkFontSize = 40;
+        const linkBoxWidth = Math.round(180);
+        const linkBoxHeight = Math.round(linkFontSize + (textPadding * 2));
+        const linkPositionY = Math.round(pricePositionY + priceBoxHeight + lineGap);
+        
+        const linkSvg = `
+          <svg width="${linkBoxWidth}" height="${linkBoxHeight}">
+            <rect width="100%" height="100%" fill="black"/>
+            <text 
+              x="${textPadding * 2}" 
+              y="${textPadding + linkFontSize * 0.8}" 
+              font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif" 
+              font-size="${linkFontSize}" 
+              fill="white">
+              ${linkText}
+            </text>
+          </svg>
+        `;
+        compositeArray.push({ input: Buffer.from(linkSvg), top: linkPositionY, left: 40 });
+      }
     }
   }
   

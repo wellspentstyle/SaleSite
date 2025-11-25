@@ -2211,6 +2211,142 @@ app.get('/admin/sale/:saleId/picks', async (req, res) => {
 });
 
 // Generate custom assets with configuration
+// SSE endpoint for asset generation with progress updates
+app.post('/admin/generate-custom-assets-stream', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  // Set up SSE
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  
+  const sendProgress = (data) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+  
+  try {
+    const { saleId, mainAsset, storyPicks } = req.body;
+    
+    if (!saleId) {
+      sendProgress({ type: 'error', message: 'Sale ID required' });
+      res.end();
+      return;
+    }
+    
+    console.log(`\n📸 Generating custom assets for sale ${saleId}...`);
+    const results = [];
+    
+    // Calculate total steps
+    const totalSteps = (mainAsset ? 1 : 0) + (storyPicks?.length || 0);
+    let currentStep = 0;
+    
+    sendProgress({ type: 'start', total: totalSteps, current: 0, message: 'Starting asset generation...' });
+    
+    // Generate main asset if requested
+    if (mainAsset) {
+      currentStep++;
+      sendProgress({ type: 'progress', total: totalSteps, current: currentStep, message: 'Generating main sale story...' });
+      
+      try {
+        const customNote = mainAsset.customNote || '';
+        const result = await generateMainSaleStory(saleId, customNote);
+        results.push({ type: 'main', success: true, ...result });
+        sendProgress({ type: 'step_complete', total: totalSteps, current: currentStep, stepType: 'main', success: true });
+      } catch (error) {
+        console.error('Main asset generation error:', error);
+        results.push({ type: 'main', success: false, error: error.message });
+        sendProgress({ type: 'step_complete', total: totalSteps, current: currentStep, stepType: 'main', success: false, error: error.message });
+      }
+    }
+    
+    // Generate individual story images
+    if (storyPicks && storyPicks.length > 0) {
+      for (let i = 0; i < storyPicks.length; i++) {
+        const pickConfig = storyPicks[i];
+        currentStep++;
+        sendProgress({ type: 'progress', total: totalSteps, current: currentStep, message: `Generating story ${i + 1} of ${storyPicks.length}...` });
+        
+        try {
+          const result = await generatePickStoryWithCopy(pickConfig.pickId, pickConfig.customCopy || '');
+          results.push({ type: 'story', pickId: pickConfig.pickId, success: true, ...result });
+          sendProgress({ type: 'step_complete', total: totalSteps, current: currentStep, stepType: 'story', success: true });
+        } catch (error) {
+          console.error(`Story generation error for pick ${pickConfig.pickId}:`, error);
+          results.push({ type: 'story', pickId: pickConfig.pickId, success: false, error: error.message });
+          sendProgress({ type: 'step_complete', total: totalSteps, current: currentStep, stepType: 'story', success: false, error: error.message });
+        }
+      }
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    const totalCount = results.length;
+    
+    // Get sale name for display
+    let saleName = 'Unknown Sale';
+    try {
+      const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
+      const saleRes = await fetch(saleUrl, {
+        headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+      });
+      if (saleRes.ok) {
+        const saleData = await saleRes.json();
+        saleName = saleData.fields.OriginalCompanyName || saleData.fields.CompanyName || 'Unknown Sale';
+      }
+    } catch (e) { 
+      console.log('Could not fetch sale name:', e.message);
+    }
+    
+    // Save results to database for persistence
+    try {
+      await pool.query('DELETE FROM generated_assets WHERE sale_id = $1', [saleId]);
+      
+      for (const result of results) {
+        await pool.query(
+          `INSERT INTO generated_assets (sale_id, sale_name, asset_type, pick_id, filename, drive_file_id, drive_url, success, error)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            saleId,
+            saleName,
+            result.type === 'story' ? 'story' : 'main',
+            result.pickId || null,
+            result.filename || null,
+            result.driveFileId || null,
+            result.driveUrl || null,
+            result.success,
+            result.error || null
+          ]
+        );
+      }
+      console.log(`💾 Saved ${results.length} assets to database for sale ${saleId}`);
+    } catch (dbError) {
+      console.error('Failed to save assets to database:', dbError.message);
+    }
+    
+    // Send completion event
+    sendProgress({ 
+      type: 'complete', 
+      success: true,
+      message: `Generated ${successCount}/${totalCount} assets`,
+      saleName,
+      saleId,
+      results
+    });
+    
+    res.end();
+    
+  } catch (error) {
+    console.error('Custom assets generation error:', error);
+    sendProgress({ type: 'error', message: error.message });
+    res.end();
+  }
+});
+
+// Legacy non-streaming endpoint (kept for compatibility)
 app.post('/admin/generate-custom-assets', async (req, res) => {
   const { auth } = req.headers;
   

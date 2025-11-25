@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Checkbox } from '../components/ui/checkbox';
-import { Loader2, Image, ImagePlus, ArrowLeft } from 'lucide-react';
+import { Progress } from '../components/ui/progress';
+import { Loader2, Image, ImagePlus, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE = '/api';
@@ -29,6 +30,13 @@ interface PickConfig {
   customCopy: string;
 }
 
+interface GenerationProgress {
+  current: number;
+  total: number;
+  message: string;
+  completedSteps: { type: string; success: boolean }[];
+}
+
 export function ConfigureAssets() {
   const { saleId } = useParams<{ saleId: string }>();
   const navigate = useNavigate();
@@ -37,6 +45,7 @@ export function ConfigureAssets() {
   const [picks, setPicks] = useState<Pick[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState<GenerationProgress | null>(null);
   
   const [generateMainAsset, setGenerateMainAsset] = useState(true);
   const [mainAssetNote, setMainAssetNote] = useState('');
@@ -121,6 +130,7 @@ export function ConfigureAssets() {
     }
 
     setGenerating(true);
+    setProgress({ current: 0, total: (hasMainAsset ? 1 : 0) + selectedStoryPicks.size, message: 'Starting...', completedSteps: [] });
     const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
@@ -135,7 +145,7 @@ export function ConfigureAssets() {
         }))
       };
 
-      const response = await fetch(`${API_BASE}/admin/generate-custom-assets`, {
+      const response = await fetch(`${API_BASE}/admin/generate-custom-assets-stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -144,24 +154,65 @@ export function ConfigureAssets() {
         body: JSON.stringify(requestBody)
       });
 
-      const data = await response.json();
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      const completedSteps: { type: string; success: boolean }[] = [];
 
-      if (data.success) {
-        sessionStorage.setItem('assetResults', JSON.stringify({
-          saleName: sale.saleName,
-          saleId: sale.id,
-          results: data.results,
-          generatedAt: new Date().toISOString()
-        }));
-        navigate('/admin/assets/results');
-      } else {
-        toast.error(data.message || 'Failed to generate assets');
+      if (!reader) {
+        throw new Error('Stream not available');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value, { stream: true });
+        const lines = text.split('\n').filter(line => line.startsWith('data: '));
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            
+            if (data.type === 'start' || data.type === 'progress') {
+              setProgress(prev => ({
+                ...prev!,
+                current: data.current,
+                total: data.total,
+                message: data.message
+              }));
+            } else if (data.type === 'step_complete') {
+              completedSteps.push({ type: data.stepType, success: data.success });
+              setProgress(prev => ({
+                ...prev!,
+                completedSteps: [...completedSteps]
+              }));
+            } else if (data.type === 'complete') {
+              sessionStorage.setItem('assetResults', JSON.stringify({
+                saleName: data.saleName,
+                saleId: data.saleId,
+                results: data.results,
+                generatedAt: new Date().toISOString()
+              }));
+              setGenerating(false);
+              setProgress(null);
+              navigate('/admin/assets/results');
+              return;
+            } else if (data.type === 'error') {
+              toast.error(data.message || 'Failed to generate assets');
+              setGenerating(false);
+              setProgress(null);
+              return;
+            }
+          } catch (e) {
+            console.error('Error parsing SSE data:', e);
+          }
+        }
       }
     } catch (error) {
       console.error('Generation error:', error);
       toast.error('Failed to generate assets');
-    } finally {
       setGenerating(false);
+      setProgress(null);
     }
   };
 
@@ -318,35 +369,61 @@ export function ConfigureAssets() {
           </section>
         )}
 
-        <div className="bg-gray-50 border border-gray-200 p-6 rounded-lg flex items-center justify-between sticky bottom-4">
-          <div className="text-sm text-gray-600">
-            {generateMainAsset && '1 main asset'}
-            {generateMainAsset && selectedStoryPicks.size > 0 && ' + '}
-            {selectedStoryPicks.size > 0 && `${selectedStoryPicks.size} story${selectedStoryPicks.size > 1 ? ' images' : ' image'}`}
-            {!generateMainAsset && selectedStoryPicks.size === 0 && 'No assets selected'}
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/admin/assets')}
-              disabled={generating}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleGenerate}
-              disabled={generating || (!generateMainAsset && selectedStoryPicks.size === 0)}
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                'Generate Assets'
+        <div className="bg-gray-50 border border-gray-200 p-6 rounded-lg sticky bottom-4 space-y-4">
+          {generating && progress ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{progress.message}</span>
+                <span className="text-sm text-gray-500">{progress.current}/{progress.total}</span>
+              </div>
+              <Progress value={(progress.current / progress.total) * 100} className="h-2" />
+              {progress.completedSteps.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {progress.completedSteps.map((step, idx) => (
+                    <div 
+                      key={idx}
+                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                        step.success 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {step.success ? (
+                        <CheckCircle2 className="h-3 w-3" />
+                      ) : (
+                        <XCircle className="h-3 w-3" />
+                      )}
+                      <span>{step.type === 'main' ? 'Main Story' : 'Pick Story'}</span>
+                    </div>
+                  ))}
+                </div>
               )}
-            </Button>
-          </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                {generateMainAsset && '1 main asset'}
+                {generateMainAsset && selectedStoryPicks.size > 0 && ' + '}
+                {selectedStoryPicks.size > 0 && `${selectedStoryPicks.size} story${selectedStoryPicks.size > 1 ? ' images' : ' image'}`}
+                {!generateMainAsset && selectedStoryPicks.size === 0 && 'No assets selected'}
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/admin/assets')}
+                  disabled={generating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleGenerate}
+                  disabled={generating || (!generateMainAsset && selectedStoryPicks.size === 0)}
+                >
+                  Generate Assets
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
