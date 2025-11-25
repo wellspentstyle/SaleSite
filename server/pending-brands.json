@@ -1389,5 +1389,21 @@
     "qualityScore": 83,
     "id": "brand_1764021460492_zbipk4kel",
     "createdAt": "2025-11-24T21:57:40.492Z"
+  },
+  {
+    "name": "Camilla & Marc",
+    "airtableRecordId": "rec4NfXCs7Z3qKz1a",
+    "type": "Brand",
+    "priceRange": "$$$",
+    "category": "Clothing, Swimwear",
+    "values": "Independent label",
+    "maxWomensSize": "",
+    "sizingSource": "",
+    "description": "If you love the sharp tailoring of Australian fashion but find Zimmermann too romantic and Sass & Bide too party-focused, Camilla & Marc hits the sweet spot between sophistication and edge. The Mirzoeff siblings have built their reputation on architectural cuts and unexpected fabrications—think leather mixed with silk crepe, or blazers with origami-like pleating that somehow feel both structured and fluid.",
+    "notes": "Price: Estimated (no products found) | Categories: From web search results | Sizing: Not found",
+    "url": "https://camilla.com",
+    "qualityScore": 53,
+    "id": "brand_1764029096203_z83c575x0",
+    "createdAt": "2025-11-25T00:04:56.203Z"
   }
 ]
