@@ -2340,14 +2340,19 @@ async function processAssetJob(jobId) {
 
 // Start a new asset generation job
 app.post('/admin/asset-jobs', async (req, res) => {
+  console.log('📋 POST /admin/asset-jobs received');
   const { auth } = req.headers;
   
   if (auth !== ADMIN_PASSWORD) {
+    console.log('   ❌ Unauthorized');
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   
   try {
     const { saleId, mainAsset, storyPicks } = req.body;
+    console.log('   Sale ID:', saleId);
+    console.log('   Main Asset:', mainAsset ? 'yes' : 'no');
+    console.log('   Story Picks:', storyPicks?.length || 0);
     
     if (!saleId) {
       return res.status(400).json({ success: false, message: 'Sale ID required' });
