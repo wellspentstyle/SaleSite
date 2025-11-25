@@ -1658,6 +1658,30 @@ app.post('/admin/picks', async (req, res) => {
   try {
     console.log(`💾 Saving ${picks.length} picks for sale ${saleId}`);
     
+    // Filter out incomplete picks - must have URL, name, and imageUrl
+    const validPicks = picks.filter(pick => {
+      const hasUrl = pick.url && pick.url.trim();
+      const hasName = pick.name && pick.name.trim();
+      const hasImage = pick.imageUrl && pick.imageUrl.trim();
+      
+      if (!hasUrl || !hasName || !hasImage) {
+        console.log(`⏭️ Skipping incomplete pick: URL=${!!hasUrl}, Name=${!!hasName}, Image=${!!hasImage}`);
+        return false;
+      }
+      return true;
+    });
+    
+    if (validPicks.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No valid picks to save (all picks were missing required fields)' 
+      });
+    }
+    
+    if (validPicks.length < picks.length) {
+      console.log(`⚠️ Filtered out ${picks.length - validPicks.length} incomplete picks`);
+    }
+    
     // Fetch the sale record to get its Company field
     const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`;
     const saleResponse = await fetch(saleUrl, {
@@ -1675,9 +1699,9 @@ app.post('/admin/picks', async (req, res) => {
     
     console.log(`📦 Sale company: ${companyIds.length > 0 ? companyIds[0] : 'None'}`);
     
-    // Create records for each pick
+    // Create records for each valid pick
     // Note: ShopMyURL, PercentOff, and Company are computed fields in Airtable, don't send them
-    const records = picks.map(pick => {
+    const records = validPicks.map(pick => {
       const fields = {
         ProductURL: cleanUrl(pick.url), // Clean URL to remove tracking parameters
         ProductName: pick.name,
@@ -1747,10 +1771,14 @@ app.post('/admin/picks', async (req, res) => {
     // Clear sales cache since picks changed
     clearSalesCache();
     
+    const skippedCount = picks.length - validPicks.length;
+    const skippedMessage = skippedCount > 0 ? ` (${skippedCount} incomplete picks skipped)` : '';
+    
     res.json({ 
       success: true, 
-      message: `Saved ${allRecordIds.length} picks`,
-      recordIds: allRecordIds
+      message: `Saved ${allRecordIds.length} picks${skippedMessage}`,
+      recordIds: allRecordIds,
+      skippedCount
     });
     
   } catch (error) {
@@ -1775,6 +1803,30 @@ app.post('/admin/manual-picks', async (req, res) => {
   try {
     console.log(`✍️ Saving ${picks.length} manual picks for sale ${saleId}`);
     
+    // Filter out incomplete picks - must have URL, name, and imageUrl
+    const validPicks = picks.filter(pick => {
+      const hasUrl = pick.url && pick.url.trim();
+      const hasName = pick.name && pick.name.trim();
+      const hasImage = pick.imageUrl && pick.imageUrl.trim();
+      
+      if (!hasUrl || !hasName || !hasImage) {
+        console.log(`⏭️ Skipping incomplete manual pick: URL=${!!hasUrl}, Name=${!!hasName}, Image=${!!hasImage}`);
+        return false;
+      }
+      return true;
+    });
+    
+    if (validPicks.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No valid picks to save (all picks were missing required fields)' 
+      });
+    }
+    
+    if (validPicks.length < picks.length) {
+      console.log(`⚠️ Filtered out ${picks.length - validPicks.length} incomplete manual picks`);
+    }
+    
     // Fetch the sale record to get its Company field
     const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`;
     const saleResponse = await fetch(saleUrl, {
@@ -1792,8 +1844,8 @@ app.post('/admin/manual-picks', async (req, res) => {
     
     console.log(`📦 Sale company: ${companyIds.length > 0 ? companyIds[0] : 'None'}`);
     
-    // Create records for each manual pick
-    const records = picks.map(pick => {
+    // Create records for each valid manual pick
+    const records = validPicks.map(pick => {
       const fields = {
         ProductURL: cleanUrl(pick.url),
         ProductName: pick.name,
@@ -1860,10 +1912,14 @@ app.post('/admin/manual-picks', async (req, res) => {
     // Clear sales cache since picks changed
     clearSalesCache();
     
+    const skippedCount = picks.length - validPicks.length;
+    const skippedMessage = skippedCount > 0 ? ` (${skippedCount} incomplete picks skipped)` : '';
+    
     res.json({ 
       success: true, 
-      message: `Saved ${allRecordIds.length} manual pick(s)`,
-      recordIds: allRecordIds
+      message: `Saved ${allRecordIds.length} manual pick(s)${skippedMessage}`,
+      recordIds: allRecordIds,
+      skippedCount
     });
     
   } catch (error) {
