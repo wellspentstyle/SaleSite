@@ -1549,5 +1549,21 @@
     "qualityScore": 73,
     "id": "brand_1764042885798_vy5mzfd2g",
     "createdAt": "2025-11-25T03:54:45.798Z"
+  },
+  {
+    "name": "Vestiaire Collective",
+    "airtableRecordId": "recfKn6zCOI3oSmIA",
+    "type": "Brand",
+    "priceRange": "$$",
+    "category": "Clothing",
+    "values": "Sustainable, Secondhand",
+    "maxWomensSize": "Up to 4",
+    "sizingSource": "brand size chart",
+    "description": "If you're tired of hunting through TheRealReal's inconsistent condition reports or paying Fashionphile's premium for the same Chanel bag everyone has, Vestiaire Collective is where the real finds live. They've built the most expansive global marketplace for authenticated luxury resale, where you can score that perfect Ganni dress from Copenhagen or a pristine Jacquemus blazer from Paris—all with transparent condition details and photos that actually show what you're buying.",
+    "notes": "Price: From 40 products via Shopping API | Categories: From 40 Shopping API products",
+    "url": "https://vestiairecollective.com",
+    "qualityScore": 95,
+    "id": "brand_1764042898797_tuqs33hta",
+    "createdAt": "2025-11-25T03:54:58.797Z"
   }
 ]
