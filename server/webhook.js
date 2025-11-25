@@ -2361,8 +2361,8 @@ async function processAssetJob(jobId) {
       
       for (const result of results) {
         await pool.query(
-          `INSERT INTO generated_assets (sale_id, sale_name, asset_type, pick_id, filename, drive_file_id, drive_url, success, error)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          `INSERT INTO generated_assets (sale_id, sale_name, asset_type, pick_id, filename, drive_file_id, drive_url, local_path, success, error)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             saleId,
             saleName,
@@ -2371,6 +2371,7 @@ async function processAssetJob(jobId) {
             result.filename || null,
             result.driveFileId || null,
             result.driveUrl || null,
+            result.localUrl || null,
             result.success,
             result.error || null
           ]
@@ -2680,8 +2681,8 @@ app.post('/admin/generate-custom-assets-stream', async (req, res) => {
       
       for (const result of results) {
         await pool.query(
-          `INSERT INTO generated_assets (sale_id, sale_name, asset_type, pick_id, filename, drive_file_id, drive_url, success, error)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          `INSERT INTO generated_assets (sale_id, sale_name, asset_type, pick_id, filename, drive_file_id, drive_url, local_path, success, error)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             saleId,
             saleName,
@@ -2690,6 +2691,7 @@ app.post('/admin/generate-custom-assets-stream', async (req, res) => {
             result.filename || null,
             result.driveFileId || null,
             result.driveUrl || null,
+            result.localUrl || null,
             result.success,
             result.error || null
           ]
@@ -2789,8 +2791,8 @@ app.post('/admin/generate-custom-assets', async (req, res) => {
       // Insert new results
       for (const result of results) {
         await pool.query(
-          `INSERT INTO generated_assets (sale_id, sale_name, asset_type, pick_id, filename, drive_file_id, drive_url, success, error)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          `INSERT INTO generated_assets (sale_id, sale_name, asset_type, pick_id, filename, drive_file_id, drive_url, local_path, success, error)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             saleId,
             saleName,
@@ -2799,6 +2801,7 @@ app.post('/admin/generate-custom-assets', async (req, res) => {
             result.filename || null,
             result.driveFileId || null,
             result.driveUrl || null,
+            result.localUrl || null,
             result.success,
             result.error || null
           ]
@@ -2858,6 +2861,7 @@ async function fetchGeneratedAssets(saleId, res, auth, ADMIN_PASSWORD, pool) {
       filename: row.filename,
       driveFileId: row.drive_file_id,
       driveUrl: row.drive_url,
+      localUrl: row.local_path,
       success: row.success,
       error: row.error,
       createdAt: row.created_at
