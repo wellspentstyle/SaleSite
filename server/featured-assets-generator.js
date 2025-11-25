@@ -1234,27 +1234,49 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
     }
   }
   
-  // Add custom copy overlay in top-right if provided
+  // Add custom copy overlay - left aligned at x=40, with word wrapping
   if (customCopy && customCopy.trim()) {
-    const copyLines = customCopy.trim().split('\n').slice(0, 3); // Max 3 lines
     const copyFontSize = 36;
-    const copyPadding = 16;
-    const copyLineHeight = copyFontSize + 8;
+    const copyPadding = 32; // More padding for spacing
+    const copyLineHeight = copyFontSize + 12;
+    const charWidth = copyFontSize * 0.52;
+    const maxBoxWidth = STORY_WIDTH - 120; // Leave margin on right side
+    const maxCharsPerLine = Math.floor((maxBoxWidth - (copyPadding * 4)) / charWidth);
     
-    // Calculate box dimensions - ensure integer values for Sharp
-    // Use more accurate character width and add extra padding on right side
+    // Word wrap the text
+    const words = customCopy.trim().split(/\s+/);
+    const wrappedLines = [];
+    let currentLine = '';
+    
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (testLine.length <= maxCharsPerLine) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) {
+          wrappedLines.push(currentLine);
+        }
+        // Handle very long words by truncating
+        currentLine = word.length > maxCharsPerLine ? word.substring(0, maxCharsPerLine - 3) + '...' : word;
+      }
+    }
+    if (currentLine) {
+      wrappedLines.push(currentLine);
+    }
+    
+    // Calculate box dimensions based on wrapped lines
     let maxLineWidth = 0;
-    for (const line of copyLines) {
-      const lineWidth = Math.ceil(line.length * copyFontSize * 0.6); // Slightly wider char estimate
+    for (const line of wrappedLines) {
+      const lineWidth = Math.ceil(line.length * charWidth);
       if (lineWidth > maxLineWidth) maxLineWidth = lineWidth;
     }
     
-    // Add equal padding on both sides (copyPadding * 2 on each side = copyPadding * 4 total, plus extra for safety)
-    const copyBoxWidth = Math.round(Math.min(maxLineWidth + (copyPadding * 5), STORY_WIDTH - 80));
-    const copyBoxHeight = Math.round((copyLines.length * copyLineHeight) + (copyPadding * 2));
+    // Add generous padding on all sides
+    const copyBoxWidth = Math.round(Math.min(maxLineWidth + (copyPadding * 4), maxBoxWidth));
+    const copyBoxHeight = Math.round((wrappedLines.length * copyLineHeight) + (copyPadding * 2));
     
     let copyTextElements = '';
-    copyLines.forEach((line, index) => {
+    wrappedLines.forEach((line, index) => {
       copyTextElements += `
         <text 
           x="${copyPadding * 2}" 
@@ -1275,9 +1297,9 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
       </svg>
     `;
     
-    // Position: 80px more to the left, and 1.5x box height lower
-    const copyX = Math.round(STORY_WIDTH - copyBoxWidth - 120); // 40 + 80 = 120px from right edge
-    const copyY = Math.round(80 + (copyBoxHeight * 1.5)); // 1.5x box height lower
+    // Position: left aligned at x=40 (same as other elements), ~15% from top
+    const copyX = 40;
+    const copyY = Math.round(STORY_HEIGHT * 0.15);
     
     compositeArray.push({
       input: Buffer.from(copySvg),
