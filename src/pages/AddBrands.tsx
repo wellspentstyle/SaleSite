@@ -53,6 +53,10 @@ interface PendingBrand {
   hasActiveSales: boolean;
 }
 
+interface RejectedBrand extends PendingBrand {
+  rejectedAt: string;
+}
+
 export function AddBrands() {
   const [brandNames, setBrandNames] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -64,10 +68,16 @@ export function AddBrands() {
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<number>>(new Set());
   const [pendingBrands, setPendingBrands] = useState<PendingBrand[]>([]);
   const [isFetchingPending, setIsFetchingPending] = useState(false);
+  const [rejectedBrands, setRejectedBrands] = useState<RejectedBrand[]>([]);
+  const [isRestoringBrand, setIsRestoringBrand] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPendingBrands();
-    const interval = setInterval(fetchPendingBrands, 30000);
+    fetchRejectedBrands();
+    const interval = setInterval(() => {
+      fetchPendingBrands();
+      fetchRejectedBrands();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -87,6 +97,46 @@ export function AddBrands() {
       console.error('Error fetching pending brands:', error);
     } finally {
       setIsFetchingPending(false);
+    }
+  };
+
+  const fetchRejectedBrands = async () => {
+    try {
+      const auth = sessionStorage.getItem('adminAuth') || '';
+      const response = await fetch(`${API_BASE}/admin/rejected-brands`, {
+        headers: { 'auth': auth }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setRejectedBrands(data.brands || []);
+      }
+    } catch (error) {
+      console.error('Error fetching rejected brands:', error);
+    }
+  };
+
+  const handleRestoreBrand = async (brandId: string) => {
+    try {
+      setIsRestoringBrand(brandId);
+      const auth = sessionStorage.getItem('adminAuth') || '';
+      const response = await fetch(`${API_BASE}/admin/rejected-brands/${brandId}/restore`, {
+        method: 'POST',
+        headers: { 'auth': auth }
+      });
+      
+      if (response.ok) {
+        toast.success('Brand restored to pending');
+        fetchPendingBrands();
+        fetchRejectedBrands();
+      } else {
+        toast.error('Failed to restore brand');
+      }
+    } catch (error) {
+      console.error('Error restoring brand:', error);
+      toast.error('Failed to restore brand');
+    } finally {
+      setIsRestoringBrand(null);
     }
   };
 
@@ -512,6 +562,54 @@ export function AddBrands() {
                 )}
               </TabsContent>
             </Tabs>
+          </div>
+        )}
+
+        {/* Recently Rejected Brands Section */}
+        {rejectedBrands.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold text-gray-600" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Recently Rejected ({rejectedBrands.length})
+            </h2>
+            <div className="bg-gray-50 rounded-lg border max-h-[300px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-gray-100 border-b">
+                  <tr>
+                    <th className="text-left p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Brand</th>
+                    <th className="text-left p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Type</th>
+                    <th className="text-left p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Rejected</th>
+                    <th className="text-right p-3 font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rejectedBrands.map((brand) => (
+                    <tr key={brand.id} className="border-b last:border-0 hover:bg-gray-100">
+                      <td className="p-3" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.name}</td>
+                      <td className="p-3 text-gray-500" style={{ fontFamily: 'DM Sans, sans-serif' }}>{brand.type || '-'}</td>
+                      <td className="p-3 text-gray-500" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                        {new Date(brand.rejectedAt).toLocaleDateString()}
+                      </td>
+                      <td className="p-3 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRestoreBrand(brand.id)}
+                          disabled={isRestoringBrand === brand.id}
+                          style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        >
+                          {isRestoringBrand === brand.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                          )}
+                          Restore
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

@@ -42,6 +42,12 @@ import {
   getRejectedEmails,
   addRejectedEmail
 } from './rejected-emails.js';
+import {
+  getRejectedBrands,
+  addRejectedBrand,
+  removeRejectedBrand,
+  getAndRemoveRejectedBrand
+} from './rejected-brands.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -505,7 +511,7 @@ app.post('/admin/pending-brands/:id/approve', async (req, res) => {
   }
 });
 
-// Reject a pending brand - just remove from pending
+// Reject a pending brand - save to rejected list, then remove from pending
 app.post('/admin/pending-brands/:id/reject', async (req, res) => {
   const { auth } = req.headers;
   if (auth !== ADMIN_PASSWORD) {
@@ -513,10 +519,62 @@ app.post('/admin/pending-brands/:id/reject', async (req, res) => {
   }
   
   try {
+    // Get the brand data before removing
+    const pendingBrands = await getPendingBrands();
+    const brandToReject = pendingBrands.find(b => b.id === req.params.id);
+    
+    // Save to rejected list for recovery
+    if (brandToReject) {
+      await addRejectedBrand(brandToReject);
+    }
+    
     await removePendingBrand(req.params.id);
     res.json({ success: true, message: 'Brand rejected' });
   } catch (error) {
     console.error('Error rejecting brand:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get rejected brands
+app.get('/admin/rejected-brands', async (req, res) => {
+  const { auth } = req.headers;
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const rejectedBrands = await getRejectedBrands();
+    res.json({ success: true, brands: rejectedBrands });
+  } catch (error) {
+    console.error('Error getting rejected brands:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Restore a rejected brand back to pending
+app.post('/admin/rejected-brands/:id/restore', async (req, res) => {
+  const { auth } = req.headers;
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const brand = await getAndRemoveRejectedBrand(req.params.id);
+    
+    if (!brand) {
+      return res.status(404).json({ success: false, message: 'Rejected brand not found' });
+    }
+    
+    // Remove rejection metadata before restoring
+    delete brand.rejectedAt;
+    
+    // Add back to pending
+    await addPendingBrand(brand);
+    
+    res.json({ success: true, message: 'Brand restored to pending' });
+  } catch (error) {
+    console.error('Error restoring brand:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
