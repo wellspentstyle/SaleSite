@@ -5028,6 +5028,21 @@ async function checkForIncompleteBrands() {
             });
             
             console.log(`✅ Researched and queued ${name} for approval (${result.qualityScore}% quality)`);
+            
+            // Send Telegram notification for new brand
+            if (TELEGRAM_CHAT_ID) {
+              const brandAlert = `🏷️ *New Brand Researched*\n\n` +
+                `*${name}*\n` +
+                `Quality: ${result.qualityScore}%\n` +
+                `Price: ${result.brand.priceRange || 'N/A'}\n` +
+                `Category: ${result.brand.category || 'N/A'}\n` +
+                (result.brand.url ? `🔗 ${result.brand.url}\n` : '') +
+                `\n_Review in Admin → Add Brands_`;
+              
+              sendAlertToTelegram(TELEGRAM_CHAT_ID, brandAlert).catch(err => {
+                console.error('Failed to send brand Telegram alert:', err.message);
+              });
+            }
           }
         } catch (error) {
           console.error(`❌ Failed to research ${name}:`, error.message);
