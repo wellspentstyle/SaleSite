@@ -658,22 +658,6 @@
     "createdAt": "2025-11-24T20:51:15.700Z"
   },
   {
-    "name": "Another Tomorrow",
-    "airtableRecordId": "recLCaDhXBdiieZ8R",
-    "type": "Brand",
-    "priceRange": "$$$",
-    "category": "Clothing",
-    "values": "Independent label, Sustainable",
-    "maxWomensSize": "Up to 16",
-    "sizingSource": "brand size chart",
-    "description": "If you're tired of choosing between clothes that look good and clothes that do good, Another Tomorrow proves you don't have to compromise. Vanessa Barboni Hallik designs pieces with thoughtful details like pleat-back shirts and signature bow blouses using deadstock fabrics and responsible production—so your wardrobe can have a point of view and a conscience.",
-    "notes": "Price: From 33 products via Shopping API | Categories: From 33 Shopping API products",
-    "url": "https://anothertomorrow.co",
-    "qualityScore": 95,
-    "id": "brand_1764017489009_oxt9vvkyl",
-    "createdAt": "2025-11-24T20:51:29.009Z"
-  },
-  {
     "name": "A.W.A.K.E. Mode",
     "airtableRecordId": "recLScVRbeAwXIyEb",
     "type": "Brand",

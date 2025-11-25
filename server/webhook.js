@@ -341,7 +341,6 @@ app.get('/admin/pending-brands', async (req, res) => {
     
     // Fetch all companies to check which are already High Priority
     const companyRecords = await fetchAllAirtableRecords(COMPANY_TABLE_NAME, {
-      fields: ['Name', 'Priority'],
       pageSize: '100'
     });
     
