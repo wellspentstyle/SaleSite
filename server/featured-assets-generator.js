@@ -85,7 +85,8 @@ export async function generateFeaturedSaleAsset(saleId) {
     
     const { sale, picks } = await fetchSaleWithPicks(saleId);
     
-    const company = sale.Company || 'Sale';
+    const companyField = sale.Company;
+    const company = Array.isArray(companyField) ? companyField[0] : (companyField || 'Sale');
     const percentOff = sale.PercentOff || 0;
     const endDate = sale.EndDate ? new Date(sale.EndDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : null;
     const discountCode = sale.DiscountCode || null;
@@ -374,7 +375,8 @@ export async function generateHeaderOnlyAsset(saleId) {
   const saleData = await saleResponse.json();
   const sale = saleData.fields;
   
-  const company = sale.Company || 'Sale';
+  const companyField = sale.Company;
+  const company = Array.isArray(companyField) ? companyField[0] : (companyField || 'Sale');
   const percentOff = sale.PercentOff || 0;
   const endDate = sale.EndDate ? new Date(sale.EndDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : null;
   const discountCode = sale.DiscountCode || sale.PromoCode || null;
@@ -508,7 +510,8 @@ export async function generateAssetWithPicks(saleId, pickIds) {
   const saleData = await saleResponse.json();
   const sale = saleData.fields;
   
-  const company = sale.Company || 'Sale';
+  const companyField = sale.Company;
+  const company = Array.isArray(companyField) ? companyField[0] : (companyField || 'Sale');
   const percentOff = sale.PercentOff || 0;
   const endDate = sale.EndDate ? new Date(sale.EndDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : null;
   const discountCode = sale.DiscountCode || sale.PromoCode || null;

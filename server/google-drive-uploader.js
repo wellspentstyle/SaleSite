@@ -116,13 +116,69 @@ async function findOrCreateNestedFolders(companyName, saleName) {
   return saleFolderId;
 }
 
-export async function uploadToGoogleDrive(filePath, fileName, companyName, saleName) {
+export async function uploadToGoogleDrive(filePathOrConfig, fileName, companyName, saleName) {
   try {
+    let actualFileName, mediaBody, folderId;
+    
+    if (typeof filePathOrConfig === 'object' && filePathOrConfig !== null) {
+      const config = filePathOrConfig;
+      actualFileName = config.fileName;
+      const mimeType = config.mimeType || 'image/jpeg';
+      
+      if (config.fileBuffer) {
+        const { Readable } = await import('stream');
+        mediaBody = Readable.from(config.fileBuffer);
+      } else if (config.filePath) {
+        mediaBody = fs.createReadStream(config.filePath);
+      } else {
+        throw new Error('Either fileBuffer or filePath must be provided');
+      }
+      
+      console.log(`☁️  Uploading to Google Drive: ${actualFileName}`);
+      const drive = await getGoogleDriveClient();
+      
+      if (config.folderPath) {
+        const parts = config.folderPath.split('/').filter(Boolean);
+        let parentId = null;
+        for (const part of parts) {
+          parentId = await findOrCreateFolder(part, parentId);
+        }
+        folderId = parentId;
+      } else {
+        folderId = await findOrCreateNestedFolders(config.companyName || 'Unknown', config.saleName || 'Unknown');
+      }
+      
+      const fileMetadata = {
+        name: actualFileName,
+        parents: [folderId]
+      };
+      
+      const media = {
+        mimeType,
+        body: mediaBody
+      };
+      
+      const response = await drive.files.create({
+        requestBody: fileMetadata,
+        media: media,
+        fields: 'id, name, webViewLink'
+      });
+      
+      console.log(`✅ Uploaded to Google Drive: ${response.data.name}`);
+      console.log(`   View link: ${response.data.webViewLink}`);
+      
+      return {
+        fileId: response.data.id,
+        fileName: response.data.name,
+        webViewLink: response.data.webViewLink
+      };
+    }
+    
     console.log(`☁️  Uploading to Google Drive: ${fileName}`);
 
     const drive = await getGoogleDriveClient();
     
-    const folderId = await findOrCreateNestedFolders(companyName, saleName);
+    folderId = await findOrCreateNestedFolders(companyName, saleName);
 
     const fileMetadata = {
       name: fileName,
@@ -131,7 +187,7 @@ export async function uploadToGoogleDrive(filePath, fileName, companyName, saleN
 
     const media = {
       mimeType: 'image/jpeg',
-      body: fs.createReadStream(filePath)
+      body: fs.createReadStream(filePathOrConfig)
     };
 
     const response = await drive.files.create({
