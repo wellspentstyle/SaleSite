@@ -25,6 +25,17 @@ function getRandomColor() {
   return HEADER_COLORS[Math.floor(Math.random() * HEADER_COLORS.length)];
 }
 
+// Calculate font size to fit text within max width
+function calculateFontSize(text, baseFontSize, maxWidth, avgCharWidth = 0.6) {
+  const approxTextWidth = text.length * baseFontSize * avgCharWidth;
+  if (approxTextWidth <= maxWidth) {
+    return baseFontSize;
+  }
+  // Scale down to fit, with a minimum font size
+  const scaleFactor = maxWidth / approxTextWidth;
+  return Math.max(Math.floor(baseFontSize * scaleFactor), Math.floor(baseFontSize * 0.4));
+}
+
 async function fetchImageAsBuffer(imageUrl, productUrl = null) {
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -85,8 +96,8 @@ export async function generateFeaturedSaleAsset(saleId) {
     
     const { sale, picks } = await fetchSaleWithPicks(saleId);
     
-    const companyField = sale.Company;
-    const company = Array.isArray(companyField) ? companyField[0] : (companyField || 'Sale');
+    // Use OriginalCompanyName (plain text) instead of Company (linked record ID)
+    const company = sale.OriginalCompanyName || sale.CompanyName || 'Sale';
     const percentOff = sale.PercentOff || 0;
     const endDate = sale.EndDate ? new Date(sale.EndDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : null;
     const discountCode = sale.DiscountCode || null;
@@ -121,6 +132,9 @@ export async function generateFeaturedSaleAsset(saleId) {
     const companyUpper = company.toUpperCase();
     const percentOffText = `${percentOff}% OFF`;
     
+    // Calculate dynamic font size for company name (max width ~960px with 60px padding)
+    const companyFontSize = calculateFontSize(companyUpper, 90, 960);
+    
     let headerInfoText = '';
     if (endDate && discountCode) {
       headerInfoText = `UNTIL ${endDate}\nPROMO CODE: ${discountCode}`;
@@ -138,7 +152,7 @@ export async function generateFeaturedSaleAsset(saleId) {
           x="60" 
           y="120" 
           font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
-          font-size="90" 
+          font-size="${companyFontSize}" 
           font-weight="900"
           letter-spacing="-2"
           fill="white"
@@ -375,8 +389,8 @@ export async function generateHeaderOnlyAsset(saleId) {
   const saleData = await saleResponse.json();
   const sale = saleData.fields;
   
-  const companyField = sale.Company;
-  const company = Array.isArray(companyField) ? companyField[0] : (companyField || 'Sale');
+  // Use OriginalCompanyName (plain text) instead of Company (linked record ID)
+  const company = sale.OriginalCompanyName || sale.CompanyName || 'Sale';
   const percentOff = sale.PercentOff || 0;
   const endDate = sale.EndDate ? new Date(sale.EndDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : null;
   const discountCode = sale.DiscountCode || sale.PromoCode || null;
@@ -384,6 +398,15 @@ export async function generateHeaderOnlyAsset(saleId) {
   const headerColor = getRandomColor();
   const companyUpper = company.toUpperCase();
   const percentOffText = `${percentOff}% OFF`;
+  
+  // Calculate font size based on company name length to prevent overflow
+  // Max width is ~920px (1080 - 80 padding on each side)
+  const maxWidth = 920;
+  const baseFontSize = 120;
+  const charsAtBaseSize = 10; // Approximate chars that fit at 120px
+  const companyFontSize = companyUpper.length > charsAtBaseSize 
+    ? Math.max(60, Math.floor(baseFontSize * charsAtBaseSize / companyUpper.length))
+    : baseFontSize;
   
   let headerInfoText = '';
   if (endDate && discountCode) {
@@ -403,7 +426,7 @@ export async function generateHeaderOnlyAsset(saleId) {
         x="80" 
         y="420" 
         font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
-        font-size="120" 
+        font-size="${companyFontSize}" 
         font-weight="900"
         letter-spacing="-3"
         fill="white">
@@ -510,8 +533,8 @@ export async function generateAssetWithPicks(saleId, pickIds) {
   const saleData = await saleResponse.json();
   const sale = saleData.fields;
   
-  const companyField = sale.Company;
-  const company = Array.isArray(companyField) ? companyField[0] : (companyField || 'Sale');
+  // Use OriginalCompanyName (plain text) instead of Company (linked record ID)
+  const company = sale.OriginalCompanyName || sale.CompanyName || 'Sale';
   const percentOff = sale.PercentOff || 0;
   const endDate = sale.EndDate ? new Date(sale.EndDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : null;
   const discountCode = sale.DiscountCode || sale.PromoCode || null;
@@ -541,6 +564,9 @@ export async function generateAssetWithPicks(saleId, pickIds) {
   const companyUpper = company.toUpperCase();
   const percentOffText = `${percentOff}% OFF`;
   
+  // Calculate dynamic font size for company name (max width ~960px with 60px padding)
+  const companyFontSize = calculateFontSize(companyUpper, 90, 960);
+  
   let headerInfoText = '';
   if (endDate && discountCode) {
     headerInfoText = `UNTIL ${endDate}\nPROMO CODE: ${discountCode}`;
@@ -558,7 +584,7 @@ export async function generateAssetWithPicks(saleId, pickIds) {
         x="60" 
         y="120" 
         font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
-        font-size="90" 
+        font-size="${companyFontSize}" 
         font-weight="900"
         letter-spacing="-2"
         fill="white">
