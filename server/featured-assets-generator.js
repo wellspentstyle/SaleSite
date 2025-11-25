@@ -885,15 +885,16 @@ export async function generateMainSaleStory(saleId, customNote = '') {
     .png()
     .toBuffer();
   
-  // Add custom note in black bar at 15% from top with word wrapping
+  // Add custom note in black bar with word wrapping - matches product info styling
   const compositeArray = [];
   
   if (customNote && customNote.trim()) {
     const noteFontSize = 48;
-    const notePadding = 40; // Equal padding on all sides
-    const noteLineHeight = noteFontSize + 16;
-    const charWidth = noteFontSize * 0.6; // More accurate width estimate
-    const maxCharsPerLine = Math.floor((STORY_WIDTH - 200) / charWidth); // Account for margins
+    const notePaddingV = 20; // Vertical padding - matches product info
+    const notePaddingH = 40; // Horizontal padding
+    const noteLineHeight = noteFontSize + 10; // Tighter line spacing
+    const charWidth = noteFontSize * 0.6;
+    const maxCharsPerLine = Math.floor((STORY_WIDTH - 200) / charWidth);
     
     // Word wrap the text
     const words = customNote.trim().split(/\s+/);
@@ -908,7 +909,6 @@ export async function generateMainSaleStory(saleId, customNote = '') {
         if (currentLine) {
           wrappedLines.push(currentLine);
         }
-        // Handle very long words by truncating
         currentLine = word.length > maxCharsPerLine ? word.substring(0, maxCharsPerLine - 3) + '...' : word;
       }
     }
@@ -916,23 +916,22 @@ export async function generateMainSaleStory(saleId, customNote = '') {
       wrappedLines.push(currentLine);
     }
     
-    // Calculate box dimensions - expand to fit all lines
+    // Calculate box dimensions
     let maxLineWidth = 0;
     for (const line of wrappedLines) {
       const lineWidth = Math.ceil(line.length * charWidth);
       if (lineWidth > maxLineWidth) maxLineWidth = lineWidth;
     }
     
-    // Equal padding on left and right (notePadding on each side)
-    const noteBoxWidth = Math.round(Math.min(maxLineWidth + (notePadding * 2), STORY_WIDTH - 160));
-    const noteBoxHeight = Math.round((wrappedLines.length * noteLineHeight) + (notePadding * 2));
+    const noteBoxWidth = Math.round(Math.min(maxLineWidth + (notePaddingH * 2), STORY_WIDTH - 160));
+    const noteBoxHeight = Math.round((wrappedLines.length * noteLineHeight) + (notePaddingV * 2));
     
     let noteTextElements = '';
     wrappedLines.forEach((line, index) => {
       noteTextElements += `
         <text 
-          x="${notePadding}" 
-          y="${notePadding + (index + 1) * noteLineHeight - 12}" 
+          x="${notePaddingH}" 
+          y="${notePaddingV + (index + 1) * noteLineHeight - 10}" 
           font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
           font-size="${noteFontSize}" 
           font-weight="400" 
@@ -949,9 +948,9 @@ export async function generateMainSaleStory(saleId, customNote = '') {
       </svg>
     `;
     
-    // Position at 15% from top with 80px left margin
+    // Position at 15% from top minus 40px, with 80px left margin
     const noteX = 80;
-    const noteY = Math.round(STORY_HEIGHT * 0.15);
+    const noteY = Math.round(STORY_HEIGHT * 0.15) - 40;
     
     compositeArray.push({
       input: Buffer.from(noteSvg),
@@ -1187,14 +1186,15 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
     }
   }
   
-  // Add custom copy overlay - left aligned at x=40, with word wrapping
+  // Add custom copy overlay - left aligned at x=40, matches product info styling
   if (customCopy && customCopy.trim()) {
     const copyFontSize = 36;
-    const copyPadding = 40; // Equal padding on all sides - matches left side
-    const copyLineHeight = copyFontSize + 12;
-    const charWidth = copyFontSize * 0.6; // More accurate width estimate
-    const maxBoxWidth = STORY_WIDTH - 80; // Leave margin on right side
-    const maxCharsPerLine = Math.floor((maxBoxWidth - (copyPadding * 2)) / charWidth);
+    const copyPaddingV = 20; // Vertical padding - matches product info boxes
+    const copyPaddingH = 40; // Horizontal padding
+    const copyLineHeight = copyFontSize + 10; // Tighter line spacing
+    const charWidth = copyFontSize * 0.6;
+    const maxBoxWidth = STORY_WIDTH - 80;
+    const maxCharsPerLine = Math.floor((maxBoxWidth - (copyPaddingH * 2)) / charWidth);
     
     // Word wrap the text
     const words = customCopy.trim().split(/\s+/);
@@ -1209,7 +1209,6 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
         if (currentLine) {
           wrappedLines.push(currentLine);
         }
-        // Handle very long words by truncating
         currentLine = word.length > maxCharsPerLine ? word.substring(0, maxCharsPerLine - 3) + '...' : word;
       }
     }
@@ -1217,23 +1216,22 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
       wrappedLines.push(currentLine);
     }
     
-    // Calculate box dimensions based on wrapped lines
+    // Calculate box dimensions
     let maxLineWidth = 0;
     for (const line of wrappedLines) {
       const lineWidth = Math.ceil(line.length * charWidth);
       if (lineWidth > maxLineWidth) maxLineWidth = lineWidth;
     }
     
-    // Equal padding on left and right (copyPadding on each side)
-    const copyBoxWidth = Math.round(Math.min(maxLineWidth + (copyPadding * 2), maxBoxWidth));
-    const copyBoxHeight = Math.round((wrappedLines.length * copyLineHeight) + (copyPadding * 2));
+    const copyBoxWidth = Math.round(Math.min(maxLineWidth + (copyPaddingH * 2), maxBoxWidth));
+    const copyBoxHeight = Math.round((wrappedLines.length * copyLineHeight) + (copyPaddingV * 2));
     
     let copyTextElements = '';
     wrappedLines.forEach((line, index) => {
       copyTextElements += `
         <text 
-          x="${copyPadding}" 
-          y="${copyPadding + (index + 1) * copyLineHeight - 8}" 
+          x="${copyPaddingH}" 
+          y="${copyPaddingV + (index + 1) * copyLineHeight - 10}" 
           font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
           font-size="${copyFontSize}" 
           font-weight="400" 
@@ -1250,9 +1248,9 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
       </svg>
     `;
     
-    // Position: left aligned at x=40 (same as other elements), ~15% from top
+    // Position: left aligned at x=40, moved up 40px from 15%
     const copyX = 40;
-    const copyY = Math.round(STORY_HEIGHT * 0.15);
+    const copyY = Math.round(STORY_HEIGHT * 0.15) - 40;
     
     compositeArray.push({
       input: Buffer.from(copySvg),
