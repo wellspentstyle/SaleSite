@@ -48,6 +48,13 @@ import {
   removeRejectedBrand,
   getAndRemoveRejectedBrand
 } from './rejected-brands.js';
+import { 
+  postToInstagram, 
+  postCarouselToInstagram, 
+  scheduleInstagramPost, 
+  testConnection as testInstagramConnection, 
+  getConnectedAccounts 
+} from './instagram-poster.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2263,6 +2270,204 @@ app.post('/admin/generate-custom-assets', async (req, res) => {
     
   } catch (error) {
     console.error('Custom assets generation error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== INSTAGRAM POSTING ENDPOINTS ==========
+
+// Test Instagram connection
+app.get('/admin/instagram/test', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const result = await testInstagramConnection();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get connected Instagram accounts
+app.get('/admin/instagram/accounts', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const accounts = await getConnectedAccounts();
+    res.json({ success: true, accounts });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Post a single image to Instagram
+app.post('/admin/instagram/post', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { imageUrl, caption, isStory } = req.body;
+    
+    if (!imageUrl) {
+      return res.status(400).json({ success: false, message: 'Image URL is required' });
+    }
+    
+    const result = await postToInstagram({ imageUrl, caption, isStory });
+    res.json(result);
+    
+  } catch (error) {
+    console.error('Instagram post error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Post a carousel to Instagram
+app.post('/admin/instagram/carousel', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { imageUrls, caption } = req.body;
+    
+    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length < 2) {
+      return res.status(400).json({ success: false, message: 'At least 2 image URLs are required for carousel' });
+    }
+    
+    const result = await postCarouselToInstagram({ imageUrls, caption });
+    res.json(result);
+    
+  } catch (error) {
+    console.error('Instagram carousel error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Schedule a post for later
+app.post('/admin/instagram/schedule', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { imageUrl, caption, scheduledFor, isStory } = req.body;
+    
+    if (!imageUrl || !scheduledFor) {
+      return res.status(400).json({ success: false, message: 'Image URL and scheduledFor are required' });
+    }
+    
+    const result = await scheduleInstagramPost({ imageUrl, caption, scheduledFor, isStory });
+    res.json(result);
+    
+  } catch (error) {
+    console.error('Instagram schedule error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate asset AND post to Instagram in one step
+app.post('/admin/generate-and-post', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { saleId, mainAsset, storyPicks, caption, postMainAsset, postStories } = req.body;
+    
+    if (!saleId) {
+      return res.status(400).json({ success: false, message: 'Sale ID required' });
+    }
+    
+    console.log(`\n📸 Generating and posting assets for sale ${saleId}...`);
+    const results = [];
+    
+    // Generate main asset if requested
+    if (mainAsset) {
+      try {
+        let assetResult;
+        if (mainAsset.type === 'without-picks') {
+          assetResult = await generateHeaderOnlyAsset(saleId);
+        } else if (mainAsset.type === 'with-picks' && mainAsset.pickIds?.length > 0) {
+          assetResult = await generateAssetWithPicks(saleId, mainAsset.pickIds);
+        }
+        
+        if (assetResult && postMainAsset) {
+          // Post to Instagram
+          const driveUrl = assetResult.driveUrl;
+          if (driveUrl) {
+            // Convert Google Drive view link to direct download link
+            const fileId = driveUrl.match(/\/d\/([^\/]+)/)?.[1];
+            const directUrl = fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : driveUrl;
+            
+            const postResult = await postToInstagram({ 
+              imageUrl: directUrl, 
+              caption: caption || '',
+              isStory: false 
+            });
+            results.push({ type: 'main', success: true, ...assetResult, posted: postResult.success, postId: postResult.postId });
+          }
+        } else if (assetResult) {
+          results.push({ type: 'main', success: true, ...assetResult, posted: false });
+        }
+      } catch (error) {
+        console.error('Main asset error:', error);
+        results.push({ type: 'main', success: false, error: error.message });
+      }
+    }
+    
+    // Generate and optionally post story images
+    if (storyPicks && storyPicks.length > 0) {
+      for (const pickConfig of storyPicks) {
+        try {
+          const storyResult = await generatePickStoryWithCopy(pickConfig.pickId, pickConfig.customCopy || '');
+          
+          if (storyResult && postStories) {
+            const fileId = storyResult.driveUrl?.match(/\/d\/([^\/]+)/)?.[1];
+            const directUrl = fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : storyResult.driveUrl;
+            
+            const postResult = await postToInstagram({ 
+              imageUrl: directUrl, 
+              isStory: true 
+            });
+            results.push({ type: 'story', pickId: pickConfig.pickId, success: true, ...storyResult, posted: postResult.success, postId: postResult.postId });
+          } else if (storyResult) {
+            results.push({ type: 'story', pickId: pickConfig.pickId, success: true, ...storyResult, posted: false });
+          }
+        } catch (error) {
+          console.error(`Story error for pick ${pickConfig.pickId}:`, error);
+          results.push({ type: 'story', pickId: pickConfig.pickId, success: false, error: error.message });
+        }
+      }
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    const postedCount = results.filter(r => r.posted).length;
+    
+    res.json({
+      success: true,
+      message: `Generated ${successCount}/${results.length} assets, posted ${postedCount} to Instagram`,
+      results
+    });
+    
+  } catch (error) {
+    console.error('Generate and post error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
-import { Loader2, Image, ImagePlus, X } from 'lucide-react';
+import { Loader2, Image, ImagePlus, Instagram, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE = '/api';
@@ -46,6 +46,11 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
   
   const [selectedStoryPicks, setSelectedStoryPicks] = useState<Set<string>>(new Set());
   const [pickConfigs, setPickConfigs] = useState<Record<string, PickConfig>>({});
+  
+  const [postToInstagram, setPostToInstagram] = useState(false);
+  const [postMainToFeed, setPostMainToFeed] = useState(true);
+  const [postStoriesToIG, setPostStoriesToIG] = useState(true);
+  const [caption, setCaption] = useState('');
 
   useEffect(() => {
     if (sale && open) {
@@ -132,7 +137,7 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
     const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
-      const requestBody = {
+      const requestBody: any = {
         saleId: sale.id,
         mainAsset: generateMainAsset ? {
           type: mainAssetType,
@@ -144,7 +149,16 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
         }))
       };
 
-      const response = await fetch(`${API_BASE}/admin/generate-custom-assets`, {
+      let endpoint = `${API_BASE}/admin/generate-custom-assets`;
+      
+      if (postToInstagram) {
+        endpoint = `${API_BASE}/admin/generate-and-post`;
+        requestBody.caption = caption;
+        requestBody.postMainAsset = postMainToFeed && generateMainAsset;
+        requestBody.postStories = postStoriesToIG && selectedStoryPicks.size > 0;
+      }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +170,12 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
       const data = await response.json();
 
       if (data.success) {
-        toast.success(data.message || 'Assets generated successfully!');
+        if (postToInstagram) {
+          const postedCount = data.results?.filter((r: any) => r.posted).length || 0;
+          toast.success(`${data.message} - Posted ${postedCount} to Instagram!`);
+        } else {
+          toast.success(data.message || 'Assets generated successfully!');
+        }
         onAssetsGenerated();
         onOpenChange(false);
       } else {
@@ -177,6 +196,10 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
     setPickConfigs({});
     setMainAssetType('without-picks');
     setGenerateMainAsset(true);
+    setPostToInstagram(false);
+    setPostMainToFeed(true);
+    setPostStoriesToIG(true);
+    setCaption('');
   };
 
   const handleClose = (open: boolean) => {
@@ -374,11 +397,84 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
               </>
             )}
 
+            <div className="border-t border-gray-200" />
+
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Instagram className="h-5 w-5" />
+                    Post to Instagram
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Automatically post generated assets to Instagram
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox 
+                    checked={postToInstagram}
+                    onCheckedChange={(checked) => setPostToInstagram(checked === true)}
+                  />
+                  <span className="text-sm">Enable</span>
+                </label>
+              </div>
+
+              {postToInstagram && (
+                <div className="space-y-4 pl-4 border-l-2 border-pink-200 bg-pink-50/30 p-4 rounded-r-lg">
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox 
+                        checked={postMainToFeed}
+                        onCheckedChange={(checked) => setPostMainToFeed(checked === true)}
+                        disabled={!generateMainAsset}
+                      />
+                      <span className={`text-sm ${!generateMainAsset ? 'text-gray-400' : ''}`}>
+                        Post main image to feed
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox 
+                        checked={postStoriesToIG}
+                        onCheckedChange={(checked) => setPostStoriesToIG(checked === true)}
+                        disabled={selectedStoryPicks.size === 0}
+                      />
+                      <span className={`text-sm ${selectedStoryPicks.size === 0 ? 'text-gray-400' : ''}`}>
+                        Post stories
+                      </span>
+                    </label>
+                  </div>
+                  
+                  {postMainToFeed && generateMainAsset && (
+                    <div>
+                      <label className="block">
+                        <span className="text-sm font-medium text-gray-700">Caption for Feed Post</span>
+                        <textarea
+                          value={caption}
+                          onChange={(e) => setCaption(e.target.value)}
+                          placeholder={`${sale?.saleName} - ${sale?.percentOff}% off!\n\n#designersale #fashion #sale`}
+                          className="mt-1 w-full text-sm p-3 border border-gray-200 rounded-lg resize-none"
+                          rows={4}
+                        />
+                        <span className="text-xs text-gray-400">
+                          Include hashtags for better reach
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+
             <div className="border-t pt-4 flex items-center justify-between">
               <div className="text-sm text-gray-500">
                 {generateMainAsset && '1 main asset'}
                 {generateMainAsset && selectedStoryPicks.size > 0 && ' + '}
                 {selectedStoryPicks.size > 0 && `${selectedStoryPicks.size} story${selectedStoryPicks.size > 1 ? ' images' : ' image'}`}
+                {postToInstagram && (
+                  <span className="ml-2 text-pink-600">
+                    → posting to Instagram
+                  </span>
+                )}
               </div>
               <div className="flex gap-3">
                 <Button
@@ -391,14 +487,18 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
                 <Button
                   onClick={handleGenerate}
                   disabled={generating || (!generateMainAsset && selectedStoryPicks.size === 0)}
+                  className={postToInstagram ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600' : ''}
                 >
                   {generating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
+                      {postToInstagram ? 'Generating & Posting...' : 'Generating...'}
                     </>
                   ) : (
-                    'Generate Assets'
+                    <>
+                      {postToInstagram && <Send className="mr-2 h-4 w-4" />}
+                      {postToInstagram ? 'Generate & Post' : 'Generate Assets'}
+                    </>
                   )}
                 </Button>
               </div>
