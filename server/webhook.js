@@ -421,9 +421,12 @@ app.post('/admin/pending-brands/:id/approve', async (req, res) => {
       }
     }
     
+    // PriceRange is a multi-select field in Airtable, needs to be an array
+    const priceRangeArray = brand.priceRange ? [brand.priceRange] : [];
+    
     const updateData = {
       Type: brand.type,
-      PriceRange: brand.priceRange,
+      PriceRange: priceRangeArray,
       Category: categoryArray,
       Values: valuesArray,
       MaxWomensSize: brand.maxWomensSize,
