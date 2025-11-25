@@ -4974,6 +4974,10 @@ app.delete('/admin/finalize-drafts/:id', async (req, res) => {
 // SERVE REACT BUILD IN PRODUCTION
 // ============================================
 
+// Serve generated assets (for previews)
+const generatedAssetsPath = path.join(__dirname, '..', 'public', 'generated-assets');
+app.use('/generated-assets', express.static(generatedAssetsPath));
+
 // Serve static files from the React build directory
 const buildPath = path.join(__dirname, '..', 'build');
 app.use(express.static(buildPath));

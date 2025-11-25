@@ -24,6 +24,7 @@ interface AssetResult {
   filename?: string;
   driveFileId?: string;
   driveUrl?: string;
+  localUrl?: string;
   error?: string;
   posted?: boolean;
   postId?: string;
@@ -105,11 +106,17 @@ export function AssetResults() {
     setSelectedAssets(newSet);
   };
 
-  const getThumbnailUrl = (driveUrl: string) => {
-    const fileId = driveUrl.match(/\/d\/([^\/]+)/)?.[1];
-    // Use Google Drive's export URL which works better across environments
-    // Fall back to lh3.googleusercontent.com format which is CORS-friendly
-    return fileId ? `https://lh3.googleusercontent.com/d/${fileId}=w500` : driveUrl;
+  const getThumbnailUrl = (asset: AssetResult) => {
+    // Prefer local URL for previews (much more reliable)
+    if (asset.localUrl) {
+      return asset.localUrl;
+    }
+    // Fall back to Google Drive URL
+    if (asset.driveUrl) {
+      const fileId = asset.driveUrl.match(/\/d\/([^\/]+)/)?.[1];
+      return fileId ? `https://lh3.googleusercontent.com/d/${fileId}=w500` : asset.driveUrl;
+    }
+    return '';
   };
 
   const getDirectDownloadUrl = (driveUrl: string) => {
@@ -289,9 +296,9 @@ export function AssetResults() {
                       }`}
                     >
                       <div className="bg-gray-100 aspect-[9/16]">
-                        {asset.driveUrl && (
+                        {(asset.localUrl || asset.driveUrl) && (
                           <img
-                            src={getThumbnailUrl(asset.driveUrl)}
+                            src={getThumbnailUrl(asset)}
                             alt={asset.filename || 'Generated asset'}
                             className="w-full h-full object-cover"
                             onError={(e) => {

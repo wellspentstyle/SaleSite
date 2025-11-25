@@ -11,6 +11,21 @@ const __dirname = path.dirname(__filename);
 const ASSET_WIDTH = 1080;
 const ASSET_HEIGHT = 1350;
 
+const LOCAL_ASSETS_DIR = path.join(__dirname, '..', 'public', 'generated-assets');
+
+function ensureLocalAssetsDir() {
+  if (!fs.existsSync(LOCAL_ASSETS_DIR)) {
+    fs.mkdirSync(LOCAL_ASSETS_DIR, { recursive: true });
+  }
+}
+
+function saveLocalAsset(filename, buffer) {
+  ensureLocalAssetsDir();
+  const localPath = path.join(LOCAL_ASSETS_DIR, filename);
+  fs.writeFileSync(localPath, buffer);
+  return `/generated-assets/${filename}`;
+}
+
 const HEADER_COLORS = ['#273536', '#145fe9', '#fe6731', '#d2972f'];
 
 const AIRTABLE_PAT = process.env.AIRTABLE_PAT;
@@ -315,6 +330,10 @@ export async function generateFeaturedSaleAsset(saleId) {
     
     console.log(`   ✅ Uploaded to Google Drive: ${filename}`);
     
+    // Save locally for preview
+    const localUrl = saveLocalAsset(filename, finalImage);
+    console.log(`   ✅ Saved locally: ${localUrl}`);
+    
     // Mark sale as having assets generated in Airtable
     try {
       const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
@@ -340,7 +359,8 @@ export async function generateFeaturedSaleAsset(saleId) {
       success: true,
       filename,
       driveFileId: driveResult.fileId,
-      driveUrl: driveResult.webViewLink
+      driveUrl: driveResult.webViewLink,
+      localUrl
     };
     
   } catch (error) {
@@ -488,6 +508,10 @@ export async function generateHeaderOnlyAsset(saleId) {
   
   console.log(`   ✅ Uploaded header-only asset: ${filename}`);
   
+  // Save locally for preview
+  const localUrl = saveLocalAsset(filename, finalImage);
+  console.log(`   ✅ Saved locally: ${localUrl}`);
+  
   // Update Airtable with asset URL
   try {
     const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
@@ -513,7 +537,8 @@ export async function generateHeaderOnlyAsset(saleId) {
     success: true,
     filename,
     driveFileId: driveResult.fileId,
-    driveUrl: driveResult.webViewLink
+    driveUrl: driveResult.webViewLink,
+    localUrl
   };
 }
 
@@ -741,6 +766,10 @@ export async function generateAssetWithPicks(saleId, pickIds) {
   
   console.log(`   ✅ Uploaded asset with picks: ${filename}`);
   
+  // Save locally for preview
+  const localUrl = saveLocalAsset(filename, finalImage);
+  console.log(`   ✅ Saved locally: ${localUrl}`);
+  
   // Update Airtable
   try {
     const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
@@ -765,7 +794,8 @@ export async function generateAssetWithPicks(saleId, pickIds) {
     success: true,
     filename,
     driveFileId: driveResult.fileId,
-    driveUrl: driveResult.webViewLink
+    driveUrl: driveResult.webViewLink,
+    localUrl
   };
 }
 
@@ -984,6 +1014,10 @@ export async function generateMainSaleStory(saleId, customNote = '') {
   
   console.log(`   ✅ Uploaded main sale story: ${filename}`);
   
+  // Save locally for preview
+  const localUrl = saveLocalAsset(filename, finalImage);
+  console.log(`   ✅ Saved locally: ${localUrl}`);
+  
   // Update Airtable with asset URL
   try {
     const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
@@ -1009,7 +1043,8 @@ export async function generateMainSaleStory(saleId, customNote = '') {
     success: true,
     filename,
     driveFileId: driveResult.fileId,
-    driveUrl: driveResult.webViewLink
+    driveUrl: driveResult.webViewLink,
+    localUrl
   };
 }
 
@@ -1323,10 +1358,15 @@ export async function generatePickStoryWithCopy(pickId, customCopy = '') {
   
   console.log(`   ✅ Uploaded story: ${filename}`);
   
+  // Save locally for preview
+  const localUrl = saveLocalAsset(filename, finalImage);
+  console.log(`   ✅ Saved locally: ${localUrl}`);
+  
   return {
     success: true,
     filename,
     driveFileId: driveResult.fileId,
-    driveUrl: driveResult.webViewLink
+    driveUrl: driveResult.webViewLink,
+    localUrl
   };
 }
