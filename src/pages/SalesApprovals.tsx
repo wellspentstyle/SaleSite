@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
-import { Loader2, Check, X, ExternalLink, AlertCircle, Edit2 } from 'lucide-react';
+import { Loader2, Check, X, ExternalLink, AlertCircle, Edit2, Plus } from 'lucide-react';
 import { EditSaleDialog } from '../components/EditSaleDialog';
 
 interface RejectedEmail {
@@ -44,6 +45,7 @@ interface DuplicateSale {
 const API_BASE = '/api';
 
 export function SalesApprovals() {
+  const navigate = useNavigate();
   const [pendingSales, setPendingSales] = useState<PendingSale[]>([]);
   const [rejectedEmails, setRejectedEmails] = useState<RejectedEmail[]>([]);
   const [approvalsEnabled, setApprovalsEnabled] = useState(false);
@@ -256,6 +258,10 @@ export function SalesApprovals() {
             <h1 className="text-3xl font-bold">Sales Approvals</h1>
             <p className="text-gray-600 mt-1">Review and approve incoming sales before they're added to Airtable</p>
           </div>
+          <Button onClick={() => navigate('/admin/sales-approvals/manual')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Sale
+          </Button>
         </div>
       
         {/* Settings Card */}

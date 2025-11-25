@@ -10,6 +10,7 @@ import { SyncGem } from './pages/SyncGem';
 import { GenerateAssets } from './pages/GenerateAssets';
 import { Freshness } from './pages/Freshness';
 import { SalesApprovals } from './pages/SalesApprovals';
+import { ManualSaleEntry } from './pages/ManualSaleEntry';
 import { Toaster } from './components/ui/sonner';
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="picks/finalize" element={<FinalizePicks />} />
           <Route path="picks/manual" element={<ManualPickEntry />} />
           <Route path="sales-approvals" element={<SalesApprovals />} />
+          <Route path="sales-approvals/manual" element={<ManualSaleEntry />} />
           <Route path="brands" element={<AddBrands />} />
           <Route path="assets" element={<GenerateAssets />} />
           <Route path="freshness" element={<Freshness />} />

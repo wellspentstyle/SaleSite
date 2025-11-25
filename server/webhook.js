@@ -3399,6 +3399,47 @@ app.get('/rejected-emails', async (req, res) => {
   }
 });
 
+// Add a manual pending sale
+app.post('/pending-sales/manual', (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const { company, percentOff, saleUrl, discountCode, startDate, endDate } = req.body;
+    
+    if (!company || !percentOff) {
+      return res.status(400).json({ success: false, error: 'Company and percentOff are required' });
+    }
+    
+    const pendingSale = addPendingSale({
+      company,
+      percentOff,
+      saleUrl: saleUrl || null,
+      cleanUrl: saleUrl || null,
+      discountCode: discountCode || null,
+      startDate: startDate || new Date().toISOString().split('T')[0],
+      endDate: endDate || null,
+      confidence: 100,
+      reasoning: 'Manually added sale',
+      companyRecordId: null,
+      emailFrom: 'manual entry',
+      emailSubject: 'Manual sale entry',
+      missingUrl: !saleUrl,
+      urlSource: saleUrl ? 'manual' : 'none'
+    });
+    
+    console.log(`✅ Manual sale added: ${company} - ${percentOff}% off`);
+    
+    res.json({ success: true, sale: pendingSale });
+  } catch (error) {
+    console.error('Error adding manual sale:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Check for duplicate sales in Airtable
 app.post('/check-duplicates/:id', async (req, res) => {
   const { auth } = req.headers;
