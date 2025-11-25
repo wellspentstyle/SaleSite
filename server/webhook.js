@@ -38,6 +38,10 @@ import {
   removePendingBrand,
   updatePendingBrand
 } from './pending-brands.js';
+import {
+  getRejectedEmails,
+  addRejectedEmail
+} from './rejected-emails.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2867,6 +2871,15 @@ ${emailContent.substring(0, 4000)}`
     if (saleData.error) {
       console.log('ℹ️  Email rejected:', saleData.error);
       console.log('   Reasoning:', saleData.reasoning);
+      
+      // Track rejected email
+      await addRejectedEmail({
+        brand: saleData.company || 'Unknown',
+        subject: subject,
+        reason: saleData.error,
+        from: from
+      });
+      
       return res.status(200).json({ 
         success: false, 
         message: saleData.error,
@@ -2883,6 +2896,15 @@ ${emailContent.substring(0, 4000)}`
         hasSaleUrl: !!saleData.saleUrl,
         hasPercentOff: !!saleData.percentOff
       });
+      
+      // Track rejected email
+      await addRejectedEmail({
+        brand: saleData.company || 'Unknown',
+        subject: subject,
+        reason: 'Missing required fields (company, URL, or discount)',
+        from: from
+      });
+      
       return res.status(200).json({ 
         success: false, 
         message: 'Missing required fields',
@@ -2897,6 +2919,14 @@ ${emailContent.substring(0, 4000)}`
       console.log('   Reasoning:', saleData.reasoning);
       console.log('   Email from:', from);
       console.log('   Subject:', subject);
+      
+      // Track rejected email
+      await addRejectedEmail({
+        brand: saleData.company || 'Unknown',
+        subject: subject,
+        reason: `Low confidence (${saleData.confidence}%) - ${saleData.reasoning || 'unclear sale details'}`,
+        from: from
+      });
       
       // Log to help debug false negatives
       return res.status(200).json({ 
@@ -2973,6 +3003,14 @@ ${emailContent.substring(0, 4000)}`
       });
       
       if (isDuplicate) {
+        // Track rejected email
+        await addRejectedEmail({
+          brand: saleData.company,
+          subject: subject,
+          reason: `Duplicate - similar ${saleData.percentOff}% sale already exists`,
+          from: from
+        });
+        
         return res.status(200).json({ 
           success: false, 
           message: 'Duplicate sale - similar sale exists in past 2 weeks',
@@ -3210,6 +3248,24 @@ app.get('/pending-sales', (req, res) => {
     res.json({ success: true, sales: pending });
   } catch (error) {
     console.error('Error getting pending sales:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get rejected emails (emails that weren't added to approval queue)
+app.get('/rejected-emails', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const rejected = await getRejectedEmails();
+    const limit = parseInt(req.query.limit) || 5;
+    res.json({ success: true, emails: rejected.slice(0, limit) });
+  } catch (error) {
+    console.error('Error getting rejected emails:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

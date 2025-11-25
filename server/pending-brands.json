@@ -33,22 +33,6 @@
     "createdAt": "2025-11-24T20:42:53.219Z"
   },
   {
-    "name": "R13",
-    "airtableRecordId": "rec0ssQq25G9rhabh",
-    "type": "Brand",
-    "priceRange": "$$$",
-    "category": "Clothing, Shoes",
-    "values": "Independent label",
-    "maxWomensSize": "",
-    "sizingSource": "",
-    "description": "If you love the Saint Laurent aesthetic but want something that feels more downtown than uptown, R13 captures that same rock-and-roll energy with grittier, more authentic detailing. Chris Leba's background in denim shows in everything—even the knitwear has that perfect lived-in drape, and the distressing always looks like it happened naturally over years of actual wear.",
-    "notes": "Price: From 37 products via Shopping API | Categories: From 37 Shopping API products | Sizing: Not found",
-    "url": "https://r13.com",
-    "qualityScore": 83,
-    "id": "brand_1764016985843_5xcagdzao",
-    "createdAt": "2025-11-24T20:43:05.843Z"
-  },
-  {
     "name": "Prada",
     "airtableRecordId": "rec1fAkB8oJBdyREp",
     "type": "Brand",
