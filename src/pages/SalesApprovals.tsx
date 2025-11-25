@@ -3,7 +3,15 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
-import { Loader2, Check, X, ExternalLink } from 'lucide-react';
+import { Loader2, Check, X, ExternalLink, AlertCircle } from 'lucide-react';
+
+interface RejectedEmail {
+  brand: string;
+  subject: string;
+  reason: string;
+  from: string;
+  rejectedAt: string;
+}
 
 interface PendingSale {
   id: string;
@@ -34,6 +42,7 @@ const API_BASE = '/api';
 
 export function SalesApprovals() {
   const [pendingSales, setPendingSales] = useState<PendingSale[]>([]);
+  const [rejectedEmails, setRejectedEmails] = useState<RejectedEmail[]>([]);
   const [approvalsEnabled, setApprovalsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -51,26 +60,32 @@ export function SalesApprovals() {
     try {
       setLoading(true);
       
-      const [salesRes, settingsRes] = await Promise.all([
+      const [salesRes, settingsRes, rejectedRes] = await Promise.all([
         fetch(`${API_BASE}/pending-sales`, {
           headers: { 'auth': auth }
         }),
         fetch(`${API_BASE}/approval-settings`, {
+          headers: { 'auth': auth }
+        }),
+        fetch(`${API_BASE}/rejected-emails`, {
           headers: { 'auth': auth }
         })
       ]);
       
       const salesData = await salesRes.json();
       const settingsData = await settingsRes.json();
+      const rejectedData = await rejectedRes.json();
       
       if (salesData.success) {
-        // Don't filter on initial load - let admin see all pending sales
-        // They can expand each sale to check for duplicates manually
         setPendingSales(salesData.sales);
       }
       
       if (settingsData.success) {
         setApprovalsEnabled(settingsData.settings.approvalsEnabled);
+      }
+      
+      if (rejectedData.success) {
+        setRejectedEmails(rejectedData.emails);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -417,6 +432,64 @@ export function SalesApprovals() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Rejected Emails */}
+        <div className="space-y-4 mt-8">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-xl font-bold">
+              Recently Rejected ({rejectedEmails.length})
+            </h2>
+          </div>
+          
+          {rejectedEmails.length === 0 ? (
+            <Card>
+              <CardContent className="py-8">
+                <p className="text-center text-muted-foreground">
+                  No rejected emails yet
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left p-3 font-medium">Brand</th>
+                        <th className="text-left p-3 font-medium">Subject</th>
+                        <th className="text-left p-3 font-medium">Reason</th>
+                        <th className="text-left p-3 font-medium">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rejectedEmails.map((email, index) => (
+                        <tr key={index} className="border-b last:border-0 hover:bg-muted/25">
+                          <td className="p-3 font-medium">{email.brand}</td>
+                          <td className="p-3 text-muted-foreground max-w-[200px] truncate" title={email.subject}>
+                            {email.subject}
+                          </td>
+                          <td className="p-3">
+                            <span className="inline-block px-2 py-1 bg-red-50 text-red-700 rounded text-xs">
+                              {email.reason}
+                            </span>
+                          </td>
+                          <td className="p-3 text-muted-foreground whitespace-nowrap">
+                            {new Date(email.rejectedAt).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Shows the last 5 emails that were rejected from the approval queue
+          </p>
         </div>
       </div>
     </div>
