@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Button } from '../components/ui/button';
-import { Loader2, ExternalLink, Settings } from 'lucide-react';
-import { toast } from 'sonner';
-import { AssetConfigurator } from '../components/AssetConfigurator';
+import { useNavigate } from 'react-router-dom';
+import { Loader2, ExternalLink, ChevronRight } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -19,12 +17,10 @@ interface Sale {
 type TabType = 'has-picks' | 'no-picks' | 'assets-generated';
 
 export function GenerateAssets() {
+  const navigate = useNavigate();
   const [sales, setSales] = useState<Sale[]>([]);
   const [loadingSales, setLoadingSales] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('has-picks');
-  
-  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
-  const [configuratorOpen, setConfiguratorOpen] = useState(false);
 
   useEffect(() => {
     fetchSales();
@@ -67,13 +63,8 @@ export function GenerateAssets() {
     }
   };
 
-  const handleOpenConfigurator = (sale: Sale) => {
-    setSelectedSale(sale);
-    setConfiguratorOpen(true);
-  };
-
-  const handleAssetsGenerated = () => {
-    fetchSales();
+  const handleConfigureSale = (sale: Sale) => {
+    navigate(`/admin/assets/configure/${sale.id}`);
   };
 
   const filteredSales = getFilteredSales();
@@ -137,7 +128,7 @@ export function GenerateAssets() {
                     {filteredSales.map((sale) => (
                       <div
                         key={sale.id}
-                        onClick={() => handleOpenConfigurator(sale)}
+                        onClick={() => handleConfigureSale(sale)}
                         className="border border-border bg-white cursor-pointer transition-all hover:shadow-md hover:border-black p-5 group"
                       >
                         <div className="flex items-start justify-between">
@@ -151,7 +142,7 @@ export function GenerateAssets() {
                               <span>{sale.picksCount} picks</span>
                             </div>
                           </div>
-                          <Settings className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
+                          <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
                         </div>
                       </div>
                     ))}
@@ -199,7 +190,7 @@ export function GenerateAssets() {
                     {filteredSales.map((sale) => (
                       <div
                         key={sale.id}
-                        onClick={() => handleOpenConfigurator(sale)}
+                        onClick={() => handleConfigureSale(sale)}
                         className="border border-border bg-white p-5 cursor-pointer hover:shadow-md hover:border-black transition-all group"
                       >
                         <div className="flex items-start justify-between">
@@ -231,7 +222,7 @@ export function GenerateAssets() {
                                 <ExternalLink className="h-4 w-4" />
                               </a>
                             )}
-                            <Settings className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
+                            <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
                           </div>
                         </div>
                       </div>
@@ -243,13 +234,6 @@ export function GenerateAssets() {
           </>
         )}
       </div>
-
-      <AssetConfigurator
-        sale={selectedSale}
-        open={configuratorOpen}
-        onOpenChange={setConfiguratorOpen}
-        onAssetsGenerated={handleAssetsGenerated}
-      />
     </div>
   );
 }

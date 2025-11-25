@@ -8,6 +8,8 @@ import { ManualPickEntry } from './pages/ManualPickEntry';
 import { AddBrands } from './pages/AddBrands';
 import { SyncGem } from './pages/SyncGem';
 import { GenerateAssets } from './pages/GenerateAssets';
+import { ConfigureAssets } from './pages/ConfigureAssets';
+import { AssetResults } from './pages/AssetResults';
 import { Freshness } from './pages/Freshness';
 import { SalesApprovals } from './pages/SalesApprovals';
 import { ManualSaleEntry } from './pages/ManualSaleEntry';
@@ -29,6 +31,8 @@ export default function App() {
           <Route path="sales-approvals/manual" element={<ManualSaleEntry />} />
           <Route path="brands" element={<AddBrands />} />
           <Route path="assets" element={<GenerateAssets />} />
+          <Route path="assets/configure/:saleId" element={<ConfigureAssets />} />
+          <Route path="assets/results" element={<AssetResults />} />
           <Route path="freshness" element={<Freshness />} />
           <Route path="sync" element={<SyncGem />} />
         </Route>
