@@ -1,0 +1,150 @@
+Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+injected.js:37 Response status: 500
+injected.js:37 Response data: Object
+injected.js:37 Generation failed: pool is not defined
+client:802 WebSocket connection to 'wss://localhost:5000/?token=lkxpn_WwNPqz' failed: 
+createConnection @ client:802
+injected.js:37 [vite] failed to connect to websocket (Error: WebSocket closed without opened.). 
+(anonymous) @ injected.js:37
+client:454 Uncaught (in promise) Error: WebSocket closed without opened.
+    at WebSocket.<anonymous> (client:454:22)
+o1151714.ingest.sentry.io/api/6318792/envelope/?sentry_key=8aa91189a4274b5a8c9b7b01d46ea360&sentry_version=7&sentry_client=sentry.javascript.browser%2F7.112.0:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1764079892187&sid=92c1233e-d600-4810-a10c-a4e3abf48579&ec=2608&gz=1:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A63ab6721&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=70f43e0b-907a-4d80-b361-de34cf24adaf:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+r.stripe.com/b:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+r.stripe.com/b:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+ingest.app.coframe.com/ingest/v2/batched_events/68c9ad4d4cddb58cf3a1f93d/:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+stallwart.build.js:1 stallwart: failed ping 1
+shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1  POST https://r.stripe.com/b net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+e @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+c @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+value @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+value @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+value @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+value @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+value @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+(anonymous) @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1 Uncaught (in promise) FetchError: Error fetching https://r.stripe.com/b: Failed to fetch
+    at shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1:227215
+(anonymous) @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+Promise.catch
+(anonymous) @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+e @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+c @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+value @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+value @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+value @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+value @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+value @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+(anonymous) @ shared-ac5b47a2cee8e7ec43a4d9273d5f1a3d.js:1
+1471 log entries are not shown.
+0d116a0874b360a7.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1764079894551&sid=92c1233e-d600-4810-a10c-a4e3abf48579&ec=2608&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ 0d116a0874b360a7.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ aef1f2c6f8544e95.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+value @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+value @ e7f41799b4d05fca.js:2
+e.<computed> @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ aef1f2c6f8544e95.js:2
+s @ e7f41799b4d05fca.js:2
+injected.js:37 handleGenerate called
+injected.js:37 sale: {id: 'recnBdgtZsldAvYsP', saleName: 'Outnet: 25% Off', percentOff: 25, company: Array(1)}
+injected.js:37 hasMainAsset: true hasStoryPicks: true
+injected.js:37 Making POST request to: /api/admin/asset-jobs
+injected.js:37 Request body: {saleId: 'recnBdgtZsldAvYsP', mainAsset: {…}, storyPicks: Array(2)}
+injected.js:214  POST https://35223a36-d499-4824-85dc-610ac9b236bd-00-21asulc06wet7.kirk.replit.dev/api/admin/asset-jobs 500 (Internal Server Error)
+apply @ injected.js:214
+handleGenerate @ ConfigureAssets.tsx:262
+callCallback2 @ chunk-K23GC2QC.js?v=1174d0c8:3680
+invokeGuardedCallbackDev @ chunk-K23GC2QC.js?v=1174d0c8:3705
+invokeGuardedCallback @ chunk-K23GC2QC.js?v=1174d0c8:3739
+invokeGuardedCallbackAndCatchFirstError @ chunk-K23GC2QC.js?v=1174d0c8:3742
+executeDispatch @ chunk-K23GC2QC.js?v=1174d0c8:7046
+processDispatchQueueItemsInOrder @ chunk-K23GC2QC.js?v=1174d0c8:7066
+processDispatchQueue @ chunk-K23GC2QC.js?v=1174d0c8:7075
+dispatchEventsForPlugins @ chunk-K23GC2QC.js?v=1174d0c8:7083
+(anonymous) @ chunk-K23GC2QC.js?v=1174d0c8:7206
+batchedUpdates$1 @ chunk-K23GC2QC.js?v=1174d0c8:18966
+batchedUpdates @ chunk-K23GC2QC.js?v=1174d0c8:3585
+dispatchEventForPluginEventSystem @ chunk-K23GC2QC.js?v=1174d0c8:7205
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-K23GC2QC.js?v=1174d0c8:5484
+dispatchEvent @ chunk-K23GC2QC.js?v=1174d0c8:5478
+dispatchDiscreteEvent @ chunk-K23GC2QC.js?v=1174d0c8:5455
+injected.js:37 Response status: 500
+injected.js:37 Response data: {success: false, message: 'pool is not defined'}
+injected.js:37 Generation failed: pool is not defined
+0d116a0874b360a7.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1764079896598&sid=92c1233e-d600-4810-a10c-a4e3abf48579&ec=2608&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ 0d116a0874b360a7.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ aef1f2c6f8544e95.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+value @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+value @ e7f41799b4d05fca.js:2
+e.<computed> @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ aef1f2c6f8544e95.js:2
+s @ e7f41799b4d05fca.js:2
+cf.js?config=%257B%2522projectId%2522%253A%252268c9ad4d4cddb58cf3a1f93d%2522%252C%2522startTime%2522%253A1764032361134%252C%2522timeoutMs%2522%253A1000%252C%2522currentUrl%2522%253A%2522https%253A%252F%252Freplit.com%252F%2540karitek%252FSaleSite%2522%252C%2522trackingOnly%2522%253Atrue%257D:10  POST https://ingest.app.coframe.com/ingest/v2/batched_events/68c9ad4d4cddb58cf3a1f93d/ net::ERR_BLOCKED_BY_CLIENT
+q @ cf.js?config=%257B%2522projectId%2522%253A%252268c9ad4d4cddb58cf3a1f93d%2522%252C%2522startTime%2522%253A1764032361134%252C%2522timeoutMs%2522%253A1000%252C%2522currentUrl%2522%253A%2522https%253A%252F%252Freplit.com%252F%2540karitek%252FSaleSite%2522%252C%2522trackingOnly%2522%253Atrue%257D:10
+M @ cf.js?config=%257B%2522projectId%2522%253A%252268c9ad4d4cddb58cf3a1f93d%2522%252C%2522startTime%2522%253A1764032361134%252C%2522timeoutMs%2522%253A1000%252C%2522currentUrl%2522%253A%2522https%253A%252F%252Freplit.com%252F%2540karitek%252FSaleSite%2522%252C%2522trackingOnly%2522%253Atrue%257D:10
+(anonymous) @ cf.js?config=%257B%2522projectId%2522%253A%252268c9ad4d4cddb58cf3a1f93d%2522%252C%2522startTime%2522%253A1764032361134%252C%2522timeoutMs%2522%253A1000%252C%2522currentUrl%2522%253A%2522https%253A%252F%252Freplit.com%252F%2540karitek%252FSaleSite%2522%252C%2522trackingOnly%2522%253Atrue%257D:10
+0d116a0874b360a7.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1764079901127&sid=92c1233e-d600-4810-a10c-a4e3abf48579&ec=2608&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ 0d116a0874b360a7.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ aef1f2c6f8544e95.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+value @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+value @ e7f41799b4d05fca.js:2
+e.<computed> @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ aef1f2c6f8544e95.js:2
+s @ e7f41799b4d05fca.js:2
+0d116a0874b360a7.js:2  ERROR  [Statsig] A networking error occurred during POST request to https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1764079901127&sid=92c1233e-d600-4810-a10c-a4e3abf48579&ec=2608&gz=1. TypeError: Failed to fetch TypeError: Failed to fetch
+    at 0d116a0874b360a7.js:2:106527
+    at t.<anonymous> (e7f41799b4d05fca.js:2:45850)
+    at Object.next (aef1f2c6f8544e95.js:2:11778)
+    at e7f41799b4d05fca.js:2:42952
+    at new Promise (<anonymous>)
+    at e7f41799b4d05fca.js:2:42706
+    at t.value (e7f41799b4d05fca.js:2:44940)
+    at e7f41799b4d05fca.js:2:31768
+    at e.value (e7f41799b4d05fca.js:2:32175)
+    at e.<computed> [as _sendRequest] (e7f41799b4d05fca.js:2:31708)
+    at t.<anonymous> (e7f41799b4d05fca.js:2:47326)
+    at Object.next (aef1f2c6f8544e95.js:2:11778)
+    at s (e7f41799b4d05fca.js:2:42762)
+(anonymous) @ 0d116a0874b360a7.js:2
+value @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ aef1f2c6f8544e95.js:2
+s @ e7f41799b4d05fca.js:2
+Promise.then
+l @ e7f41799b4d05fca.js:2
+u @ e7f41799b4d05fca.js:2
+Promise.then
+l @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+value @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+value @ e7f41799b4d05fca.js:2
+e.<computed> @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ aef1f2c6f8544e95.js:2
+s @ e7f41799b4d05fca.js:2
+0d116a0874b360a7.js:2   WARN  [Statsig] Failed to flush events.
+(anonymous) @ 0d116a0874b360a7.js:2
+value @ e7f41799b4d05fca.js:2
+(anonymous) @ e7f41799b4d05fca.js:2
+(anonymous) @ aef1f2c6f8544e95.js:2
+s @ e7f41799b4d05fca.js:2
+0d116a0874b360a7.js:2   WARN  [Statsig] Unable to save failed logs to storage

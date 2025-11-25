@@ -6,6 +6,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { execSync } from 'child_process';
 import { scrapeProduct } from './scrapers/index.js';
 import crypto from 'crypto';
+import pg from 'pg';
+const { Pool } = pg;
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeTelegramBot, sendAlertToTelegram, sendSaleApprovalAlert } from './telegram-bot.js';
@@ -72,6 +74,11 @@ const openai = new OpenAI({
 // Initialize Anthropic with API key
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+// Initialize PostgreSQL pool for asset jobs
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
 });
 
 // Airtable configuration
