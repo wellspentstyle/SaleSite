@@ -3457,25 +3457,13 @@ app.post('/sales/add-direct', async (req, res) => {
     
     console.log(`💾 Adding sale directly to Airtable: ${company} - ${percentOff}% off`);
     
-    // Look up company record ID
-    let companyRecordId = null;
-    try {
-      const normalizedName = company.toLowerCase().trim();
-      const companiesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}?filterByFormula=${encodeURIComponent(`LOWER({Name}) = "${normalizedName}"`)}`;
-      
-      const companyResponse = await fetch(companiesUrl, {
-        headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
-      });
-      
-      if (companyResponse.ok) {
-        const companyData = await companyResponse.json();
-        if (companyData.records && companyData.records.length > 0) {
-          companyRecordId = companyData.records[0].id;
-          console.log(`✅ Found company record: ${companyRecordId}`);
-        }
-      }
-    } catch (error) {
-      console.error('⚠️  Company lookup failed:', error.message);
+    // Find or create company record (same logic as email automation)
+    console.log('🔗 Looking up or creating Company record...');
+    const companyRecordId = await findOrCreateCompany(company);
+    if (companyRecordId) {
+      console.log(`✅ Company record: ${companyRecordId}`);
+    } else {
+      console.log('⚠️  Could not find or create company record');
     }
     
     // Create Airtable record
