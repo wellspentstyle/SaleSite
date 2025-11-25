@@ -826,13 +826,27 @@ export async function generateMainSaleStory(saleId, customNote = '') {
     headerInfoLines = 1;
   }
   
-  // Calculate link position based on header info lines
-  const linkYPosition = headerInfoLines === 2 ? 1260 : (headerInfoLines === 1 ? 1180 : 1020);
-  
   // Create the full-height story with colored background
+  // Link goes above brand name, centered, with same spacing as between brand and percent off
+  // Brand at y=700, percent off at y=920, gap = 220px
+  // So link should be at y = 700 - 220 = 480 (baseline position)
+  const linkYPosition = 480;
+  
   const svg = `
     <svg width="${STORY_WIDTH}" height="${STORY_HEIGHT}">
       <rect width="100%" height="100%" fill="${headerColor}"/>
+      
+      ${saleLink ? `
+      <text 
+        x="${STORY_WIDTH / 2}" 
+        y="${linkYPosition}" 
+        text-anchor="middle"
+        font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif" 
+        font-size="64" 
+        fill="white">
+        🔗🔗🔗
+      </text>
+      ` : ''}
       
       <text 
         x="80" 
@@ -879,17 +893,6 @@ export async function generateMainSaleStory(saleId, customNote = '') {
         ${escapeHtml(headerInfoText.split('\n')[1])}
       </text>
       ` : ''}
-      ` : ''}
-      
-      ${saleLink ? `
-      <text 
-        x="80" 
-        y="${linkYPosition}" 
-        font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif" 
-        font-size="64" 
-        fill="white">
-        🔗🔗🔗
-      </text>
       ` : ''}
     </svg>
   `;
