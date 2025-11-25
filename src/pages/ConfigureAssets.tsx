@@ -38,9 +38,8 @@ export function ConfigureAssets() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   
-  const [mainAssetType, setMainAssetType] = useState<'without-picks' | 'with-picks'>('without-picks');
-  const [selectedMainPicks, setSelectedMainPicks] = useState<Set<string>>(new Set());
   const [generateMainAsset, setGenerateMainAsset] = useState(true);
+  const [mainAssetNote, setMainAssetNote] = useState('');
   
   const [selectedStoryPicks, setSelectedStoryPicks] = useState<Set<string>>(new Set());
   const [pickConfigs, setPickConfigs] = useState<Record<string, PickConfig>>({});
@@ -50,13 +49,6 @@ export function ConfigureAssets() {
       fetchSaleAndPicks(saleId);
     }
   }, [saleId]);
-
-  useEffect(() => {
-    if (picks.length > 0 && selectedMainPicks.size === 0) {
-      const firstThree = picks.slice(0, 3).map(p => p.id);
-      setSelectedMainPicks(new Set(firstThree));
-    }
-  }, [picks]);
 
   const fetchSaleAndPicks = async (id: string) => {
     setLoading(true);
@@ -100,20 +92,6 @@ export function ConfigureAssets() {
     }
   };
 
-  const toggleMainPick = (pickId: string) => {
-    const newSet = new Set(selectedMainPicks);
-    if (newSet.has(pickId)) {
-      newSet.delete(pickId);
-    } else {
-      if (newSet.size < 3) {
-        newSet.add(pickId);
-      } else {
-        toast.error('Maximum 3 picks for main asset');
-      }
-    }
-    setSelectedMainPicks(newSet);
-  };
-
   const toggleStoryPick = (pickId: string) => {
     const newSet = new Set(selectedStoryPicks);
     if (newSet.has(pickId)) {
@@ -149,8 +127,7 @@ export function ConfigureAssets() {
       const requestBody = {
         saleId: sale.id,
         mainAsset: generateMainAsset ? {
-          type: mainAssetType,
-          pickIds: mainAssetType === 'with-picks' ? Array.from(selectedMainPicks) : []
+          customNote: mainAssetNote || ''
         } : null,
         storyPicks: Array.from(selectedStoryPicks).map(pickId => ({
           pickId,
@@ -234,10 +211,10 @@ export function ConfigureAssets() {
             <div>
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <Image className="h-5 w-5" />
-                Main Sale Image (1080x1350)
+                Main Sale Story (1080x1920)
               </h3>
               <p className="text-sm text-gray-500 mt-1">
-                Feed post with brand name and discount
+                Story with brand name and discount percentage
               </p>
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
@@ -251,75 +228,21 @@ export function ConfigureAssets() {
 
           {generateMainAsset && (
             <div className="space-y-4 pl-4 border-l-2 border-gray-200">
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setMainAssetType('without-picks')}
-                  className={`flex-1 p-4 border-2 rounded-lg transition-all font-sans ${
-                    mainAssetType === 'without-picks'
-                      ? 'border-black bg-gray-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-medium">Without Picks</div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    Header only with brand name
-                  </div>
-                </button>
-                <button
-                  onClick={() => picks.length > 0 && setMainAssetType('with-picks')}
-                  disabled={picks.length === 0}
-                  className={`flex-1 p-4 border-2 rounded-lg transition-all font-sans ${
-                    picks.length === 0 
-                      ? 'opacity-50 cursor-not-allowed border-gray-200'
-                      : mainAssetType === 'with-picks'
-                        ? 'border-black bg-gray-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-medium">With Picks</div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    {picks.length === 0 ? 'No picks available' : 'Header + product images below'}
-                  </div>
-                </button>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">
+                  Custom Note (optional)
+                </label>
+                <textarea
+                  value={mainAssetNote}
+                  onChange={(e) => setMainAssetNote(e.target.value)}
+                  placeholder="Add a note (e.g. 'Free shipping over $100')"
+                  className="w-full p-3 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  rows={2}
+                />
+                <p className="text-xs text-gray-500">
+                  Appears in a black bar at the bottom-left of the image
+                </p>
               </div>
-
-              {mainAssetType === 'with-picks' && picks.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">
-                    Select up to 3 picks to feature ({selectedMainPicks.size}/3):
-                  </p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {picks.map((pick) => (
-                      <div
-                        key={pick.id}
-                        onClick={() => toggleMainPick(pick.id)}
-                        className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
-                          selectedMainPicks.has(pick.id)
-                            ? 'border-black ring-2 ring-black ring-offset-1'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="aspect-square bg-gray-100">
-                          <img
-                            src={pick.imageUrl}
-                            alt={pick.productName}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="p-2">
-                          <p className="text-xs font-medium truncate">{pick.productName}</p>
-                          <p className="text-xs text-gray-500">${pick.salePrice}</p>
-                        </div>
-                        {selectedMainPicks.has(pick.id) && (
-                          <div className="absolute top-2 right-2 bg-black text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">
-                            ✓
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </section>

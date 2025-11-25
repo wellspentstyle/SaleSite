@@ -328,7 +328,7 @@ export function AssetResults() {
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <div className={`bg-gray-100 ${asset.type === 'main' ? 'aspect-[4/5]' : 'aspect-[9/16]'}`}>
+                      <div className="bg-gray-100 aspect-[9/16]">
                         {asset.driveUrl && (
                           <img
                             src={getThumbnailUrl(asset.driveUrl)}

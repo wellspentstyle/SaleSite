@@ -10,7 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeTelegramBot, sendAlertToTelegram, sendSaleApprovalAlert } from './telegram-bot.js';
 import { scrapeGemItems } from './gem-scraper.js';
-import { generateMultipleFeaturedAssets, generateHeaderOnlyAsset, generateAssetWithPicks, generatePickStoryWithCopy } from './featured-assets-generator.js';
+import { generateMultipleFeaturedAssets, generateHeaderOnlyAsset, generateAssetWithPicks, generatePickStoryWithCopy, generateMainSaleStory } from './featured-assets-generator.js';
 import { 
   addPendingSale, 
   getPendingSales, 
@@ -2228,18 +2228,13 @@ app.post('/admin/generate-custom-assets', async (req, res) => {
     console.log(`\n📸 Generating custom assets for sale ${saleId}...`);
     const results = [];
     
-    // Generate main asset if requested
+    // Generate main asset if requested (now uses Story format 1080x1920)
     if (mainAsset) {
       try {
-        if (mainAsset.type === 'without-picks') {
-          // Generate header-only asset
-          const result = await generateHeaderOnlyAsset(saleId);
-          results.push({ type: 'main-header', success: true, ...result });
-        } else if (mainAsset.type === 'with-picks' && mainAsset.pickIds?.length > 0) {
-          // Generate asset with specific picks
-          const result = await generateAssetWithPicks(saleId, mainAsset.pickIds);
-          results.push({ type: 'main-picks', success: true, ...result });
-        }
+        // Use the new story-format main asset generator
+        const customNote = mainAsset.customNote || '';
+        const result = await generateMainSaleStory(saleId, customNote);
+        results.push({ type: 'main', success: true, ...result });
       } catch (error) {
         console.error('Main asset generation error:', error);
         results.push({ type: 'main', success: false, error: error.message });

@@ -782,6 +782,210 @@ function escapeHtml(text) {
     .replace(/'/g, '&#039;');
 }
 
+// Generate main sale asset in Story format (1080x1920)
+export async function generateMainSaleStory(saleId, customNote = '') {
+  console.log(`🎨 Generating main sale story for sale: ${saleId}`);
+  
+  const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
+  const saleResponse = await fetch(saleUrl, {
+    headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
+  });
+  
+  if (!saleResponse.ok) {
+    throw new Error(`Failed to fetch sale: ${saleResponse.statusText}`);
+  }
+  
+  const saleData = await saleResponse.json();
+  const sale = saleData.fields;
+  
+  const company = sale.OriginalCompanyName || sale.CompanyName || 'Sale';
+  const percentOff = sale.PercentOff || 0;
+  const endDate = sale.EndDate ? new Date(sale.EndDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : null;
+  const discountCode = sale.DiscountCode || sale.PromoCode || null;
+  
+  const headerColor = getRandomColor();
+  const companyUpper = company.toUpperCase();
+  const percentOffText = `${percentOff}% OFF`;
+  
+  // Calculate font size for company name to fit width
+  const maxWidth = 920;
+  const baseFontSize = 120;
+  const companyFontSize = calculateFontSize(companyUpper, baseFontSize, maxWidth, 0.7);
+  
+  let headerInfoText = '';
+  if (endDate && discountCode) {
+    headerInfoText = `UNTIL ${endDate}\nPROMO CODE: ${discountCode}`;
+  } else if (endDate) {
+    headerInfoText = `UNTIL ${endDate}`;
+  } else if (discountCode) {
+    headerInfoText = `PROMO CODE: ${discountCode}`;
+  }
+  
+  // Create the full-height story with colored background
+  const svg = `
+    <svg width="${STORY_WIDTH}" height="${STORY_HEIGHT}">
+      <rect width="100%" height="100%" fill="${headerColor}"/>
+      
+      <text 
+        x="80" 
+        y="700" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="${companyFontSize}" 
+        font-weight="900"
+        letter-spacing="-3"
+        fill="white">
+        ${escapeHtml(companyUpper)}
+      </text>
+      
+      <text 
+        x="80" 
+        y="920" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="200" 
+        font-weight="900"
+        letter-spacing="-4"
+        fill="white">
+        ${percentOffText}
+      </text>
+      
+      ${headerInfoText ? `
+      <text 
+        x="80" 
+        y="1080" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="56" 
+        font-weight="700"
+        letter-spacing="2"
+        fill="white">
+        ${escapeHtml(headerInfoText.split('\n')[0])}
+      </text>
+      ${headerInfoText.split('\n')[1] ? `
+      <text 
+        x="80" 
+        y="1160" 
+        font-family="DejaVu Sans, Arial, Helvetica, sans-serif" 
+        font-size="56" 
+        font-weight="700"
+        letter-spacing="2"
+        fill="white">
+        ${escapeHtml(headerInfoText.split('\n')[1])}
+      </text>
+      ` : ''}
+      ` : ''}
+    </svg>
+  `;
+  
+  let backgroundImage = await sharp(Buffer.from(svg))
+    .png()
+    .toBuffer();
+  
+  // Add custom note in black bar at bottom-left (like product stories)
+  const compositeArray = [];
+  
+  if (customNote && customNote.trim()) {
+    const noteLines = customNote.trim().split('\n').slice(0, 3); // Max 3 lines
+    const noteFontSize = 48;
+    const notePadding = 20;
+    const noteLineHeight = noteFontSize + 12;
+    const charWidth = noteFontSize * 0.55;
+    
+    // Calculate box dimensions
+    let maxLineWidth = 0;
+    for (const line of noteLines) {
+      const lineWidth = Math.ceil(line.length * charWidth);
+      if (lineWidth > maxLineWidth) maxLineWidth = lineWidth;
+    }
+    
+    const noteBoxWidth = Math.round(Math.min(maxLineWidth + (notePadding * 4), STORY_WIDTH - 80));
+    const noteBoxHeight = Math.round((noteLines.length * noteLineHeight) + (notePadding * 2));
+    
+    let noteTextElements = '';
+    noteLines.forEach((line, index) => {
+      noteTextElements += `
+        <text 
+          x="${notePadding * 2}" 
+          y="${notePadding + (index + 1) * noteLineHeight - 12}" 
+          font-family="IBM Plex Mono, SF Mono, Courier New, monospace" 
+          font-size="${noteFontSize}" 
+          font-weight="400" 
+          fill="white">
+          ${escapeHtml(line)}
+        </text>
+      `;
+    });
+    
+    const noteSvg = `
+      <svg width="${noteBoxWidth}" height="${noteBoxHeight}">
+        <rect width="100%" height="100%" fill="black"/>
+        ${noteTextElements}
+      </svg>
+    `;
+    
+    // Position at bottom-left with 40px margin from edges
+    const noteX = 40;
+    const noteY = Math.round(STORY_HEIGHT - noteBoxHeight - 100);
+    
+    compositeArray.push({
+      input: Buffer.from(noteSvg),
+      top: noteY,
+      left: noteX
+    });
+  }
+  
+  // Composite the note overlay if present
+  let finalImage;
+  if (compositeArray.length > 0) {
+    finalImage = await sharp(backgroundImage)
+      .composite(compositeArray)
+      .png()
+      .toBuffer();
+  } else {
+    finalImage = backgroundImage;
+  }
+  
+  const today = new Date().toISOString().split('T')[0];
+  const sanitizedName = company.replace(/[^a-zA-Z0-9]/g, '-');
+  const filename = `${sanitizedName}-${percentOff}off-story.png`;
+  
+  console.log(`   📤 Uploading to Google Drive...`);
+  const driveResult = await uploadToGoogleDrive({
+    fileName: filename,
+    mimeType: 'image/png',
+    fileBuffer: finalImage,
+    folderPath: `Product Images/Stories/${today}`
+  });
+  
+  console.log(`   ✅ Uploaded main sale story: ${filename}`);
+  
+  // Update Airtable with asset URL
+  try {
+    const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sales/${saleId}`;
+    await fetch(updateUrl, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          FeaturedAssetURL: driveResult.webViewLink,
+          FeaturedAssetDate: new Date().toISOString().split('T')[0]
+        }
+      })
+    });
+    console.log(`   ✅ Updated Airtable with asset URL`);
+  } catch (error) {
+    console.error(`   ⚠️  Failed to update Airtable: ${error.message}`);
+  }
+  
+  return {
+    success: true,
+    filename,
+    driveFileId: driveResult.fileId,
+    driveUrl: driveResult.webViewLink
+  };
+}
+
 // Generate a story image with custom copy overlay
 export async function generatePickStoryWithCopy(pickId, customCopy = '') {
   console.log(`🎨 Generating story for pick: ${pickId}`);
