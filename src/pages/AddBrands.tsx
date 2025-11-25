@@ -3,7 +3,7 @@ import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
-import { Loader2, Copy, RotateCcw, X, Edit2 } from 'lucide-react';
+import { Loader2, Copy, RotateCcw, X, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EditBrandDialog } from '../components/EditBrandDialog';
 import { PendingBrandCard } from '../components/PendingBrandCard';
@@ -317,6 +317,11 @@ export function AddBrands() {
         } : r
       ));
     }
+  };
+
+  const handleDeleteResult = (index: number) => {
+    setResults(prev => prev.filter((_, idx) => idx !== index));
+    toast.success('Brand removed from results');
   };
 
   const handleCopyTable = () => {
@@ -886,18 +891,29 @@ export function AddBrands() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {(result.status === 'completed' || result.status === 'failed') && (
+                        <div className="flex items-center gap-1">
+                          {(result.status === 'completed' || result.status === 'failed') && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditingIndex(index)}
+                              className="h-8 px-2"
+                              style={{ fontFamily: 'DM Sans, sans-serif' }}
+                            >
+                              <Edit2 className="h-3 w-3 mr-1" />
+                              Edit
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => setEditingIndex(index)}
-                            className="h-8 px-2"
+                            onClick={() => handleDeleteResult(index)}
+                            className="h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
                             style={{ fontFamily: 'DM Sans, sans-serif' }}
                           >
-                            <Edit2 className="h-3 w-3 mr-1" />
-                            Edit
+                            <Trash2 className="h-3 w-3" />
                           </Button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
