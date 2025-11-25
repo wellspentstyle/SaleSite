@@ -3812,6 +3812,12 @@ async function checkForIncompleteBrands() {
       
       if (!name || pendingNames.has(name.toLowerCase())) continue;
       
+      // Skip shops - only auto-research brands
+      const companyType = fields.Type;
+      if (companyType === 'Shop') {
+        continue;
+      }
+      
       // Skip brands that are already approved (Priority = 'High')
       const isAlreadyApproved = fields.Priority === 'High';
       if (isAlreadyApproved) {
