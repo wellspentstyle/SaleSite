@@ -3,7 +3,8 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
-import { Loader2, Check, X, ExternalLink, AlertCircle } from 'lucide-react';
+import { Loader2, Check, X, ExternalLink, AlertCircle, Edit2 } from 'lucide-react';
+import { EditSaleDialog } from '../components/EditSaleDialog';
 
 interface RejectedEmail {
   brand: string;
@@ -49,6 +50,7 @@ export function SalesApprovals() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<Record<string, DuplicateSale[]>>({});
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
+  const [editingSale, setEditingSale] = useState<PendingSale | null>(null);
 
   useEffect(() => {
     loadData();
@@ -219,6 +221,28 @@ export function SalesApprovals() {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const handleEditSale = (updatedData: { company: string; percentOff: number; saleUrl: string; discountCode?: string; startDate: string; endDate?: string }) => {
+    if (!editingSale) return;
+    
+    setPendingSales(prev => prev.map(sale => {
+      if (sale.id === editingSale.id) {
+        return {
+          ...sale,
+          company: updatedData.company,
+          percentOff: updatedData.percentOff,
+          saleUrl: updatedData.saleUrl,
+          cleanUrl: updatedData.saleUrl,
+          discountCode: updatedData.discountCode,
+          startDate: updatedData.startDate,
+          endDate: updatedData.endDate
+        };
+      }
+      return sale;
+    }));
+    
+    setEditingSale(null);
   };
 
   return (
@@ -399,6 +423,15 @@ export function SalesApprovals() {
                       {/* Actions */}
                       <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
                         <Button
+                          variant="outline"
+                          onClick={() => setEditingSale(sale)}
+                          disabled={actionLoading === sale.id}
+                          style={{ fontFamily: 'system-ui, sans-serif' }}
+                        >
+                          <Edit2 className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button
                           onClick={() => handleApproveSale(sale.id)}
                           disabled={actionLoading === sale.id}
                           className="flex-1"
@@ -415,7 +448,6 @@ export function SalesApprovals() {
                           variant="outline"
                           onClick={() => handleRejectSale(sale.id)}
                           disabled={actionLoading === sale.id}
-                          className="flex-1"
                           style={{ fontFamily: 'system-ui, sans-serif' }}
                         >
                           {actionLoading === sale.id ? (
@@ -492,6 +524,23 @@ export function SalesApprovals() {
           </p>
         </div>
       </div>
+
+      {/* Edit Sale Dialog */}
+      {editingSale && (
+        <EditSaleDialog
+          open={!!editingSale}
+          onOpenChange={(open) => !open && setEditingSale(null)}
+          saleData={{
+            company: editingSale.company,
+            percentOff: editingSale.percentOff,
+            saleUrl: editingSale.saleUrl,
+            discountCode: editingSale.discountCode,
+            startDate: editingSale.startDate,
+            endDate: editingSale.endDate
+          }}
+          onSave={handleEditSale}
+        />
+      )}
     </div>
   );
 }
