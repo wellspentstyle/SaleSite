@@ -8,7 +8,7 @@ import { scrapeProduct } from './scrapers/index.js';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initializeTelegramBot } from './telegram-bot.js';
+import { initializeTelegramBot, sendAlertToTelegram } from './telegram-bot.js';
 import { scrapeGemItems } from './gem-scraper.js';
 import { generateMultipleFeaturedAssets } from './featured-assets-generator.js';
 import { 
@@ -93,6 +93,22 @@ const CLOUDMAIL_SECRET = process.env.CLOUDMAIL_SECRET;
 // Telegram configuration
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+// Helper function to send critical error alerts via Telegram
+async function sendCriticalErrorAlert(errorType, details) {
+  if (!TELEGRAM_CHAT_ID) return;
+  
+  const message = `🚨 *Critical Error*\n\n` +
+    `*Type:* ${errorType}\n` +
+    `*Details:* ${details}\n` +
+    `*Time:* ${new Date().toLocaleString()}`;
+  
+  try {
+    await sendAlertToTelegram(TELEGRAM_CHAT_ID, message);
+  } catch (err) {
+    console.error('Failed to send error alert:', err.message);
+  }
+}
 
 // Gem configuration
 const GEM_EMAIL = process.env.GEM_EMAIL;
@@ -3182,6 +3198,19 @@ ${emailContent.substring(0, 4000)}`
         urlSource: saleData.urlSource
       });
       
+      // Send Telegram alert for new pending sale
+      if (TELEGRAM_CHAT_ID) {
+        const alertMessage = `🛍️ *New Sale to Approve*\n\n` +
+          `*${saleData.company}* - ${saleData.percentOff}% off\n` +
+          `Confidence: ${saleData.confidence}%\n` +
+          (saleData.discountCode ? `Code: \`${saleData.discountCode}\`\n` : '') +
+          `\n_From: ${from}_`;
+        
+        sendAlertToTelegram(TELEGRAM_CHAT_ID, alertMessage).catch(err => {
+          console.error('Failed to send Telegram alert:', err.message);
+        });
+      }
+      
       return res.status(200).json({
         success: true,
         message: 'Sale pending approval',
@@ -3241,6 +3270,13 @@ ${emailContent.substring(0, 4000)}`
     if (!airtableResponse.ok) {
       const errorText = await airtableResponse.text();
       console.error('❌ Airtable error:', errorText);
+      
+      // Send critical error alert for Airtable failures
+      sendCriticalErrorAlert(
+        'Airtable API Error',
+        `Failed to save sale for ${saleData.company}: ${errorText.substring(0, 100)}`
+      );
+      
       return res.status(200).json({ 
         success: false, 
         message: 'Airtable error',
@@ -3270,6 +3306,13 @@ ${emailContent.substring(0, 4000)}`
   } catch (error) {
     console.error('❌ Webhook processing error:', error);
     console.error('Stack trace:', error.stack);
+    
+    // Send critical error alert
+    sendCriticalErrorAlert(
+      'Email Processing Failed',
+      `${error.message} - Check server logs for details`
+    );
+    
     res.status(200).json({ 
       success: false, 
       message: error.message,

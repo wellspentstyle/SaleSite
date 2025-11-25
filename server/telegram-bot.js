@@ -43,6 +43,32 @@ export async function sendStoryToTelegram(chatId, imageBuffer, caption) {
   }
 }
 
+export async function sendAlertToTelegram(chatId, message, options = {}) {
+  if (!bot) {
+    console.warn('⚠️  Telegram bot not initialized, skipping alert');
+    return false;
+  }
+  
+  if (!chatId) {
+    console.warn('⚠️  Telegram chat ID not provided, skipping alert');
+    return false;
+  }
+  
+  try {
+    await bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      disable_web_page_preview: true,
+      ...options
+    });
+    
+    console.log('📱 Alert sent to Telegram');
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send Telegram alert:', error.message);
+    return false;
+  }
+}
+
 export function getTelegramBot() {
   return bot;
 }
