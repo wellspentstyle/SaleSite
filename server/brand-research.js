@@ -510,7 +510,7 @@ Examples:
         });
 
         const categoryResponse = categoryCompletion.choices[0]?.message?.content?.trim() || '';
-        categories = categoryResponse.split(',').map(c => c.trim()).filter(c => c);
+        categories = categoryResponse.split(',').map(c => c.trim().replace(/^["']|["']$/g, '')).filter(c => c);
 
       } else {
         // Fallback: search-based category detection
@@ -558,7 +558,7 @@ Return as comma-separated list. Default to "Clothing" if unclear.`
           });
 
           const categoryResult = categoryCompletion.choices[0]?.message?.content?.trim() || '';
-          categories = categoryResult.split(',').map(c => c.trim()).filter(c => c);
+          categories = categoryResult.split(',').map(c => c.trim().replace(/^["']|["']$/g, '')).filter(c => c);
         }
       }
 
