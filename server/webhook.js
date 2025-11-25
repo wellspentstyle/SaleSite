@@ -2895,6 +2895,42 @@ app.get('/admin/generated-assets', async (req, res) => {
   return fetchGeneratedAssets(null, res, auth, ADMIN_PASSWORD, pool);
 });
 
+// Get all sales with saved assets (ready to post)
+app.get('/admin/saved-assets', async (req, res) => {
+  const { auth } = req.headers;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    const result = await pool.query(`
+      SELECT 
+        sale_id,
+        sale_name,
+        COUNT(*) as asset_count,
+        COUNT(*) FILTER (WHERE success = true) as success_count,
+        MIN(created_at) as created_at
+      FROM generated_assets
+      GROUP BY sale_id, sale_name
+      ORDER BY MIN(created_at) DESC
+    `);
+    
+    const savedAssets = result.rows.map(row => ({
+      saleId: row.sale_id,
+      saleName: row.sale_name,
+      assetCount: parseInt(row.asset_count),
+      successCount: parseInt(row.success_count),
+      createdAt: row.created_at
+    }));
+    
+    res.json({ success: true, savedAssets });
+  } catch (error) {
+    console.error('Error fetching saved assets:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Clear generated assets for a sale
 app.delete('/admin/generated-assets/:saleId', async (req, res) => {
   const { auth } = req.headers;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Checkbox } from '../components/ui/checkbox';
 import {
@@ -43,6 +43,7 @@ const isDevelopment = window.location.hostname.includes('replit.dev') ||
 
 export function AssetResults() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [resultsData, setResultsData] = useState<ResultsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
@@ -53,10 +54,14 @@ export function AssetResults() {
   useEffect(() => {
     const loadAssets = async () => {
       const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+      const saleIdParam = searchParams.get('saleId');
       
-      // Always load from database - assets are persisted there
+      // Load from database - either specific sale or most recent
       try {
-        const response = await fetch(`${API_BASE}/admin/generated-assets`, {
+        const url = saleIdParam 
+          ? `${API_BASE}/admin/generated-assets/${saleIdParam}`
+          : `${API_BASE}/admin/generated-assets`;
+        const response = await fetch(url, {
           headers: { 'auth': auth }
         });
         const data = await response.json();

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, ExternalLink, ChevronRight } from 'lucide-react';
+import { Loader2, ExternalLink, ChevronRight, Instagram, Clock } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -14,16 +14,26 @@ interface Sale {
   featuredAssetDate: string | null;
 }
 
-type TabType = 'has-picks' | 'no-picks' | 'assets-generated';
+interface SavedAsset {
+  saleId: string;
+  saleName: string;
+  assetCount: number;
+  successCount: number;
+  createdAt: string;
+}
+
+type TabType = 'ready-to-post' | 'has-picks' | 'no-picks' | 'assets-generated';
 
 export function GenerateAssets() {
   const navigate = useNavigate();
   const [sales, setSales] = useState<Sale[]>([]);
+  const [savedAssets, setSavedAssets] = useState<SavedAsset[]>([]);
   const [loadingSales, setLoadingSales] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>('has-picks');
+  const [activeTab, setActiveTab] = useState<TabType>('ready-to-post');
 
   useEffect(() => {
     fetchSales();
+    fetchSavedAssets();
   }, []);
 
   const fetchSales = async () => {
@@ -42,6 +52,37 @@ export function GenerateAssets() {
     } finally {
       setLoadingSales(false);
     }
+  };
+
+  const fetchSavedAssets = async () => {
+    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/saved-assets`, {
+        headers: { 'auth': auth }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSavedAssets(data.savedAssets || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch saved assets:', error);
+    }
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
   };
 
   const liveSales = sales.filter(sale => sale.live === 'YES');
@@ -70,6 +111,7 @@ export function GenerateAssets() {
   const filteredSales = getFilteredSales();
 
   const tabs: { id: TabType; label: string; count: number }[] = [
+    { id: 'ready-to-post', label: 'Ready to Post', count: savedAssets.length },
     { id: 'has-picks', label: 'Has Picks', count: salesWithPicks.length },
     { id: 'no-picks', label: 'Needs Picks', count: salesWithoutPicks.length },
     { id: 'assets-generated', label: 'Assets Generated', count: salesWithAssets.length },
@@ -117,6 +159,52 @@ export function GenerateAssets() {
           </div>
         ) : (
           <>
+            {activeTab === 'ready-to-post' && (
+              <div className="space-y-4">
+                {savedAssets.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-gray-300 rounded-lg">
+                    <Instagram className="h-10 w-10 mx-auto text-gray-400 mb-3" />
+                    <p className="text-muted-foreground text-sm">
+                      No saved assets ready to post
+                    </p>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      Generate assets from the "Has Picks" tab to save them here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {savedAssets.map((asset) => (
+                      <div
+                        key={asset.saleId}
+                        onClick={() => navigate(`/admin/assets/results?saleId=${asset.saleId}`)}
+                        className="border border-border bg-white cursor-pointer transition-all hover:shadow-md hover:border-black p-5 group"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-base">
+                              {asset.saleName}
+                            </h3>
+                            <div className="flex items-center gap-3 mt-2 text-sm text-gray-600">
+                              <span className="flex items-center gap-1">
+                                <Instagram className="h-3.5 w-3.5" />
+                                {asset.successCount} asset{asset.successCount !== 1 ? 's' : ''}
+                              </span>
+                              <span className="text-gray-400">|</span>
+                              <span className="flex items-center gap-1 text-gray-500">
+                                <Clock className="h-3.5 w-3.5" />
+                                {formatTimeAgo(asset.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === 'has-picks' && (
               <div className="space-y-4">
                 {filteredSales.length === 0 ? (
