@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Checkbox } from '../components/ui/checkbox';
 import { Progress } from '../components/ui/progress';
-import { Loader2, Image, ImagePlus, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, Image, ImagePlus, ArrowLeft, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE = '/api';
@@ -227,6 +227,18 @@ export function ConfigureAssets() {
     }));
   };
 
+  const handleClear = () => {
+    setGenerateMainAsset(true);
+    setMainAssetNote('');
+    setSelectedStoryPicks(new Set());
+    const clearedConfigs: Record<string, PickConfig> = {};
+    picks.forEach(pick => {
+      clearedConfigs[pick.id] = { pickId: pick.id, customCopy: '' };
+    });
+    setPickConfigs(clearedConfigs);
+    toast.success('Configuration cleared');
+  };
+
   const handleGenerate = async () => {
     console.log('handleGenerate called');
     console.log('sale:', sale);
@@ -324,10 +336,19 @@ export function ConfigureAssets() {
   return (
     <div className="p-8 admin-page">
       <div className="max-w-4xl mx-auto space-y-8">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={() => navigate('/admin/assets')}>
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleClear}
+            disabled={isGenerating}
+          >
+            <RotateCcw className="h-4 w-4 mr-1" />
+            Clear
           </Button>
         </div>
 
