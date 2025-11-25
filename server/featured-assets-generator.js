@@ -827,26 +827,10 @@ export async function generateMainSaleStory(saleId, customNote = '') {
   }
   
   // Create the full-height story with colored background
-  // Link goes above brand name, centered, with same spacing as between brand and percent off
-  // Brand at y=700, percent off at y=920, gap = 220px
-  // So link should be at y = 700 - 220 = 480 (baseline position)
-  const linkYPosition = 480;
-  
+  // Brand name at y=700, percent off at y=920
   const svg = `
     <svg width="${STORY_WIDTH}" height="${STORY_HEIGHT}">
       <rect width="100%" height="100%" fill="${headerColor}"/>
-      
-      ${saleLink ? `
-      <text 
-        x="${STORY_WIDTH / 2}" 
-        y="${linkYPosition}" 
-        text-anchor="middle"
-        font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif" 
-        font-size="64" 
-        fill="white">
-        🔗🔗🔗
-      </text>
-      ` : ''}
       
       <text 
         x="80" 
@@ -901,28 +885,49 @@ export async function generateMainSaleStory(saleId, customNote = '') {
     .png()
     .toBuffer();
   
-  // Add custom note in black bar at bottom-left (like product stories)
+  // Add custom note in black bar at 15% from top with word wrapping
   const compositeArray = [];
   
   if (customNote && customNote.trim()) {
-    const noteLines = customNote.trim().split('\n').slice(0, 3); // Max 3 lines
     const noteFontSize = 48;
-    const notePadding = 20;
-    const noteLineHeight = noteFontSize + 12;
-    const charWidth = noteFontSize * 0.55;
+    const notePadding = 24;
+    const noteLineHeight = noteFontSize + 16;
+    const charWidth = noteFontSize * 0.52;
+    const maxCharsPerLine = Math.floor((STORY_WIDTH - 160) / charWidth); // 80px margin each side
     
-    // Calculate box dimensions
+    // Word wrap the text
+    const words = customNote.trim().split(/\s+/);
+    const wrappedLines = [];
+    let currentLine = '';
+    
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (testLine.length <= maxCharsPerLine) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) {
+          wrappedLines.push(currentLine);
+        }
+        // Handle very long words by truncating
+        currentLine = word.length > maxCharsPerLine ? word.substring(0, maxCharsPerLine - 3) + '...' : word;
+      }
+    }
+    if (currentLine) {
+      wrappedLines.push(currentLine);
+    }
+    
+    // Calculate box dimensions - expand to fit all lines
     let maxLineWidth = 0;
-    for (const line of noteLines) {
+    for (const line of wrappedLines) {
       const lineWidth = Math.ceil(line.length * charWidth);
       if (lineWidth > maxLineWidth) maxLineWidth = lineWidth;
     }
     
     const noteBoxWidth = Math.round(Math.min(maxLineWidth + (notePadding * 4), STORY_WIDTH - 80));
-    const noteBoxHeight = Math.round((noteLines.length * noteLineHeight) + (notePadding * 2));
+    const noteBoxHeight = Math.round((wrappedLines.length * noteLineHeight) + (notePadding * 2));
     
     let noteTextElements = '';
-    noteLines.forEach((line, index) => {
+    wrappedLines.forEach((line, index) => {
       noteTextElements += `
         <text 
           x="${notePadding * 2}" 
@@ -943,9 +948,9 @@ export async function generateMainSaleStory(saleId, customNote = '') {
       </svg>
     `;
     
-    // Position at bottom-left with 40px margin from edges
-    const noteX = 40;
-    const noteY = Math.round(STORY_HEIGHT - noteBoxHeight - 100);
+    // Position at 15% from top with 80px left margin
+    const noteX = 80;
+    const noteY = Math.round(STORY_HEIGHT * 0.15);
     
     compositeArray.push({
       input: Buffer.from(noteSvg),
