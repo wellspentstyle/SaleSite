@@ -28,12 +28,9 @@ export async function postToInstagram({ imageUrl, caption, isStory = false }) {
       type: 'image',
       url: imageUrl
     }],
+    content: caption || ' ',
     publishNow: true
   };
-
-  if (!isStory) {
-    payload.content = caption || '';
-  }
 
   try {
     const response = await fetch(`${LATE_API_BASE}/posts`, {
@@ -146,12 +143,9 @@ export async function scheduleInstagramPost({ imageUrl, caption, scheduledFor, i
       type: 'image',
       url: imageUrl
     }],
+    content: caption || ' ',
     scheduledFor: scheduledFor
   };
-
-  if (caption && !isStory) {
-    payload.content = caption;
-  }
 
   try {
     const response = await fetch(`${LATE_API_BASE}/posts`, {
