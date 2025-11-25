@@ -3640,7 +3640,10 @@ async function checkForIncompleteBrands() {
       
       // Skip brands that are already approved (Priority = 'High')
       const isAlreadyApproved = fields.Priority === 'High';
-      if (isAlreadyApproved) continue;
+      if (isAlreadyApproved) {
+        // Uncomment for debugging: console.log(`⏭️ Skipping ${name} (already Priority='High')`);
+        continue;
+      }
       
       const isIncomplete = !fields.PriceRange || !fields.Category || !fields.Description;
       
