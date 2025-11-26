@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
-import { Loader2, Check, X, ExternalLink, AlertCircle, Edit2, Plus } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Loader2, Check, X, ExternalLink, AlertCircle, Edit2, Plus, Sparkles, ClipboardList } from 'lucide-react';
 import { EditSaleDialog } from '../components/EditSaleDialog';
+import ExtractSale from './admin/ExtractSale';
 
 interface RejectedEmail {
   brand: string;
@@ -46,6 +48,7 @@ const API_BASE = '/api';
 
 export function SalesApprovals() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [pendingSales, setPendingSales] = useState<PendingSale[]>([]);
   const [rejectedEmails, setRejectedEmails] = useState<RejectedEmail[]>([]);
   const [approvalsEnabled, setApprovalsEnabled] = useState(false);
@@ -55,6 +58,9 @@ export function SalesApprovals() {
   const [duplicates, setDuplicates] = useState<Record<string, DuplicateSale[]>>({});
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [editingSale, setEditingSale] = useState<PendingSale | null>(null);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'pending');
 
   useEffect(() => {
     loadData();
@@ -249,22 +255,49 @@ export function SalesApprovals() {
     setEditingSale(null);
   };
 
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setSearchParams({ tab: value });
+  };
+
   return (
     <div className="p-4 md:p-8 admin-page">
       <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Sales Approvals</h1>
-            <p className="text-gray-600 mt-1 text-sm md:text-base">Review and approve incoming sales before they're added to Airtable</p>
+            <h1 className="text-2xl md:text-3xl font-bold">Add Sales</h1>
+            <p className="text-gray-600 mt-1 text-sm md:text-base">Add new sales or review pending approvals</p>
           </div>
-          <Button onClick={() => navigate('/admin/sales-approvals/manual')} className="w-full md:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Sale
-          </Button>
         </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="pending" className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Pending ({pendingSales.length})
+            </TabsTrigger>
+            <TabsTrigger value="extract" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Extract
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="extract" className="mt-6">
+            <ExtractSale />
+          </TabsContent>
+
+          <TabsContent value="pending" className="mt-6 space-y-4">
+            {/* Manual Add Button */}
+            <div className="flex justify-end">
+              <Button onClick={() => navigate('/admin/sales-approvals/manual')} variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Manual Entry
+              </Button>
+            </div>
       
-        {/* Settings Card */}
+            {/* Settings Card */}
         <Card>
           <CardContent className="pt-4 md:pt-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -549,6 +582,8 @@ export function SalesApprovals() {
             Shows recent emails that were rejected from the approval queue
           </p>
         </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Edit Sale Dialog */}

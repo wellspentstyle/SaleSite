@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -175,8 +174,7 @@ export default function ExtractSale() {
   };
 
   return (
-    <AdminLayout>
-      <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">Extract Sale</h1>
           <p className="text-gray-600">
@@ -468,7 +466,6 @@ FLASH SALE! Get 30% off everything at Example Brand this weekend only. Use code 
             </Card>
           </div>
         )}
-      </div>
-    </AdminLayout>
+    </div>
   );
 }
