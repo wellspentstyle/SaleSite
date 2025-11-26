@@ -1,11 +1,11 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { Textarea } from '../../components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Upload, FileText, Loader2, Check, AlertCircle, Sparkles, ArrowRight } from 'lucide-react';
 
 interface ExtractedSale {
@@ -92,7 +92,7 @@ export default function ExtractSale() {
     setEditedData(null);
 
     try {
-      const response = await fetch('/admin/extract-sale', {
+      const response = await fetch('/api/admin/extract-sale', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -105,7 +105,13 @@ export default function ExtractSale() {
         })
       });
 
-      const result = await response.json();
+      const text = await response.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error(`Server error: ${text.slice(0, 200) || 'Empty response'}`);
+      }
 
       if (!result.success) {
         throw new Error(result.message || 'Extraction failed');
@@ -127,7 +133,7 @@ export default function ExtractSale() {
     setError(null);
 
     try {
-      const response = await fetch('/pending-sales/manual', {
+      const response = await fetch('/api/pending-sales/manual', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -151,7 +157,13 @@ export default function ExtractSale() {
         })
       });
 
-      const result = await response.json();
+      const text = await response.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error(`Server error: ${text.slice(0, 200) || 'Empty response'}`);
+      }
 
       if (!result.success) {
         throw new Error(result.message || 'Failed to save sale');
@@ -159,7 +171,7 @@ export default function ExtractSale() {
 
       setSaveSuccess(true);
       setTimeout(() => {
-        navigate('/admin/sales-approvals');
+        navigate('/admin/sales-approvals?tab=pending');
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save sale');
@@ -191,7 +203,7 @@ export default function ExtractSale() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'image' | 'text')}>
+              <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as 'image' | 'text')}>
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                   <TabsTrigger value="image" className="flex items-center gap-2">
                     <Upload className="w-4 h-4" />

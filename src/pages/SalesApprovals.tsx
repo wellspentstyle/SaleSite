@@ -5,6 +5,16 @@ import { Card, CardContent } from '../components/ui/card';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import { Loader2, Check, X, ExternalLink, AlertCircle, Edit2, Plus, Sparkles, ClipboardList } from 'lucide-react';
 import { EditSaleDialog } from '../components/EditSaleDialog';
 import ExtractSale from './admin/ExtractSale';
@@ -61,6 +71,10 @@ export function SalesApprovals() {
   
   // Tab state
   const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'pending');
+  
+  // Confirmation dialog state
+  const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
+  const [pendingApprovalValue, setPendingApprovalValue] = useState<boolean | null>(null);
 
   useEffect(() => {
     loadData();
@@ -106,11 +120,19 @@ export function SalesApprovals() {
     }
   };
 
-  const handleToggleApprovals = async (enabled: boolean) => {
+  const handleApprovalToggleRequest = (enabled: boolean) => {
+    setPendingApprovalValue(enabled);
+    setShowApprovalConfirm(true);
+  };
+
+  const handleConfirmApprovalToggle = async () => {
+    if (pendingApprovalValue === null) return;
+    
     const auth = sessionStorage.getItem('adminAuth') || '';
     
     try {
       setSettingsLoading(true);
+      setShowApprovalConfirm(false);
       
       const response = await fetch(`${API_BASE}/approval-settings`, {
         method: 'POST',
@@ -118,18 +140,19 @@ export function SalesApprovals() {
           'Content-Type': 'application/json',
           'auth': auth
         },
-        body: JSON.stringify({ approvalsEnabled: enabled })
+        body: JSON.stringify({ approvalsEnabled: pendingApprovalValue })
       });
       
       const data = await response.json();
       
       if (data.success) {
-        setApprovalsEnabled(enabled);
+        setApprovalsEnabled(pendingApprovalValue);
       }
     } catch (error) {
       console.error('Error updating settings:', error);
     } finally {
       setSettingsLoading(false);
+      setPendingApprovalValue(null);
     }
   };
 
@@ -296,28 +319,6 @@ export function SalesApprovals() {
                 Manual Entry
               </Button>
             </div>
-      
-            {/* Settings Card */}
-        <Card>
-          <CardContent className="pt-4 md:pt-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-1">
-                <Label htmlFor="approvals-toggle" className="text-base" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                  Require Manual Approval
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  When enabled, new sales will wait for your approval before being added to Airtable.
-                </p>
-              </div>
-              <Switch
-                id="approvals-toggle"
-                checked={approvalsEnabled}
-                onCheckedChange={handleToggleApprovals}
-                disabled={settingsLoading}
-              />
-            </div>
-          </CardContent>
-        </Card>
 
       {/* Pending Sales */}
       <div className="space-y-4">
@@ -582,9 +583,54 @@ export function SalesApprovals() {
             Shows recent emails that were rejected from the approval queue
           </p>
         </div>
+
+            {/* Settings Card - at bottom */}
+            <Card className="mt-8 border-dashed">
+              <CardContent className="pt-4 md:pt-6">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="approvals-toggle" className="text-base" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                      Require Manual Approval
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      When enabled, new sales will wait for your approval before being added to Airtable.
+                    </p>
+                  </div>
+                  <Switch
+                    id="approvals-toggle"
+                    checked={approvalsEnabled}
+                    onCheckedChange={handleApprovalToggleRequest}
+                    disabled={settingsLoading}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Confirmation Dialog for Approval Toggle */}
+      <AlertDialog open={showApprovalConfirm} onOpenChange={setShowApprovalConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingApprovalValue ? 'Enable Manual Approval?' : 'Disable Manual Approval?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingApprovalValue 
+                ? 'New sales from emails will require your manual approval before being added to Airtable. You can review and approve them from this page.'
+                : 'New sales from emails will be automatically added to Airtable without requiring your approval. Make sure your email parsing is reliable before disabling this.'
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingApprovalValue(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmApprovalToggle}>
+              {pendingApprovalValue ? 'Enable' : 'Disable'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit Sale Dialog */}
       {editingSale && (
