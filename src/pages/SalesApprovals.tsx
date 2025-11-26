@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Switch } from '../components/ui/switch';
@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
-import { Loader2, Check, X, ExternalLink, AlertCircle, Edit2, Plus, Sparkles, ClipboardList } from 'lucide-react';
+import { Loader2, Check, X, ExternalLink, AlertCircle, Edit2, Sparkles, ClipboardList } from 'lucide-react';
 import { EditSaleDialog } from '../components/EditSaleDialog';
 import ExtractSale from './admin/ExtractSale';
 
@@ -57,7 +57,6 @@ interface DuplicateSale {
 const API_BASE = '/api';
 
 export function SalesApprovals() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [pendingSales, setPendingSales] = useState<PendingSale[]>([]);
   const [rejectedEmails, setRejectedEmails] = useState<RejectedEmail[]>([]);
@@ -69,8 +68,8 @@ export function SalesApprovals() {
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [editingSale, setEditingSale] = useState<PendingSale | null>(null);
   
-  // Tab state
-  const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'pending');
+  // Tab state - default to 'extract' (Add tab)
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'extract');
   
   // Confirmation dialog state
   const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
@@ -297,13 +296,13 @@ export function SalesApprovals() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="pending" className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4" />
-              Pending ({pendingSales.length})
-            </TabsTrigger>
             <TabsTrigger value="extract" className="flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
-              Extract
+              Add
+            </TabsTrigger>
+            <TabsTrigger value="pending" className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Approve ({pendingSales.length})
             </TabsTrigger>
           </TabsList>
 
@@ -312,14 +311,6 @@ export function SalesApprovals() {
           </TabsContent>
 
           <TabsContent value="pending" className="mt-6 space-y-4">
-            {/* Manual Add Button */}
-            <div className="flex justify-end">
-              <Button onClick={() => navigate('/admin/sales-approvals/manual')} variant="outline">
-                <Plus className="h-4 w-4 mr-2" />
-                Manual Entry
-              </Button>
-            </div>
-
       {/* Pending Sales */}
       <div className="space-y-4">
           <div className="flex items-center justify-between">

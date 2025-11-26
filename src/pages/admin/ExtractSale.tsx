@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { Upload, FileText, Loader2, Check, AlertCircle, Sparkles, ArrowRight } from 'lucide-react';
+import { Upload, FileText, Loader2, Check, AlertCircle, Sparkles, ArrowRight, Plus } from 'lucide-react';
 
 interface ExtractedSale {
   company: string;
@@ -186,12 +186,20 @@ export default function ExtractSale() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Extract Sale</h1>
-          <p className="text-gray-600">
-            Upload a screenshot or paste text from a sale announcement to automatically extract the details.
-          </p>
+    <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-1">AI Extraction</h2>
+            <p className="text-gray-600 text-sm">
+              Upload a screenshot or paste text to automatically extract sale details.
+            </p>
+          </div>
+          <Link to="/admin/sales-approvals/manual">
+            <Button variant="outline" className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              Manual Entry
+            </Button>
+          </Link>
         </div>
 
         {!extractedData ? (
