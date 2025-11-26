@@ -1374,6 +1374,206 @@ app.post('/admin/extract-image', async (req, res) => {
   }
 });
 
+// Extract sale information from image or text using AI
+app.post('/admin/extract-sale', async (req, res) => {
+  const { auth } = req.headers;
+  const { image, text, sourceHint } = req.body;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  if (!image && !text) {
+    return res.status(400).json({ success: false, message: 'Either image or text is required' });
+  }
+  
+  try {
+    console.log(`🔍 Extracting sale from ${image ? 'image' : 'text'}...`);
+    
+    const extractionPrompt = `You are a sales data extraction assistant. Extract sale information from the provided ${image ? 'screenshot/image' : 'text'}.
+
+Return a JSON object with these fields:
+{
+  "company": "Brand/Company name running the sale",
+  "percentOff": 30,
+  "saleUrl": "URL to the sale if visible (or null)",
+  "discountCode": "Promo code if mentioned (or null)",
+  "startDate": "2025-01-01",
+  "endDate": "2025-01-07",
+  "saleType": "% off | Up to X% off | Starting at $X | Free shipping | Other",
+  "notes": "Any additional context about the sale",
+  "confidence": 85,
+  "reasoning": "Brief explanation of what was extracted and any uncertainties"
+}
+
+Guidelines:
+- For percentOff, extract the primary discount number (e.g., "Up to 50% off" = 50)
+- Dates should be in YYYY-MM-DD format. If unclear, use reasonable estimates.
+- If dates say "this weekend" or similar, estimate based on current date context
+- Be conservative with confidence (lower if info is unclear)
+- Include relevant details in notes (e.g., "Select styles only", "Online exclusive")`;
+
+    let completion;
+    
+    if (image) {
+      // Use GPT-4o Vision for image extraction
+      completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: extractionPrompt
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: {
+                  url: image.startsWith('data:') ? image : `data:image/png;base64,${image}`
+                }
+              },
+              {
+                type: 'text',
+                text: sourceHint ? `Additional context: ${sourceHint}` : 'Please extract sale information from this image.'
+              }
+            ]
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.2
+      });
+    } else {
+      // Use GPT-4o-mini for text extraction
+      completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: extractionPrompt
+          },
+          {
+            role: 'user',
+            content: `${sourceHint ? `Context: ${sourceHint}\n\n` : ''}Extract sale information from this text:\n\n${text}`
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.2
+      });
+    }
+    
+    const responseText = completion.choices[0].message.content;
+    console.log('🤖 AI Response:', responseText);
+    
+    // Parse the JSON from the response - handle markdown code fences
+    let jsonString = responseText;
+    // Strip markdown code fences if present
+    jsonString = jsonString.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+    
+    const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Could not parse AI response as JSON');
+    }
+    
+    let extracted;
+    try {
+      extracted = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      throw new Error('AI returned invalid JSON format');
+    }
+    
+    // Validate and sanitize extracted data
+    const sanitized = {
+      company: String(extracted.company || '').trim(),
+      percentOff: null,
+      saleUrl: null,
+      cleanUrl: null,
+      discountCode: extracted.discountCode ? String(extracted.discountCode).trim() : null,
+      startDate: null,
+      endDate: null,
+      saleType: extracted.saleType ? String(extracted.saleType).trim() : null,
+      notes: extracted.notes ? String(extracted.notes).trim() : null,
+      confidence: 50,
+      reasoning: extracted.reasoning ? String(extracted.reasoning).trim() : 'Extracted via AI',
+      missingUrl: true
+    };
+    
+    // Parse percentOff as number
+    if (extracted.percentOff !== null && extracted.percentOff !== undefined) {
+      const parsed = parseInt(extracted.percentOff, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+        sanitized.percentOff = parsed;
+      }
+    }
+    
+    // Parse confidence as number
+    if (extracted.confidence !== null && extracted.confidence !== undefined) {
+      const parsed = parseInt(extracted.confidence, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+        sanitized.confidence = parsed;
+      }
+    }
+    
+    // Validate and normalize dates (YYYY-MM-DD format)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (extracted.startDate && dateRegex.test(extracted.startDate)) {
+      sanitized.startDate = extracted.startDate;
+    }
+    if (extracted.endDate && dateRegex.test(extracted.endDate)) {
+      sanitized.endDate = extracted.endDate;
+    }
+    
+    // Validate and set URLs
+    if (extracted.saleUrl && typeof extracted.saleUrl === 'string') {
+      const urlStr = extracted.saleUrl.trim();
+      if (urlStr.startsWith('http://') || urlStr.startsWith('https://')) {
+        sanitized.saleUrl = urlStr;
+        sanitized.missingUrl = false;
+        // Generate clean URL (remove query params and trailing slashes)
+        try {
+          const urlObj = new URL(urlStr);
+          sanitized.cleanUrl = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}`.replace(/\/$/, '');
+        } catch {
+          sanitized.cleanUrl = urlStr;
+        }
+      }
+    }
+    
+    // Try to match company to existing companies for autofill
+    let companyMatch = null;
+    if (sanitized.company && cachedCompanies.length > 0) {
+      const searchName = sanitized.company.toLowerCase().trim();
+      companyMatch = cachedCompanies.find(c => {
+        const companyName = (c.fields.Company || '').toLowerCase();
+        return companyName === searchName || 
+               companyName.includes(searchName) || 
+               searchName.includes(companyName);
+      });
+      
+      if (companyMatch) {
+        console.log(`✅ Matched to existing company: ${companyMatch.fields.Company}`);
+        sanitized.companyRecordId = companyMatch.id;
+        sanitized.matchedCompany = companyMatch.fields.Company;
+      }
+    }
+    
+    console.log('📦 Extracted sale data:', sanitized);
+    
+    res.json({
+      success: true,
+      data: sanitized
+    });
+    
+  } catch (error) {
+    console.error('❌ Sale extraction error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to extract sale information' 
+    });
+  }
+});
+
 // Extract domain from URL for skip logic
 function extractDomain(url) {
   try {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Package, Tag, Image, Gem, RefreshCw, CheckSquare, X } from 'lucide-react';
+import { Package, Tag, Image, Gem, RefreshCw, CheckSquare, X, Sparkles } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -16,6 +16,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   
   const navItems = [
     { path: '/admin/sales-approvals', label: 'Sales Approvals', icon: CheckSquare, badge: pendingCount },
+    { path: '/admin/extract-sale', label: 'Extract Sale', icon: Sparkles },
     { path: '/admin/picks', label: 'Add Picks', icon: Package, badge: draftsCount },
     { path: '/admin/brands', label: 'Add Brands', icon: Tag, badge: pendingBrandsCount },
     { path: '/admin/assets', label: 'Generate Assets', icon: Image },
