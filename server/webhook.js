@@ -697,8 +697,8 @@ app.get('/sales', async (req, res) => {
         saleUrl = `https://go.shopmy.us/apx/l9N1lH?url=${encodeURIComponent(cleanedUrl)}`;
       }
       
-      // Extract company data (use CompanyName for display, Type/PriceRange/etc are lookup fields)
-      const companyName = record.fields.CompanyName || 'Unknown Brand';
+      // Extract company data (use CompanyName lookup, fallback to OriginalCompanyName plain text)
+      const companyName = record.fields.CompanyName || record.fields.OriginalCompanyName || 'Unknown Brand';
       
       const priceRange = Array.isArray(record.fields.PriceRange) 
         ? record.fields.PriceRange[0] 
