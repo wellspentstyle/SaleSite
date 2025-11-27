@@ -473,22 +473,27 @@ app.post('/admin/pending-brands/:id/approve', async (req, res) => {
     }
     
     // Handle values - could be string or array
+    // Also strip any stray quotes that may have gotten into the data
     let valuesArray = [];
     if (brand.values) {
       if (Array.isArray(brand.values)) {
-        valuesArray = brand.values;
+        valuesArray = brand.values.map(v => v.replace(/^"|"$/g, '').trim()).filter(v => v);
       } else if (typeof brand.values === 'string') {
-        valuesArray = brand.values.split(', ').filter(v => v.trim());
+        const cleanValues = brand.values.replace(/^"|"$/g, '');
+        valuesArray = cleanValues.split(', ').map(v => v.replace(/^"|"$/g, '').trim()).filter(v => v);
       }
     }
     
     // Handle category - could be string or array
+    // Also strip any stray quotes that may have gotten into the data
     let categoryArray = [];
     if (brand.category) {
       if (Array.isArray(brand.category)) {
-        categoryArray = brand.category;
+        categoryArray = brand.category.map(c => c.replace(/^"|"$/g, '').trim()).filter(c => c);
       } else if (typeof brand.category === 'string') {
-        categoryArray = brand.category.split(', ').filter(c => c.trim());
+        // Remove surrounding quotes and split
+        const cleanCategory = brand.category.replace(/^"|"$/g, '');
+        categoryArray = cleanCategory.split(', ').map(c => c.replace(/^"|"$/g, '').trim()).filter(c => c);
       }
     }
     

@@ -204,7 +204,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
         <div>
           <Label className="text-sm font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Type</Label>
           {isEditing ? (
-            <Select value={editedData.type} onValueChange={(value) => setEditedData({ ...editedData, type: value })}>
+            <Select value={editedData.type} onValueChange={(value: string) => setEditedData({ ...editedData, type: value })}>
               <SelectTrigger className="mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -286,7 +286,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
         <div>
           <Label className="text-sm font-medium" style={{ fontFamily: 'DM Sans, sans-serif' }}>Max Size</Label>
           {isEditing ? (
-            <Select value={editedData.maxWomensSize} onValueChange={(value) => setEditedData({ ...editedData, maxWomensSize: value })}>
+            <Select value={editedData.maxWomensSize} onValueChange={(value: string) => setEditedData({ ...editedData, maxWomensSize: value })}>
               <SelectTrigger className="mt-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                 <SelectValue placeholder="Select max size" />
               </SelectTrigger>
