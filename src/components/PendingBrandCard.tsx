@@ -110,13 +110,20 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
     }
   };
 
-  const CATEGORY_OPTIONS = ['Clothing', 'Shoes', 'Bags', 'Accessories', 'Jewelry', 'Swimwear', 'Homewares'];
+  const CATEGORY_OPTIONS = ['Clothing', 'Shoes', 'Bags', 'Accessories', 'Jewelry', 'Swimwear', 'Homewares', 'Outerwear'];
   const VALUES_OPTIONS = ['Independent label', 'Sustainable', 'Women-Owned', 'BIPOC-Owned', 'Secondhand'];
   const TYPE_OPTIONS = ['Brand', 'Shop'];
   const MAX_SIZE_OPTIONS = ['Up to 0', 'Up to 2', 'Up to 4', 'Up to 6', 'Up to 8', 'Up to 10', 'Up to 12', 'Up to 14', 'Up to 16', 'Up to 18', 'Up to 18+', 'Not found'];
 
+  // Helper to normalize category/value strings by stripping quotes
+  const normalizeValue = (val: string) => val.replace(/^"|"$/g, '').trim();
+
   const handleCategoryToggle = (category: string) => {
-    const currentCategories = editedData.category.split(', ').filter(c => c);
+    // Normalize existing categories to strip any quotes
+    const currentCategories = editedData.category
+      .split(', ')
+      .map(normalizeValue)
+      .filter(c => c);
     const newCategories = currentCategories.includes(category)
       ? currentCategories.filter(c => c !== category)
       : [...currentCategories, category];
@@ -124,7 +131,11 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
   };
 
   const handleValueToggle = (value: string) => {
-    const currentValues = editedData.values.split(', ').filter(v => v);
+    // Normalize existing values to strip any quotes
+    const currentValues = editedData.values
+      .split(', ')
+      .map(normalizeValue)
+      .filter(v => v);
     const newValues = currentValues.includes(value)
       ? currentValues.filter(v => v !== value)
       : [...currentValues, value];
@@ -238,7 +249,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
           {isEditing ? (
             <div className="mt-2 space-y-2 p-3 border rounded-md" style={{ fontFamily: 'DM Sans, sans-serif' }}>
               {CATEGORY_OPTIONS.map(category => {
-                const currentCategories = editedData.category.split(', ').filter(c => c);
+                const currentCategories = editedData.category.split(', ').map(normalizeValue).filter(c => c);
                 return (
                   <div key={category} className="flex items-center gap-2">
                     <Checkbox
@@ -263,7 +274,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
           {isEditing ? (
             <div className="mt-2 space-y-2 p-3 border rounded-md" style={{ fontFamily: 'DM Sans, sans-serif' }}>
               {VALUES_OPTIONS.map(value => {
-                const currentValues = editedData.values.split(', ').filter(v => v);
+                const currentValues = editedData.values.split(', ').map(normalizeValue).filter(v => v);
                 return (
                   <div key={value} className="flex items-center gap-2">
                     <Checkbox
