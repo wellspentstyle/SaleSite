@@ -526,6 +526,8 @@ app.post('/admin/pending-brands/:id/approve', async (req, res) => {
     
     if (!updateResponse.ok) {
       const errorText = await updateResponse.text();
+      console.error('❌ Airtable error response:', errorText);
+      console.error('❌ Data sent to Airtable:', JSON.stringify(updateData, null, 2));
       throw new Error(`Airtable update failed: ${updateResponse.status} ${errorText}`);
     }
     
