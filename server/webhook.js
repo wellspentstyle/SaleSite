@@ -3986,18 +3986,24 @@ async function transferPicksToNewSale(oldSaleId, newSaleId) {
     
     console.log(`📦 Found ${picks.length} picks to transfer`);
     
-    // Update each pick to link to the new sale instead of (or in addition to) the old one
+    // Update each pick to link to the new sale
+    // NOTE: SaleID is the actual linked record field, SaleRecordIDs is a formula/lookup
     let transferred = 0;
     for (const pick of picks) {
-      const currentSaleIds = pick.fields.SaleRecordIDs || [];
-      // Replace old sale ID with new sale ID
-      const newSaleIds = currentSaleIds.map(id => id === oldSaleId ? newSaleId : id);
-      // Also add new sale if not already present
-      if (!newSaleIds.includes(newSaleId)) {
-        newSaleIds.push(newSaleId);
+      // Get current linked sale IDs (from SaleID field which is the actual link)
+      const currentSaleIds = pick.fields.SaleID || [];
+      
+      // Build new sale IDs array - replace old with new, or just set to new
+      let finalSaleIds = [newSaleId];
+      
+      // If there were multiple sales linked, preserve the others (except old one)
+      if (currentSaleIds.length > 1) {
+        finalSaleIds = currentSaleIds
+          .filter(id => id !== oldSaleId)
+          .concat(newSaleId);
+        // Remove duplicates
+        finalSaleIds = [...new Set(finalSaleIds)];
       }
-      // Remove old sale ID
-      const finalSaleIds = newSaleIds.filter(id => id !== oldSaleId);
       
       const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pick.id}`;
       const updateResponse = await fetch(updateUrl, {
@@ -4008,7 +4014,7 @@ async function transferPicksToNewSale(oldSaleId, newSaleId) {
         },
         body: JSON.stringify({
           fields: {
-            SaleRecordIDs: finalSaleIds
+            SaleID: finalSaleIds  // Use SaleID (the linked record field), not SaleRecordIDs
           }
         })
       });
