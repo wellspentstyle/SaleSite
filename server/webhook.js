@@ -3894,6 +3894,171 @@ async function findOrCreateCompany(companyName) {
   }
 }
 
+// ========================================
+// ONE-LIVE-SALE-PER-COMPANY HELPERS
+// ========================================
+
+/**
+ * Find existing live sale for a company
+ * Returns the sale record if found, null otherwise
+ */
+async function findLiveSaleForCompany(companyRecordId, companyName) {
+  console.log(`🔍 Checking for existing live sale for company: ${companyName || companyRecordId}`);
+  
+  try {
+    // Build filter formula - check by company record ID first, fallback to name
+    let filterFormula;
+    if (companyRecordId) {
+      filterFormula = `AND({Live}='YES', FIND("${companyRecordId}", ARRAYJOIN({Company})))`;
+    } else if (companyName) {
+      const escaped = companyName.replace(/"/g, '\\"');
+      filterFormula = `AND({Live}='YES', OR(LOWER({OriginalCompanyName})=LOWER("${escaped}"), FIND(LOWER("${escaped}"), LOWER({CompanyName}))))`;
+    } else {
+      return null;
+    }
+    
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`
+      }
+    });
+    
+    if (!response.ok) {
+      console.error('❌ Error searching for live sales:', await response.text());
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    if (data.records && data.records.length > 0) {
+      console.log(`📦 Found ${data.records.length} existing live sale(s) for company`);
+      // Return the first (should typically only be one)
+      return data.records[0];
+    }
+    
+    console.log('✅ No existing live sale found for company');
+    return null;
+    
+  } catch (error) {
+    console.error('❌ Error finding live sale:', error);
+    return null;
+  }
+}
+
+/**
+ * Transfer picks from one sale to another
+ * Updates the SaleRecordIDs field on pick records
+ */
+async function transferPicksToNewSale(oldSaleId, newSaleId) {
+  console.log(`🔄 Transferring picks from sale ${oldSaleId} to ${newSaleId}`);
+  
+  try {
+    // Find all picks linked to the old sale
+    const filterFormula = `FIND("${oldSaleId}", ARRAYJOIN({SaleRecordIDs}))`;
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`
+      }
+    });
+    
+    if (!response.ok) {
+      console.error('❌ Error fetching picks:', await response.text());
+      return { transferred: 0, error: 'Failed to fetch picks' };
+    }
+    
+    const data = await response.json();
+    const picks = data.records || [];
+    
+    if (picks.length === 0) {
+      console.log('ℹ️  No picks to transfer');
+      return { transferred: 0 };
+    }
+    
+    console.log(`📦 Found ${picks.length} picks to transfer`);
+    
+    // Update each pick to link to the new sale instead of (or in addition to) the old one
+    let transferred = 0;
+    for (const pick of picks) {
+      const currentSaleIds = pick.fields.SaleRecordIDs || [];
+      // Replace old sale ID with new sale ID
+      const newSaleIds = currentSaleIds.map(id => id === oldSaleId ? newSaleId : id);
+      // Also add new sale if not already present
+      if (!newSaleIds.includes(newSaleId)) {
+        newSaleIds.push(newSaleId);
+      }
+      // Remove old sale ID
+      const finalSaleIds = newSaleIds.filter(id => id !== oldSaleId);
+      
+      const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pick.id}`;
+      const updateResponse = await fetch(updateUrl, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fields: {
+            SaleRecordIDs: finalSaleIds
+          }
+        })
+      });
+      
+      if (updateResponse.ok) {
+        transferred++;
+        console.log(`  ✅ Transferred pick ${pick.id}`);
+      } else {
+        console.error(`  ❌ Failed to transfer pick ${pick.id}:`, await updateResponse.text());
+      }
+    }
+    
+    console.log(`✅ Transferred ${transferred}/${picks.length} picks`);
+    return { transferred, total: picks.length };
+    
+  } catch (error) {
+    console.error('❌ Error transferring picks:', error);
+    return { transferred: 0, error: error.message };
+  }
+}
+
+/**
+ * Deactivate (set Live=NO) an existing sale
+ */
+async function deactivateSale(saleId) {
+  console.log(`🔒 Deactivating sale ${saleId}`);
+  
+  try {
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`;
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          Live: 'NO'
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      console.error('❌ Error deactivating sale:', await response.text());
+      return false;
+    }
+    
+    console.log(`✅ Deactivated sale ${saleId}`);
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Error deactivating sale:', error);
+    return false;
+  }
+}
+
 // CloudMailin/AgentMail webhook endpoint - IMPROVED VERSION
 app.post('/webhook/agentmail', upload.none(), async (req, res) => {
   console.log('📧 Received email webhook');
