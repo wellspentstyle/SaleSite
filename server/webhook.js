@@ -3906,13 +3906,19 @@ async function findLiveSaleForCompany(companyRecordId, companyName) {
   console.log(`🔍 Checking for existing live sale for company: ${companyName || companyRecordId}`);
   
   try {
-    // Build filter formula - check by company record ID first, fallback to name
+    // Build filter formula - check by BOTH company record ID AND OriginalCompanyName
+    // This ensures we catch all live sales for a company regardless of how they were linked
     let filterFormula;
-    if (companyRecordId) {
+    const escaped = companyName ? companyName.replace(/"/g, '\\"') : '';
+    
+    if (companyRecordId && companyName) {
+      // Check both linked Company record AND OriginalCompanyName
+      filterFormula = `AND({Live}='YES', OR(FIND("${companyRecordId}", ARRAYJOIN({Company})), LOWER({OriginalCompanyName})=LOWER("${escaped}")))`;
+    } else if (companyRecordId) {
       filterFormula = `AND({Live}='YES', FIND("${companyRecordId}", ARRAYJOIN({Company})))`;
     } else if (companyName) {
-      const escaped = companyName.replace(/"/g, '\\"');
-      filterFormula = `AND({Live}='YES', OR(LOWER({OriginalCompanyName})=LOWER("${escaped}"), FIND(LOWER("${escaped}"), LOWER({CompanyName}))))`;
+      // Check OriginalCompanyName when no company record ID
+      filterFormula = `AND({Live}='YES', LOWER({OriginalCompanyName})=LOWER("${escaped}"))`;
     } else {
       return null;
     }
@@ -5034,22 +5040,26 @@ app.post('/approve-sale/:id', async (req, res) => {
     
     console.log(`✅ Approving sale: ${pendingSale.company} ${pendingSale.percentOff}%`);
     
-    // If replacing an existing sale, delete it first
+    // Track old sale for pick transfer and cleanup (will be set if we find an existing live sale)
+    let oldSaleToTransferFrom = null;
+    let shouldDeleteOldSale = false;
+    
+    // Identify old sale BEFORE creating new one (but don't delete/deactivate yet)
     if (replaceSaleId) {
-      console.log(`🔄 Replacing existing sale: ${replaceSaleId}`);
-      const deleteUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${replaceSaleId}`;
+      console.log(`🔄 Will replace existing sale: ${replaceSaleId}`);
+      oldSaleToTransferFrom = replaceSaleId;
+      shouldDeleteOldSale = true; // Delete after new sale created and picks transferred
+    } else {
+      // Check for existing live sale for this company (one-live-sale-per-company rule)
+      const existingLiveSale = await findLiveSaleForCompany(
+        pendingSale.companyRecordId, 
+        pendingSale.company
+      );
       
-      const deleteResponse = await fetch(deleteUrl, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_PAT}`
-        }
-      });
-      
-      if (!deleteResponse.ok) {
-        console.error('⚠️  Failed to delete old sale, continuing with approval');
-      } else {
-        console.log('✅ Deleted old sale successfully');
+      if (existingLiveSale) {
+        console.log(`📦 Found existing live sale for ${pendingSale.company}: ${existingLiveSale.id}`);
+        oldSaleToTransferFrom = existingLiveSale.id;
+        // Don't delete - just deactivate after new sale is created
       }
     }
     
@@ -5112,15 +5122,84 @@ app.post('/approve-sale/:id', async (req, res) => {
     }
     
     const airtableData = await airtableResponse.json();
-    console.log('✅ Created Airtable record:', airtableData.id);
+    const newSaleId = airtableData.id;
+    console.log('✅ Created Airtable record:', newSaleId);
     
-    // Clear sales cache
+    // Transfer picks and cleanup old sale with proper error handling
+    let picksTransferred = 0;
+    let cleanupError = null;
+    
+    if (oldSaleToTransferFrom && newSaleId) {
+      try {
+        // Step 1: Transfer picks
+        console.log(`🔄 Transferring picks from ${oldSaleToTransferFrom} to ${newSaleId}`);
+        const transferResult = await transferPicksToNewSale(oldSaleToTransferFrom, newSaleId);
+        picksTransferred = transferResult.transferred || 0;
+        if (picksTransferred > 0) {
+          console.log(`✅ Transferred ${picksTransferred} picks to new sale`);
+        }
+        
+        // Step 2: Cleanup old sale (delete if replacing, deactivate otherwise)
+        if (shouldDeleteOldSale) {
+          console.log(`🗑️  Deleting old sale: ${oldSaleToTransferFrom}`);
+          const deleteUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${oldSaleToTransferFrom}`;
+          const deleteResponse = await fetch(deleteUrl, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${AIRTABLE_PAT}`
+            }
+          });
+          
+          if (!deleteResponse.ok) {
+            throw new Error(`Failed to delete old sale: ${await deleteResponse.text()}`);
+          }
+          console.log('✅ Deleted old sale successfully');
+        } else {
+          // Deactivate the old sale to prevent duplicate live sales
+          const deactivated = await deactivateSale(oldSaleToTransferFrom);
+          if (!deactivated) {
+            throw new Error('Failed to deactivate old sale');
+          }
+          console.log(`✅ Deactivated old sale ${oldSaleToTransferFrom}`);
+        }
+      } catch (error) {
+        cleanupError = error;
+        console.error('❌ Cleanup failed, rolling back new sale:', error.message);
+        
+        // Rollback: Delete the newly created sale to prevent duplicate live sales
+        try {
+          const rollbackUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${newSaleId}`;
+          await fetch(rollbackUrl, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${AIRTABLE_PAT}`
+            }
+          });
+          console.log('✅ Rolled back new sale creation');
+        } catch (rollbackError) {
+          console.error('❌ Rollback failed:', rollbackError.message);
+        }
+        
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to cleanup old sale. Approval rolled back.',
+          details: error.message
+        });
+      }
+    }
+    
+    // Clear sales cache only after successful completion
     clearSalesCache();
+    
+    const message = picksTransferred > 0 
+      ? `Sale approved and added to Airtable. Transferred ${picksTransferred} picks from previous sale.`
+      : 'Sale approved and added to Airtable';
     
     res.json({ 
       success: true, 
-      message: 'Sale approved and added to Airtable',
-      recordId: airtableData.id
+      message,
+      recordId: newSaleId,
+      picksTransferred
     });
     
   } catch (error) {
