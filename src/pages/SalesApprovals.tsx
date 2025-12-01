@@ -68,8 +68,8 @@ export function SalesApprovals() {
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [editingSale, setEditingSale] = useState<PendingSale | null>(null);
   
-  // Tab state - default to 'extract' (Add tab)
-  const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'extract');
+  // Tab state - default to 'pending' (Approve tab)
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'pending');
   
   // Confirmation dialog state
   const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
@@ -296,13 +296,13 @@ export function SalesApprovals() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="extract" className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              Add
-            </TabsTrigger>
             <TabsTrigger value="pending" className="flex items-center gap-2">
               <ClipboardList className="h-4 w-4" />
               Approve ({pendingSales.length})
+            </TabsTrigger>
+            <TabsTrigger value="extract" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Add
             </TabsTrigger>
           </TabsList>
 
