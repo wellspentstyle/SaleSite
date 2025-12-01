@@ -128,10 +128,16 @@ async function saveItemsToAirtable(items) {
 
 export async function scrapeGemItems(magicLink, options = {}) {
   const {
-    maxItems = 5,
+    maxItems = null,  // null = scrape all new items since last sync
     logger = console,
     diagnostic = false
   } = options;
+  
+  // Read the marker to get last synced item URL
+  const marker = readMarker();
+  const lastSyncedUrl = marker.lastItemId;  // We store the first item's URL as the marker
+  logger.log(`📌 Last synced item: ${lastSyncedUrl || 'None (first sync)'}`);
+  
 
   let browser;
   let context;
@@ -283,7 +289,7 @@ export async function scrapeGemItems(magicLink, options = {}) {
         logger.log('⚠️ Timed out waiting for items, trying to scrape anyway...');
     }
 
-    const items = await page.evaluate((maxItems) => {
+    const items = await page.evaluate(({ maxItems, lastSyncedUrl }) => {
       const results = [];
       
       // Gem.app uses .productLink class for saved items
@@ -301,13 +307,22 @@ export async function scrapeGemItems(magicLink, options = {}) {
         }
       }
 
-      if (elements.length === 0) return [];
+      if (elements.length === 0) return results;
 
-      for (let i = 0; i < Math.min(elements.length, maxItems); i++) {
+      const limit = maxItems || elements.length; // If no maxItems, get all
+      
+      for (let i = 0; i < Math.min(elements.length, limit); i++) {
         const element = elements[i];
 
         // The link IS the product container on Gem
         const url = element.href || '';
+        
+        // Stop if we've reached an item we've already synced
+        if (lastSyncedUrl && url === lastSyncedUrl) {
+          console.log(`Found previously synced item, stopping.`);
+          break;
+        }
+        
         const img = element.querySelector('img');
         const title = element.querySelector('h3');
 
@@ -331,9 +346,24 @@ export async function scrapeGemItems(magicLink, options = {}) {
       }
 
       return results;
-    }, maxItems);
+    }, { maxItems, lastSyncedUrl });
 
     logger.log(`✅ Extracted ${items.length} items from saved page`);
+    
+    if (items.length === 0) {
+      logger.log('ℹ️  No new items to sync');
+      await browser.close();
+      return {
+        success: true,
+        message: 'No new items to sync',
+        itemsScraped: 0,
+        itemsSaved: 0,
+        items: []
+      };
+    }
+    
+    // Store the first item's Gem URL as the marker (before we replace with external URL)
+    const firstItemGemUrl = items[0]?.url;
 
     // Now visit each product page to get the actual external URL and price
     logger.log('🔍 Fetching details from each product page...');
@@ -458,12 +488,18 @@ export async function scrapeGemItems(magicLink, options = {}) {
 
     // Save to Airtable
     const saveResult = await saveItemsToAirtable(items);
+    
+    // Update the marker with the first (newest) item's Gem URL
+    if (saveResult.success && saveResult.count > 0 && firstItemGemUrl) {
+      writeMarker(firstItemGemUrl);
+      logger.log(`📌 Updated sync marker to: ${firstItemGemUrl}`);
+    }
 
     await browser.close();
 
     return {
       success: true,
-      message: `Successfully scraped ${items.length} items`,
+      message: `Successfully scraped ${items.length} new items`,
       itemsScraped: items.length,
       itemsSaved: saveResult.count,
       items: items
