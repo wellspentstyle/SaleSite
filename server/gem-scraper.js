@@ -67,18 +67,28 @@ async function saveItemsToAirtable(items) {
   try {
     console.log(`💾 Saving ${items.length} items to Airtable...`);
 
-    const records = items.map(item => ({
-      fields: {
+    const records = items.map(item => {
+      const fields = {
         ProductName: item.name,
         ProductURL: item.url,
         Brand: item.brand,
-        Price: item.price,
-        Size: item.size,
         ImageURL: item.imageUrl,
         DateSaved: item.dateSaved,
         Marketplace: item.marketplace
+      };
+      
+      // Only include Price if it's a valid number
+      if (item.price && !isNaN(parseFloat(item.price))) {
+        fields.Price = parseFloat(item.price);
       }
-    }));
+      
+      // Only include Size if it's not empty
+      if (item.size && item.size.trim()) {
+        fields.Size = item.size.trim();
+      }
+      
+      return { fields };
+    });
 
     const BATCH_SIZE = 10;
     const savedRecords = [];
@@ -119,7 +129,8 @@ async function saveItemsToAirtable(items) {
 export async function scrapeGemItems(magicLink, options = {}) {
   const {
     maxItems = 5,
-    logger = console
+    logger = console,
+    diagnostic = false
   } = options;
 
   let browser;
@@ -164,10 +175,10 @@ export async function scrapeGemItems(magicLink, options = {}) {
 
     page = await context.newPage();
 
-    // DIRECT NAVIGATION - Skip the magic link, go straight to items
-    logger.log('📍 Navigating directly to https://gem.app/items ...');
+    // DIRECT NAVIGATION - Skip the magic link, go straight to saved items
+    logger.log('📍 Navigating directly to https://gem.app/saved ...');
 
-    const response = await page.goto('https://gem.app/items', {
+    const response = await page.goto('https://gem.app/saved', {
       waitUntil: 'domcontentloaded',
       timeout: 30000
     });
@@ -188,22 +199,97 @@ export async function scrapeGemItems(magicLink, options = {}) {
 
     logger.log('✅ Authentication successful! We are inside.');
 
+    // DIAGNOSTIC MODE: Take screenshots and capture page info
+    if (diagnostic) {
+      logger.log('🔬 DIAGNOSTIC MODE ENABLED');
+      
+      // Take screenshot
+      const screenshotPath = path.join(__dirname, 'gem-diagnostic.png');
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      logger.log(`📸 Screenshot saved to: ${screenshotPath}`);
+      
+      // Wait longer for content to load
+      await page.waitForTimeout(3000);
+      
+      // Get page info
+      const pageInfo = await page.evaluate(() => {
+        const allElements = document.querySelectorAll('*');
+        const links = document.querySelectorAll('a[href*="/item"]');
+        const articles = document.querySelectorAll('article');
+        const images = document.querySelectorAll('img');
+        const divs = document.querySelectorAll('div');
+        
+        // Get a sample of the body HTML (first 5000 chars)
+        const bodyHTML = document.body.innerHTML.substring(0, 5000);
+        
+        // Find any elements that might be item containers
+        const potentialItems = [];
+        divs.forEach((div, i) => {
+          if (i < 20) {
+            const classes = div.className || '';
+            const dataAttrs = Array.from(div.attributes)
+              .filter(a => a.name.startsWith('data-'))
+              .map(a => `${a.name}="${a.value}"`);
+            if (classes.includes('item') || classes.includes('card') || classes.includes('product') || dataAttrs.length > 0) {
+              potentialItems.push({
+                tag: div.tagName,
+                classes: classes.substring(0, 100),
+                dataAttrs: dataAttrs.slice(0, 3)
+              });
+            }
+          }
+        });
+        
+        return {
+          totalElements: allElements.length,
+          linkCount: links.length,
+          articleCount: articles.length,
+          imageCount: images.length,
+          divCount: divs.length,
+          potentialItems,
+          bodyPreview: bodyHTML,
+          documentTitle: document.title
+        };
+      });
+      
+      logger.log('📊 PAGE ANALYSIS:');
+      logger.log(`   Total elements: ${pageInfo.totalElements}`);
+      logger.log(`   Links with /item: ${pageInfo.linkCount}`);
+      logger.log(`   Articles: ${pageInfo.articleCount}`);
+      logger.log(`   Images: ${pageInfo.imageCount}`);
+      logger.log(`   Divs: ${pageInfo.divCount}`);
+      logger.log(`   Document title: ${pageInfo.documentTitle}`);
+      
+      if (pageInfo.potentialItems.length > 0) {
+        logger.log('   Potential item containers:');
+        pageInfo.potentialItems.forEach((item, i) => {
+          logger.log(`     ${i+1}. ${item.tag} class="${item.classes}" ${item.dataAttrs.join(' ')}`);
+        });
+      }
+      
+      // Save body preview to file for inspection
+      const htmlPath = path.join(__dirname, 'gem-diagnostic.html');
+      fs.writeFileSync(htmlPath, pageInfo.bodyPreview);
+      logger.log(`📄 HTML preview saved to: ${htmlPath}`);
+    }
+
     // Extract items
     logger.log('📍 Extracting items...');
 
-    // Try to wait for items to load
+    // Try to wait for items to load - Gem uses .productLink class for items
     try {
-        await page.waitForSelector('article, [data-testid*="item"]', { timeout: 5000 });
+        await page.waitForSelector('a.productLink, a[href*="/product/"]', { timeout: 10000 });
     } catch(e) {
         logger.log('⚠️ Timed out waiting for items, trying to scrape anyway...');
     }
 
     const items = await page.evaluate((maxItems) => {
       const results = [];
+      
+      // Gem.app uses .productLink class for saved items
       const selectors = [
-        'article',
-        '[data-testid*="item"]',
-        'a[href*="/item/"]'
+        'a.productLink',
+        'a[href*="/product/"]'
       ];
 
       let elements = [];
@@ -220,16 +306,22 @@ export async function scrapeGemItems(magicLink, options = {}) {
       for (let i = 0; i < Math.min(elements.length, maxItems); i++) {
         const element = elements[i];
 
-        const link = element.querySelector('a') || (element.tagName === 'A' ? element : null);
+        // The link IS the product container on Gem
+        const url = element.href || '';
         const img = element.querySelector('img');
-        const title = element.querySelector('h1, h2, h3, h4');
+        const title = element.querySelector('h3');
 
-        if (link || img) {
+        // Extract brand from title (usually first word before space)
+        const titleText = title?.textContent?.trim() || 'Unnamed Item';
+        const brandMatch = titleText.match(/^([A-Za-z]+)\s/);
+        const brand = brandMatch ? brandMatch[1] : '';
+
+        if (url || img) {
           results.push({
-            url: link?.href || '',
-            imageUrl: img?.src || '',
-            name: title?.textContent?.trim() || 'Unnamed Item',
-            brand: '',
+            url: url,
+            imageUrl: img?.src || img?.getAttribute('data-src') || '',
+            name: titleText,
+            brand: brand,
             price: '',
             size: '',
             dateSaved: new Date().toISOString().split('T')[0],
