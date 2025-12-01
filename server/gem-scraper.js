@@ -354,16 +354,23 @@ export async function scrapeGemItems(magicLink, options = {}) {
         
         // Extract external URL and price from product page
         const details = await page.evaluate(() => {
-          // Find external marketplace link
+          // Find external marketplace link - check for direct links first
           const allLinks = Array.from(document.querySelectorAll('a[href]'));
-          const marketplaces = ['therealreal', 'poshmark', 'ebay', 'vestiaire', 'depop', 'grailed', 'mercari', 'tradesy', 'rebag', 'fashionphile'];
+          const marketplaces = ['therealreal', 'poshmark', 'ebay', 'vestiaire', 'depop', 'grailed', 'mercari', 'tradesy', 'rebag', 'fashionphile', 'etsy', '1stdibs'];
           
           let externalUrl = '';
+          let gemGoUrl = '';
+          
           for (const link of allLinks) {
             const href = link.href || '';
+            // Check for direct marketplace links
             if (marketplaces.some(m => href.toLowerCase().includes(m))) {
               externalUrl = href;
               break;
+            }
+            // Also capture /go/ redirect links as fallback
+            if (href.includes('gem.app/go/')) {
+              gemGoUrl = href;
             }
           }
           
@@ -390,36 +397,55 @@ export async function scrapeGemItems(magicLink, options = {}) {
             }
           }
           
-          // Try to find marketplace name
-          let marketplace = 'Unknown';
-          if (externalUrl) {
-            if (externalUrl.includes('therealreal')) marketplace = 'The RealReal';
-            else if (externalUrl.includes('poshmark')) marketplace = 'Poshmark';
-            else if (externalUrl.includes('ebay')) marketplace = 'eBay';
-            else if (externalUrl.includes('vestiaire')) marketplace = 'Vestiaire Collective';
-            else if (externalUrl.includes('depop')) marketplace = 'Depop';
-            else if (externalUrl.includes('grailed')) marketplace = 'Grailed';
-            else if (externalUrl.includes('mercari')) marketplace = 'Mercari';
-            else if (externalUrl.includes('tradesy')) marketplace = 'Tradesy';
-            else if (externalUrl.includes('rebag')) marketplace = 'Rebag';
-            else if (externalUrl.includes('fashionphile')) marketplace = 'Fashionphile';
-          }
-          
-          return { externalUrl, price, marketplace };
+          return { externalUrl, gemGoUrl, price };
         });
         
+        let finalUrl = details.externalUrl;
+        
+        // If no direct external URL found but we have a /go/ redirect, follow it
+        if (!finalUrl && details.gemGoUrl) {
+          logger.log(`      ↳ Following redirect...`);
+          try {
+            await page.goto(details.gemGoUrl, {
+              waitUntil: 'domcontentloaded',
+              timeout: 15000
+            });
+            await page.waitForTimeout(1500);
+            finalUrl = page.url();
+          } catch (e) {
+            logger.log(`      ⚠️ Redirect failed: ${e.message}`);
+          }
+        }
+        
+        // Determine marketplace from final URL
+        let marketplace = 'Unknown';
+        if (finalUrl) {
+          if (finalUrl.includes('therealreal')) marketplace = 'The RealReal';
+          else if (finalUrl.includes('poshmark')) marketplace = 'Poshmark';
+          else if (finalUrl.includes('ebay')) marketplace = 'eBay';
+          else if (finalUrl.includes('vestiaire')) marketplace = 'Vestiaire Collective';
+          else if (finalUrl.includes('depop')) marketplace = 'Depop';
+          else if (finalUrl.includes('grailed')) marketplace = 'Grailed';
+          else if (finalUrl.includes('mercari')) marketplace = 'Mercari';
+          else if (finalUrl.includes('tradesy')) marketplace = 'Tradesy';
+          else if (finalUrl.includes('rebag')) marketplace = 'Rebag';
+          else if (finalUrl.includes('fashionphile')) marketplace = 'Fashionphile';
+          else if (finalUrl.includes('etsy')) marketplace = 'Etsy';
+          else if (finalUrl.includes('1stdibs')) marketplace = '1stDibs';
+        }
+        
         // Update item with details
-        if (details.externalUrl) {
-          item.url = details.externalUrl;
+        if (finalUrl && !finalUrl.includes('gem.app')) {
+          item.url = finalUrl;
         }
         if (details.price) {
           item.price = details.price;
         }
-        if (details.marketplace && details.marketplace !== 'Unknown') {
-          item.marketplace = details.marketplace;
+        if (marketplace !== 'Unknown') {
+          item.marketplace = marketplace;
         }
         
-        logger.log(`      → $${details.price || 'N/A'} from ${details.marketplace}`);
+        logger.log(`      → $${details.price || 'N/A'} from ${marketplace}`);
         
       } catch (err) {
         logger.log(`      ⚠️ Failed to fetch details: ${err.message}`);
