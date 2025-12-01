@@ -27,5 +27,8 @@ out/
 logs/
 *.log
 
+# Auth/credentials
+server/gem-auth.json
+
 # OS
 Thumbs.db
