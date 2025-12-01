@@ -333,10 +333,101 @@ export async function scrapeGemItems(magicLink, options = {}) {
       return results;
     }, maxItems);
 
-    logger.log(`✅ Extracted ${items.length} items`);
+    logger.log(`✅ Extracted ${items.length} items from saved page`);
+
+    // Now visit each product page to get the actual external URL and price
+    logger.log('🔍 Fetching details from each product page...');
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item.url) continue;
+      
+      try {
+        logger.log(`   [${i+1}/${items.length}] Fetching ${item.name.substring(0, 40)}...`);
+        
+        await page.goto(item.url, {
+          waitUntil: 'domcontentloaded',
+          timeout: 15000
+        });
+        
+        await page.waitForTimeout(2000);
+        
+        // Extract external URL and price from product page
+        const details = await page.evaluate(() => {
+          // Find external marketplace link
+          const allLinks = Array.from(document.querySelectorAll('a[href]'));
+          const marketplaces = ['therealreal', 'poshmark', 'ebay', 'vestiaire', 'depop', 'grailed', 'mercari', 'tradesy', 'rebag', 'fashionphile'];
+          
+          let externalUrl = '';
+          for (const link of allLinks) {
+            const href = link.href || '';
+            if (marketplaces.some(m => href.toLowerCase().includes(m))) {
+              externalUrl = href;
+              break;
+            }
+          }
+          
+          // Find price - look for $ followed by numbers
+          let price = '';
+          const priceRegex = /\$\s*([\d,]+(?:\.\d{2})?)/;
+          
+          // Check specific elements first
+          const priceElements = document.querySelectorAll('[class*="price"], [class*="Price"]');
+          for (const el of priceElements) {
+            const match = el.textContent?.match(priceRegex);
+            if (match) {
+              price = match[1].replace(',', '');
+              break;
+            }
+          }
+          
+          // If not found, search all text nodes
+          if (!price) {
+            const bodyText = document.body.innerText;
+            const match = bodyText.match(priceRegex);
+            if (match) {
+              price = match[1].replace(',', '');
+            }
+          }
+          
+          // Try to find marketplace name
+          let marketplace = 'Unknown';
+          if (externalUrl) {
+            if (externalUrl.includes('therealreal')) marketplace = 'The RealReal';
+            else if (externalUrl.includes('poshmark')) marketplace = 'Poshmark';
+            else if (externalUrl.includes('ebay')) marketplace = 'eBay';
+            else if (externalUrl.includes('vestiaire')) marketplace = 'Vestiaire Collective';
+            else if (externalUrl.includes('depop')) marketplace = 'Depop';
+            else if (externalUrl.includes('grailed')) marketplace = 'Grailed';
+            else if (externalUrl.includes('mercari')) marketplace = 'Mercari';
+            else if (externalUrl.includes('tradesy')) marketplace = 'Tradesy';
+            else if (externalUrl.includes('rebag')) marketplace = 'Rebag';
+            else if (externalUrl.includes('fashionphile')) marketplace = 'Fashionphile';
+          }
+          
+          return { externalUrl, price, marketplace };
+        });
+        
+        // Update item with details
+        if (details.externalUrl) {
+          item.url = details.externalUrl;
+        }
+        if (details.price) {
+          item.price = details.price;
+        }
+        if (details.marketplace && details.marketplace !== 'Unknown') {
+          item.marketplace = details.marketplace;
+        }
+        
+        logger.log(`      → $${details.price || 'N/A'} from ${details.marketplace}`);
+        
+      } catch (err) {
+        logger.log(`      ⚠️ Failed to fetch details: ${err.message}`);
+      }
+    }
 
     if (items.length > 0) {
-      logger.log('📝 Sample item:', items[0]);
+      logger.log('📝 Sample item with details:', items[0]);
     }
 
     // Save to Airtable
