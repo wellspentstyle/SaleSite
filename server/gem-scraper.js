@@ -330,6 +330,28 @@ export async function scrapeGemItems(magicLink, options = {}) {
         const titleText = title?.textContent?.trim() || 'Unnamed Item';
         const brandMatch = titleText.match(/^([A-Za-z]+)\s/);
         const brand = brandMatch ? brandMatch[1] : '';
+        
+        // Try to extract size from title (e.g. "- Size Medium", "Size L", "- M -", "XL")
+        let size = '';
+        const sizePatterns = [
+          /[\s\-–]+Size\s+(XXS|XS|S|M|L|XL|XXL|XXXL|Small|Medium|Large|X-?Large|One Size|\d{1,2}(?:\.\d)?)/i,
+          /[\s\-–]+(XXS|XS|S|M|L|XL|XXL|XXXL)[\s\-–]*$/i,
+          /[\s\-–]+(Small|Medium|Large|X-?Large)[\s\-–]*$/i,
+          /\bSize\s+([\d]{1,2})\b/i
+        ];
+        for (const pattern of sizePatterns) {
+          const match = titleText.match(pattern);
+          if (match) {
+            // Normalize size names
+            let sizeVal = match[1].toUpperCase();
+            if (sizeVal === 'SMALL') sizeVal = 'S';
+            else if (sizeVal === 'MEDIUM') sizeVal = 'M';
+            else if (sizeVal === 'LARGE') sizeVal = 'L';
+            else if (sizeVal === 'X-LARGE' || sizeVal === 'XLARGE') sizeVal = 'XL';
+            size = sizeVal;
+            break;
+          }
+        }
 
         if (url || img) {
           results.push({
@@ -338,7 +360,7 @@ export async function scrapeGemItems(magicLink, options = {}) {
             name: titleText,
             brand: brand,
             price: '',
-            size: '',
+            size: size,
             dateSaved: new Date().toISOString().split('T')[0],
             marketplace: 'Gem'
           });
@@ -382,7 +404,7 @@ export async function scrapeGemItems(magicLink, options = {}) {
         
         await page.waitForTimeout(2000);
         
-        // Extract external URL and price from product page
+        // Extract external URL, price, and size from product page
         const details = await page.evaluate(() => {
           // Find external marketplace link - check for direct links first
           const allLinks = Array.from(document.querySelectorAll('a[href]'));
@@ -427,7 +449,49 @@ export async function scrapeGemItems(magicLink, options = {}) {
             }
           }
           
-          return { externalUrl, gemGoUrl, price };
+          // Find size - look for size elements or text patterns
+          let size = '';
+          
+          // Look for elements with size in class name
+          const sizeElements = document.querySelectorAll('[class*="size"], [class*="Size"]');
+          for (const el of sizeElements) {
+            const text = el.textContent?.trim();
+            // Match common size patterns
+            const sizeMatch = text?.match(/^(XXS|XS|S|M|L|XL|XXL|XXXL|OS|One Size|\d{1,2}(?:\.\d)?|[0-9]+\/[0-9]+)$/i);
+            if (sizeMatch) {
+              size = sizeMatch[1].toUpperCase();
+              break;
+            }
+          }
+          
+          // If not found, look for "Size:" label patterns
+          if (!size) {
+            const bodyText = document.body.innerText;
+            const sizePatterns = [
+              /Size[:\s]+([XSML]{1,4}|XXS|XS|S|M|L|XL|XXL|XXXL|OS|One Size|\d{1,2}(?:\.\d)?)/i,
+              /\bSize\s*([0-9]{1,2})\b/i,
+              /\b(XXS|XS|S|M|L|XL|XXL|XXXL)\b/
+            ];
+            for (const pattern of sizePatterns) {
+              const match = bodyText.match(pattern);
+              if (match) {
+                size = match[1].toUpperCase();
+                break;
+              }
+            }
+          }
+          
+          // Also check the product title for size info (often at the end like "- Size M")
+          const titleEl = document.querySelector('h1');
+          if (!size && titleEl) {
+            const titleText = titleEl.textContent || '';
+            const titleSizeMatch = titleText.match(/[\s\-]+(?:Size\s+)?([XSML]{1,4}|XXS|XS|S|M|L|XL|XXL|XXXL|\d{1,2})(?:\s|$)/i);
+            if (titleSizeMatch) {
+              size = titleSizeMatch[1].toUpperCase();
+            }
+          }
+          
+          return { externalUrl, gemGoUrl, price, size };
         });
         
         let finalUrl = details.externalUrl;
@@ -471,11 +535,14 @@ export async function scrapeGemItems(magicLink, options = {}) {
         if (details.price) {
           item.price = details.price;
         }
+        if (details.size) {
+          item.size = details.size;
+        }
         if (marketplace !== 'Unknown') {
           item.marketplace = marketplace;
         }
         
-        logger.log(`      → $${details.price || 'N/A'} from ${marketplace}`);
+        logger.log(`      → $${details.price || 'N/A'} | Size: ${details.size || 'N/A'} | ${marketplace}`);
         
       } catch (err) {
         logger.log(`      ⚠️ Failed to fetch details: ${err.message}`);
