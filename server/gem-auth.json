@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "gem",
+      "value": "s%3Aw7tw-DS99HLMNWFoOZJrhSvlsFs5GyZW.FPnDPyr3pUcqDm0YmuCoxfHmvDKV%2BU4qHxYaMjerizY",
+      "domain": ".gem.app",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}
