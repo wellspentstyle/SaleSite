@@ -1,0 +1,60 @@
+px playwright install chromium
+Playwright Host validation warning: 
+╔══════════════════════════════════════════════════════╗
+║ Host system is missing dependencies to run browsers. ║
+║ Please install them with the following command:      ║
+║                                                      ║
+║     sudo npx playwright install-deps                 ║
+║                                                      ║
+║ Alternatively, use apt:                              ║
+║     sudo apt-get install libgbm1                     ║
+║                                                      ║
+║ <3 Playwright Team                                   ║
+╚══════════════════════════════════════════════════════╝
+    at validateDependenciesLinux (/home/runner/workspace/node_modules/playwright-core/lib/server/registry/dependencies.js:269:9)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Registry._validateHostRequirements (/home/runner/workspace/node_modules/playwright-core/lib/server/registry/index.js:961:14)
+    at async Registry._validateHostRequirementsForExecutableIfNeeded (/home/runner/workspace/node_modules/playwright-core/lib/server/registry/index.js:1083:7)
+    at async Registry.validateHostRequirementsForExecutablesIfNeeded (/home/runner/workspace/node_modules/playwright-core/lib/server/registry/index.js:1072:7)
+    at async i.<anonymous> (/home/runner/workspace/node_modules/playwright-core/lib/cli/program.js:217:7)
+~/workspace$ npx playwright install-deps chromium
+Installing dependencies...
+Switching to root user to install dependencies...
+    You don't need sudo in Replit, all files that
+    can be modified already have the correct permissions
+    and you can install new software using Nix.
+
+Tools like
+apt, brew, and
+yum which modify
+system dependencies
+are not directly
+callable inside
+Replit. We offer the
+System Dependencies
+pane for easy
+dependency management.
+
+For more information,
+please check
+https://docs.replit.com/replit-workspace/dependency-management
+, and don't forget
+to indicate whether
+you found the
+documentation helpful
+at the bottom of
+the page!
+
+Failed to install browser dependencies
+Error: Installation process exited with code: 1
+~/workspace$ sudo npx playwright install-deps 
+Installing dependencies...
+Switching to root user to install dependencies...
+Tools like apt, brew, and yum which modify system dependencies are not directly callable inside Replit. We
+offer the System Dependencies pane for easy dependency management.
+
+For more information, please check https://docs.replit.com/replit-workspace/dependency-management , and don't
+forget to indicate whether you found the documentation helpful at the bottom of the page!
+
+Failed to install browser dependencies
+Error: Installation process exited with code: 1
