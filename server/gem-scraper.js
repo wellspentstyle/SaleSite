@@ -5,9 +5,18 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+function getChromiumPath() {
+  try {
+    return execSync('which chromium', { encoding: 'utf-8' }).trim();
+  } catch {
+    return null;
+  }
+}
 
 // CONFIGURATION
 const AUTH_FILE = path.join(__dirname, 'gem-auth.json');
@@ -127,8 +136,12 @@ export async function scrapeGemItems(magicLink, options = {}) {
 
     logger.log('📂 Found gem-auth.json - injecting cookies...');
 
+    const chromiumPath = getChromiumPath();
+    logger.log(`🌐 Using Chromium at: ${chromiumPath || 'bundled'}`);
+
     browser = await chromium.launch({
       headless: true,
+      executablePath: chromiumPath || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
