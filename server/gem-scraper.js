@@ -528,9 +528,142 @@ export async function scrapeGemItems(magicLink, options = {}) {
           else if (finalUrl.includes('1stdibs')) marketplace = '1stDibs';
         }
         
+        // Try to get product image from the marketplace page
+        let marketplaceImage = '';
+        if (finalUrl && !finalUrl.includes('gem.app')) {
+          try {
+            // Navigate to marketplace page to get the actual product image
+            await page.goto(finalUrl, {
+              waitUntil: 'domcontentloaded',
+              timeout: 15000
+            });
+            await page.waitForTimeout(2000);
+            
+            // Extract main product image based on marketplace
+            marketplaceImage = await page.evaluate((marketplace) => {
+              // First, try og:image meta tag (most reliable, works even with some bot protection)
+              const ogImage = document.querySelector('meta[property="og:image"]');
+              if (ogImage) {
+                const content = ogImage.getAttribute('content');
+                if (content && content.startsWith('http') && !content.includes('logo') && !content.includes('placeholder')) {
+                  return content;
+                }
+              }
+              
+              // Try twitter:image meta tag
+              const twitterImage = document.querySelector('meta[name="twitter:image"]');
+              if (twitterImage) {
+                const content = twitterImage.getAttribute('content');
+                if (content && content.startsWith('http') && !content.includes('logo') && !content.includes('placeholder')) {
+                  return content;
+                }
+              }
+              
+              // Marketplace-specific selectors for main product image
+              const selectors = {
+                'The RealReal': [
+                  'img[data-testid="product-image"]',
+                  '.product-image img',
+                  '.pdp-image img',
+                  'img[alt*="product"]',
+                  '.gallery img:first-child'
+                ],
+                'Poshmark': [
+                  'img[data-testid="listing-image"]',
+                  '.listing-image img',
+                  '.carousel img:first-child',
+                  'img[alt*="Cover"]',
+                  '.img__container img'
+                ],
+                'eBay': [
+                  'img[data-zoom-src]',
+                  '.ux-image-carousel-item img',
+                  '#icImg',
+                  'img[itemprop="image"]',
+                  '.img-main img'
+                ],
+                'Vestiaire Collective': [
+                  '.product-media img',
+                  'img[data-testid="product-image"]',
+                  '.gallery-image img'
+                ],
+                'Depop': [
+                  'img[data-testid="product-image"]',
+                  '.ProductImage img',
+                  'img[alt*="product"]'
+                ],
+                'Grailed': [
+                  '.listing-photo img',
+                  'img[data-testid="listing-image"]',
+                  '.Photos img:first-child'
+                ],
+                'Mercari': [
+                  'img[data-testid="item-image"]',
+                  '.item-photo img',
+                  '.carousel img:first-child'
+                ],
+                'Etsy': [
+                  'img[data-listing-card-listing-image]',
+                  '.listing-page-image-carousel img',
+                  'img[alt*="listing"]'
+                ],
+                '1stDibs': [
+                  '.product-image img',
+                  'img[data-testid="product-photo"]'
+                ],
+                'Rebag': [
+                  '.product-image img',
+                  'img[data-testid="product-image"]'
+                ],
+                'Fashionphile': [
+                  '.product-image img',
+                  '#main-image'
+                ]
+              };
+              
+              // Get selectors for this marketplace, or use generic ones
+              const marketplaceSelectors = selectors[marketplace] || [];
+              const genericSelectors = [
+                'img[src*="product"]',
+                'img[class*="product"]',
+                'img[class*="main"]',
+                'img[class*="gallery"]:first-child',
+                'main img:first-child',
+                'article img:first-child'
+              ];
+              
+              const allSelectors = [...marketplaceSelectors, ...genericSelectors];
+              
+              for (const selector of allSelectors) {
+                try {
+                  const img = document.querySelector(selector);
+                  if (img) {
+                    // Get the highest quality src available
+                    const src = img.getAttribute('data-zoom-src') || 
+                                img.getAttribute('data-src') || 
+                                img.getAttribute('data-lazy-src') ||
+                                img.src;
+                    if (src && src.startsWith('http') && !src.includes('placeholder') && !src.includes('logo')) {
+                      return src;
+                    }
+                  }
+                } catch (e) {}
+              }
+              
+              return '';
+            }, marketplace);
+            
+          } catch (imgErr) {
+            logger.log(`      ⚠️ Could not fetch marketplace image: ${imgErr.message}`);
+          }
+        }
+        
         // Update item with details
         if (finalUrl && !finalUrl.includes('gem.app')) {
           item.url = finalUrl;
+        }
+        if (marketplaceImage) {
+          item.imageUrl = marketplaceImage;
         }
         if (details.price) {
           item.price = details.price;
@@ -542,7 +675,7 @@ export async function scrapeGemItems(magicLink, options = {}) {
           item.marketplace = marketplace;
         }
         
-        logger.log(`      → $${details.price || 'N/A'} | Size: ${details.size || 'N/A'} | ${marketplace}`);
+        logger.log(`      → $${details.price || 'N/A'} | Size: ${details.size || 'N/A'} | ${marketplace}${marketplaceImage ? ' | 📷' : ''}`);
         
       } catch (err) {
         logger.log(`      ⚠️ Failed to fetch details: ${err.message}`);
