@@ -74,6 +74,8 @@ export function SalesApprovals() {
   // Confirmation dialog state
   const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
   const [pendingApprovalValue, setPendingApprovalValue] = useState<boolean | null>(null);
+  const [showRejectAllConfirm, setShowRejectAllConfirm] = useState(false);
+  const [rejectAllLoading, setRejectAllLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -255,6 +257,30 @@ export function SalesApprovals() {
     }
   };
 
+  const handleRejectAll = async () => {
+    const auth = sessionStorage.getItem('adminAuth') || '';
+    
+    try {
+      setRejectAllLoading(true);
+      
+      const rejectPromises = pendingSales.map(sale => 
+        fetch(`${API_BASE}/reject-sale/${sale.id}`, {
+          method: 'POST',
+          headers: { 'auth': auth }
+        })
+      );
+      
+      await Promise.all(rejectPromises);
+      setPendingSales([]);
+      setShowRejectAllConfirm(false);
+    } catch (error) {
+      console.error('Error rejecting all sales:', error);
+      alert('Error rejecting some sales');
+    } finally {
+      setRejectAllLoading(false);
+    }
+  };
+
   const handleEditSale = (updatedData: { company: string; percentOff: number; saleUrl: string; discountCode?: string; startDate: string; endDate?: string }) => {
     if (!editingSale) return;
     
@@ -314,9 +340,22 @@ export function SalesApprovals() {
       {/* Pending Sales */}
       <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">
-              Pending Sales ({pendingSales.length})
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold">
+                Pending Sales ({pendingSales.length})
+              </h2>
+              {pendingSales.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowRejectAllConfirm(true)}
+                  disabled={rejectAllLoading}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Reject All
+                </Button>
+              )}
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -618,6 +657,30 @@ export function SalesApprovals() {
             <AlertDialogCancel onClick={() => setPendingApprovalValue(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmApprovalToggle}>
               {pendingApprovalValue ? 'Enable' : 'Disable'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showRejectAllConfirm} onOpenChange={setShowRejectAllConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject All Pending Sales?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reject all {pendingSales.length} pending sales. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={rejectAllLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleRejectAll}
+              disabled={rejectAllLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {rejectAllLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Reject All
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
