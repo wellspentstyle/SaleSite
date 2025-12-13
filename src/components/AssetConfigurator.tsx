@@ -67,7 +67,7 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
 
   const fetchPicks = async (saleId: string) => {
     setLoading(true);
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       const response = await fetch(`${API_BASE}/admin/sale/${saleId}/picks`, {
@@ -134,7 +134,7 @@ export function AssetConfigurator({ sale, open, onOpenChange, onAssetsGenerated 
     }
 
     setGenerating(true);
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       const requestBody: any = {

@@ -38,7 +38,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
   const handleSaveEdit = async () => {
     setIsProcessing(true);
     try {
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`/api/admin/pending-brands/${brand.id}`, {
         method: 'PUT',
         headers: {
@@ -65,7 +65,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
   const handleApprove = async () => {
     setIsProcessing(true);
     try {
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`/api/admin/pending-brands/${brand.id}/approve`, {
         method: 'POST',
         headers: {
@@ -89,7 +89,7 @@ export function PendingBrandCard({ brand, onApprove, onReject }: PendingBrandCar
   const handleReject = async () => {
     setIsProcessing(true);
     try {
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`/api/admin/pending-brands/${brand.id}/reject`, {
         method: 'POST',
         headers: {

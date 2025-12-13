@@ -53,7 +53,7 @@ export function AssetResults() {
 
   useEffect(() => {
     const loadAssets = async () => {
-      const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+      const auth = localStorage.getItem('adminAuth') || 'dev-mode';
       const saleIdParam = searchParams.get('saleId');
       
       // Load from database - either specific sale or most recent
@@ -159,7 +159,7 @@ export function AssetResults() {
     }
 
     setPosting(true);
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       // Order: main sale image first, then product stories in order
@@ -221,7 +221,7 @@ export function AssetResults() {
   const handleClearAssets = async () => {
     if (!resultsData) return;
     
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
     try {
       await fetch(`${API_BASE}/admin/generated-assets/${resultsData.saleId}`, {
         method: 'DELETE',

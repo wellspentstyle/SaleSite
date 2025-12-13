@@ -82,7 +82,7 @@ export function SalesApprovals() {
   }, []);
 
   const loadData = async () => {
-    const auth = sessionStorage.getItem('adminAuth') || '';
+    const auth = localStorage.getItem('adminAuth') || '';
     
     try {
       setLoading(true);
@@ -129,7 +129,7 @@ export function SalesApprovals() {
   const handleConfirmApprovalToggle = async () => {
     if (pendingApprovalValue === null) return;
     
-    const auth = sessionStorage.getItem('adminAuth') || '';
+    const auth = localStorage.getItem('adminAuth') || '';
     
     try {
       setSettingsLoading(true);
@@ -158,7 +158,7 @@ export function SalesApprovals() {
   };
 
   const handleCheckDuplicates = async (saleId: string) => {
-    const auth = sessionStorage.getItem('adminAuth') || '';
+    const auth = localStorage.getItem('adminAuth') || '';
     
     try {
       const response = await fetch(`${API_BASE}/check-duplicates/${saleId}`, {
@@ -186,7 +186,7 @@ export function SalesApprovals() {
   };
 
   const handleApproveSale = async (id: string, replaceSaleId?: string) => {
-    const auth = sessionStorage.getItem('adminAuth') || '';
+    const auth = localStorage.getItem('adminAuth') || '';
     
     try {
       setActionLoading(id);
@@ -232,7 +232,7 @@ export function SalesApprovals() {
   };
 
   const handleRejectSale = async (id: string) => {
-    const auth = sessionStorage.getItem('adminAuth') || '';
+    const auth = localStorage.getItem('adminAuth') || '';
     
     try {
       setActionLoading(id);
@@ -258,7 +258,7 @@ export function SalesApprovals() {
   };
 
   const handleRejectAll = async () => {
-    const auth = sessionStorage.getItem('adminAuth') || '';
+    const auth = localStorage.getItem('adminAuth') || '';
     
     try {
       setRejectAllLoading(true);

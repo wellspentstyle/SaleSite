@@ -12,7 +12,7 @@ export function AdminLayout() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!sessionStorage.getItem('adminAuth');
+    return !!localStorage.getItem('adminAuth');
   });
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -24,7 +24,7 @@ export function AdminLayout() {
 
     const fetchCounts = async () => {
       try {
-        const auth = sessionStorage.getItem('adminAuth') || '';
+        const auth = localStorage.getItem('adminAuth') || '';
         
         const [salesRes, draftsRes, brandsRes] = await Promise.all([
           fetch(`${API_BASE}/pending-sales`, { headers: { 'auth': auth } }),
@@ -69,7 +69,7 @@ export function AdminLayout() {
       const data = await response.json();
 
       if (data.success) {
-        sessionStorage.setItem('adminAuth', password);
+        localStorage.setItem('adminAuth', password);
         setIsAuthenticated(true);
       } else {
         setAuthError('Invalid password');
@@ -82,7 +82,7 @@ export function AdminLayout() {
   };
 
   const handleSignOut = () => {
-    sessionStorage.removeItem('adminAuth');
+    localStorage.removeItem('adminAuth');
     setIsAuthenticated(false);
     setPassword('');
   };

@@ -26,7 +26,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const auth = sessionStorage.getItem('adminAuth') || '';
+        const auth = localStorage.getItem('adminAuth') || '';
         
         const [salesRes, draftsRes, brandsRes] = await Promise.all([
           fetch(`${API_BASE}/pending-sales`, {

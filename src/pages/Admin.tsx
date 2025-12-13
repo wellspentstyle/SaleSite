@@ -19,7 +19,7 @@ export function Admin({ onBackToSite }: AdminProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!sessionStorage.getItem('adminAuth');
+    return !!localStorage.getItem('adminAuth');
   });
   const [currentPage, setCurrentPage] = useState<AdminPage>('picks-admin');
   const [loading, setLoading] = useState(false);
@@ -44,7 +44,7 @@ export function Admin({ onBackToSite }: AdminProps) {
 
       if (data.success) {
         // Store the password for subsequent API calls
-        sessionStorage.setItem('adminAuth', password);
+        localStorage.setItem('adminAuth', password);
         setIsAuthenticated(true);
       } else {
         setAuthError('Invalid password');
@@ -57,7 +57,7 @@ export function Admin({ onBackToSite }: AdminProps) {
   };
 
   const handleSignOut = () => {
-    sessionStorage.removeItem('adminAuth');
+    localStorage.removeItem('adminAuth');
     setIsAuthenticated(false);
     setPassword('');
     setCurrentPage('picks-admin');

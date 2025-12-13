@@ -96,7 +96,7 @@ export default function ExtractSale() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'auth': sessionStorage.getItem('adminAuth') || ''
+          'auth': localStorage.getItem('adminAuth') || ''
         },
         body: JSON.stringify({
           image: activeTab === 'image' ? imagePreview : undefined,
@@ -137,7 +137,7 @@ export default function ExtractSale() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'auth': sessionStorage.getItem('adminAuth') || ''
+          'auth': localStorage.getItem('adminAuth') || ''
         },
         body: JSON.stringify({
           company: editedData.company,

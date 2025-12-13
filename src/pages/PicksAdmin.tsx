@@ -99,7 +99,7 @@ export function PicksAdmin() {
   }, [currentView]);
 
   const fetchSales = async () => {
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       const response = await fetch(`${API_BASE}/admin/sales`, {
@@ -118,7 +118,7 @@ export function PicksAdmin() {
 
   const fetchDrafts = async () => {
     setLoadingDrafts(true);
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       // Fetch both manual pick drafts and finalize drafts
@@ -204,7 +204,7 @@ export function PicksAdmin() {
   };
 
   const handleDeleteDraft = async (draftId: string, draftType: 'manual' | 'finalize') => {
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
     
     try {
       const endpoint = draftType === 'manual' 
@@ -230,7 +230,7 @@ export function PicksAdmin() {
 
   const handleToggleActive = async (sale: Sale, e: React.MouseEvent) => {
     e.stopPropagation();
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
     const newLiveStatus = sale.live === 'YES' ? 'NO' : 'YES';
 
     setSales(prevSales => 
@@ -295,7 +295,7 @@ export function PicksAdmin() {
       return;
     }
     
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       const response = await fetch(`${API_BASE}/admin/sales/${editingSale.id}`, {

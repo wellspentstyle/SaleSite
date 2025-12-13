@@ -103,7 +103,7 @@ export function FinalizePicks() {
     
     // Try to load existing draft
     const loadDraft = async () => {
-      const auth = sessionStorage.getItem('adminAuth');
+      const auth = localStorage.getItem('adminAuth');
       try {
         const response = await fetch(`${API_BASE}/admin/finalize-drafts`, {
           headers: { 'auth': auth || '' }
@@ -150,7 +150,7 @@ export function FinalizePicks() {
   const autoSaveDraft = useCallback(async () => {
     if (!selectedSaleId || picks.length === 0) return;
     
-    const auth = sessionStorage.getItem('adminAuth');
+    const auth = localStorage.getItem('adminAuth');
     try {
       const response = await fetch(`${API_BASE}/admin/finalize-drafts`, {
         method: 'POST',
@@ -222,7 +222,7 @@ export function FinalizePicks() {
 
   // Progressive scraping function
   const scrapeProgressively = async (urls: string[]) => {
-    const auth = sessionStorage.getItem('adminAuth');
+    const auth = localStorage.getItem('adminAuth');
     const failedDomains = new Set<string>();
     const toastedBlockedDomains = new Set<string>(); // Track domains we've already toasted about
     let successCount = 0;
@@ -519,7 +519,7 @@ export function FinalizePicks() {
       return;
     }
 
-    const auth = sessionStorage.getItem('adminAuth');
+    const auth = localStorage.getItem('adminAuth');
 
     try {
       const response = await fetch(`${API_BASE}/admin/sales/${selectedSaleId}`, {
@@ -550,7 +550,7 @@ export function FinalizePicks() {
 
   const handleSaveDraft = async () => {
     setIsSavingDraft(true);
-    const auth = sessionStorage.getItem('adminAuth');
+    const auth = localStorage.getItem('adminAuth');
     
     try {
       const response = await fetch(`${API_BASE}/admin/finalize-drafts`, {
@@ -612,7 +612,7 @@ export function FinalizePicks() {
     }
 
     setIsSaving(true);
-    const auth = sessionStorage.getItem('adminAuth');
+    const auth = localStorage.getItem('adminAuth');
 
     try {
       const response = await fetch(`${API_BASE}/admin/picks`, {

@@ -37,7 +37,7 @@ export function GenerateAssets() {
   }, []);
 
   const fetchSales = async () => {
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       const response = await fetch(`${API_BASE}/admin/sales`, {
@@ -55,7 +55,7 @@ export function GenerateAssets() {
   };
 
   const fetchSavedAssets = async () => {
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       const response = await fetch(`${API_BASE}/admin/saved-assets`, {

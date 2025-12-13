@@ -27,7 +27,7 @@ export function SyncGem() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  const auth = sessionStorage.getItem('adminAuth') || '';
+  const auth = localStorage.getItem('adminAuth') || '';
 
   // Poll for status when sync is running
   useEffect(() => {

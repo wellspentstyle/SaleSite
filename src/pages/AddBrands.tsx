@@ -84,7 +84,7 @@ export function AddBrands() {
   const fetchPendingBrands = async () => {
     try {
       setIsFetchingPending(true);
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`${API_BASE}/admin/pending-brands`, {
         headers: { 'auth': auth }
       });
@@ -102,7 +102,7 @@ export function AddBrands() {
 
   const fetchRejectedBrands = async () => {
     try {
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`${API_BASE}/admin/rejected-brands`, {
         headers: { 'auth': auth }
       });
@@ -119,7 +119,7 @@ export function AddBrands() {
   const handleRestoreBrand = async (brandId: string) => {
     try {
       setIsRestoringBrand(brandId);
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`${API_BASE}/admin/rejected-brands/${brandId}/restore`, {
         method: 'POST',
         headers: { 'auth': auth }
@@ -195,7 +195,7 @@ export function AddBrands() {
       ));
 
       try {
-        const auth = sessionStorage.getItem('adminAuth') || '';
+        const auth = localStorage.getItem('adminAuth') || '';
         const response = await fetch(`${API_BASE}/admin/brand-research`, {
           method: 'POST',
           headers: {
@@ -268,7 +268,7 @@ export function AddBrands() {
     ));
 
     try {
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`${API_BASE}/admin/brand-research`, {
         method: 'POST',
         headers: {
@@ -413,7 +413,7 @@ export function AddBrands() {
       return;
     }
 
-    const auth = sessionStorage.getItem('adminAuth') || '';
+    const auth = localStorage.getItem('adminAuth') || '';
     let updatedCount = 0;
     let createdCount = 0;
     let failedCount = 0;

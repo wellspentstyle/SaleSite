@@ -64,7 +64,7 @@ export function ManualPickEntry() {
     const loadDraft = async () => {
       if (!state?.draftId) return;
 
-      const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+      const auth = localStorage.getItem('adminAuth') || 'dev-mode';
       
       try {
         const response = await fetch(`${API_BASE}/admin/manual-picks/drafts/${state.draftId}`, {
@@ -93,7 +93,7 @@ export function ManualPickEntry() {
     const hasContent = picks.some(p => p.url && p.url.trim());
     if (!hasContent || !state?.selectedSaleId) return;
 
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       const response = await fetch(`${API_BASE}/admin/manual-picks/drafts`, {
@@ -232,7 +232,7 @@ export function ManualPickEntry() {
     }
 
     setIsSavingDraft(true);
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       const response = await fetch(`${API_BASE}/admin/manual-picks/drafts`, {
@@ -275,7 +275,7 @@ export function ManualPickEntry() {
     }
 
     setIsSaving(true);
-    const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
     try {
       const response = await fetch(`${API_BASE}/admin/manual-picks`, {

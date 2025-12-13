@@ -46,7 +46,7 @@ export function Freshness() {
   const fetchPicks = async () => {
     setIsLoading(true);
     try {
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`${API_BASE}/admin/picks`, {
         headers: { 'auth': auth }
       });
@@ -124,7 +124,7 @@ export function Freshness() {
 
     setIsRefreshing(true);
     try {
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`${API_BASE}/admin/picks/refresh`, {
         method: 'POST',
         headers: {
@@ -158,7 +158,7 @@ export function Freshness() {
 
     setIsRefreshing(true);
     try {
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`${API_BASE}/admin/picks/mark-sold-out`, {
         method: 'POST',
         headers: {
@@ -188,7 +188,7 @@ export function Freshness() {
     setIsRefreshing(true);
     toast.info('Running nightly freshness check...');
     try {
-      const auth = sessionStorage.getItem('adminAuth') || '';
+      const auth = localStorage.getItem('adminAuth') || '';
       const response = await fetch(`${API_BASE}/admin/picks/nightly-check`, {
         method: 'POST',
         headers: {

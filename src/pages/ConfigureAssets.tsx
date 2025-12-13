@@ -57,7 +57,7 @@ export function ConfigureAssets() {
   const [selectedStoryPicks, setSelectedStoryPicks] = useState<Set<string>>(new Set());
   const [pickConfigs, setPickConfigs] = useState<Record<string, PickConfig>>({});
 
-  const auth = sessionStorage.getItem('adminAuth') || 'dev-mode';
+  const auth = localStorage.getItem('adminAuth') || 'dev-mode';
 
   // Save config to server whenever it changes
   const saveConfig = useCallback(async () => {

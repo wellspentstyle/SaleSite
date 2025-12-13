@@ -42,7 +42,7 @@ export function ManualSaleEntry() {
   const handleAddToSite = async () => {
     if (!validateForm()) return;
     
-    const auth = sessionStorage.getItem('adminAuth') || '';
+    const auth = localStorage.getItem('adminAuth') || '';
     
     try {
       setIsSavingToSite(true);
@@ -82,7 +82,7 @@ export function ManualSaleEntry() {
   const handleAddToPending = async () => {
     if (!validateForm()) return;
 
-    const auth = sessionStorage.getItem('adminAuth') || '';
+    const auth = localStorage.getItem('adminAuth') || '';
     
     try {
       setIsSavingToPending(true);
