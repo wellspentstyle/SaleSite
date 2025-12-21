@@ -84,6 +84,77 @@ const pool = new Pool({
 // Airtable configuration
 const AIRTABLE_PAT = process.env.AIRTABLE_PAT;
 
+// Rate limiter for Airtable API (5 requests per second limit)
+class AirtableRateLimiter {
+  constructor(requestsPerSecond = 4) { // Use 4 to stay safely under 5/sec limit
+    this.minInterval = 1000 / requestsPerSecond;
+    this.lastRequestTime = 0;
+    this.queue = [];
+    this.processing = false;
+  }
+
+  async throttle() {
+    return new Promise((resolve) => {
+      this.queue.push(resolve);
+      this.processQueue();
+    });
+  }
+
+  async processQueue() {
+    if (this.processing || this.queue.length === 0) return;
+    this.processing = true;
+
+    while (this.queue.length > 0) {
+      const now = Date.now();
+      const timeSinceLastRequest = now - this.lastRequestTime;
+      
+      if (timeSinceLastRequest < this.minInterval) {
+        await new Promise(r => setTimeout(r, this.minInterval - timeSinceLastRequest));
+      }
+      
+      this.lastRequestTime = Date.now();
+      const resolve = this.queue.shift();
+      resolve();
+    }
+    
+    this.processing = false;
+  }
+}
+
+const airtableRateLimiter = new AirtableRateLimiter();
+
+// Helper function for Airtable fetch with rate limiting and retry
+async function airtableFetch(url, options = {}, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    await airtableRateLimiter.throttle();
+    
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    });
+
+    if (response.ok) {
+      return response;
+    }
+
+    if (response.status === 429) {
+      const waitTime = Math.min(1000 * Math.pow(2, attempt), 30000); // Exponential backoff, max 30s
+      console.log(`⏳ Rate limited by Airtable, waiting ${waitTime/1000}s before retry ${attempt}/${retries}...`);
+      await new Promise(r => setTimeout(r, waitTime));
+      continue;
+    }
+
+    // For non-429 errors, throw immediately
+    throw new Error(`Airtable error: ${response.status} ${response.statusText}`);
+  }
+
+  throw new Error('Airtable rate limit exceeded after maximum retries');
+}
+
 // Auto-detect environment and use appropriate Airtable base
 // Production deployments have REPLIT_DEPLOYMENT env var set
 const isProduction = !!process.env.REPLIT_DEPLOYMENT;
@@ -279,15 +350,7 @@ async function fetchAllAirtableRecords(tableName, params = {}) {
     }
     
     const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}?${urlParams}`;
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Airtable error: ${response.status} ${response.statusText}`);
-    }
+    const response = await airtableFetch(url);
     
     const data = await response.json();
     allRecords.push(...data.records);
@@ -520,21 +583,13 @@ app.post('/admin/pending-brands/:id/approve', async (req, res) => {
     console.log('📝 Update data for Airtable:', JSON.stringify(updateData, null, 2));
     console.log('🔗 Airtable record ID:', brand.airtableRecordId);
     
-    const updateResponse = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}/${brand.airtableRecordId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ fields: updateData })
-    });
-    
-    if (!updateResponse.ok) {
-      const errorText = await updateResponse.text();
-      console.error('❌ Airtable error response:', errorText);
-      console.error('❌ Data sent to Airtable:', JSON.stringify(updateData, null, 2));
-      throw new Error(`Airtable update failed: ${updateResponse.status} ${errorText}`);
-    }
+    const updateResponse = await airtableFetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}/${brand.airtableRecordId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ fields: updateData })
+      }
+    );
     
     await removePendingBrand(req.params.id);
     
@@ -1101,20 +1156,13 @@ app.patch('/admin/sales/:saleId', async (req, res) => {
   }
   
   try {
-    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ fields })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('❌ Airtable PATCH error:', error);
-      return res.status(500).json({ success: false, message: 'Failed to update sale in Airtable' });
-    }
+    const response = await airtableFetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ fields })
+      }
+    );
     
     const data = await response.json();
     console.log(`✅ Updated sale ${saleId}:`, fields);
@@ -1280,18 +1328,17 @@ app.post('/admin/clean-urls', async (req, res) => {
           });
           
           // Update Airtable
-          await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${record.id}`, {
-            method: 'PATCH',
-            headers: {
-              'Authorization': `Bearer ${AIRTABLE_PAT}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              fields: {
-                CleanURL: cleaned
-              }
-            })
-          });
+          await airtableFetch(
+            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${record.id}`,
+            {
+              method: 'PATCH',
+              body: JSON.stringify({
+                fields: {
+                  CleanURL: cleaned
+                }
+              })
+            }
+          );
           
           console.log(`✅ Updated ${record.fields.Company}: ${cleaned}`);
         }
@@ -5501,15 +5548,9 @@ async function checkForIncompleteBrands() {
   try {
     console.log('🔍 Checking for incomplete brands...');
     
-    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}`, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Airtable fetch failed: ${response.status}`);
-    }
+    const response = await airtableFetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}`
+    );
     
     const data = await response.json();
     const companies = data.records;
