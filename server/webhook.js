@@ -1098,19 +1098,24 @@ app.get('/admin/sales', async (req, res) => {
       });
     });
     
-    const sales = salesRecords.map(record => ({
-      id: record.id,
-      saleName: record.fields.SaleName || record.fields.Company || 'Unnamed Sale',
-      company: record.fields.Company,
-      percentOff: record.fields.PercentOff,
-      startDate: record.fields.StartDate,
-      endDate: record.fields.EndDate,
-      live: record.fields.Live,
-      saleUrl: record.fields.SaleURL || record.fields.CleanURL,
-      picksCount: picksCountBySale.get(record.id) || 0,
-      featuredAssetUrl: record.fields.FeaturedAssetURL || null,
-      featuredAssetDate: record.fields.FeaturedAssetDate || null
-    }));
+    const sales = salesRecords.map(record => {
+      // Extract company name (use CompanyName lookup, fallback to OriginalCompanyName plain text)
+      const companyName = record.fields.CompanyName || record.fields.OriginalCompanyName || 'Unknown Brand';
+      
+      return {
+        id: record.id,
+        saleName: record.fields.SaleName || companyName || 'Unnamed Sale',
+        company: companyName,
+        percentOff: record.fields.PercentOff,
+        startDate: record.fields.StartDate,
+        endDate: record.fields.EndDate,
+        live: record.fields.Live,
+        saleUrl: record.fields.SaleURL || record.fields.CleanURL,
+        picksCount: picksCountBySale.get(record.id) || 0,
+        featuredAssetUrl: record.fields.FeaturedAssetURL || null,
+        featuredAssetDate: record.fields.FeaturedAssetDate || null
+      };
+    });
     
     res.json({ success: true, sales });
   } catch (error) {
