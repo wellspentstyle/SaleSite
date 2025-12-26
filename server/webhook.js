@@ -5531,6 +5531,271 @@ app.use('/generated-assets', express.static(generatedAssetsPath));
 const buildPath = path.join(__dirname, '..', 'build');
 app.use(express.static(buildPath));
 
+// ============================================
+// GEM ITEM PAGES (for Instagram unfurling)
+// Must come BEFORE SPA catch-all
+// ============================================
+
+// Helper to escape HTML
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Serve Gem item page with Open Graph meta tags
+// Note: Gem items only exist in the main production base, not the dev base
+app.get('/gem/:recordId', async (req, res) => {
+  const { recordId } = req.params;
+  
+  try {
+    // Use the main production base for Gem items (they only exist there)
+    const gemBaseId = process.env.AIRTABLE_BASE_ID;
+    const airtableUrl = `https://api.airtable.com/v0/${gemBaseId}/Gem/${recordId}`;
+    await airtableRateLimiter.throttle();
+    
+    const response = await fetch(airtableUrl, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_PAT}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      return res.status(404).send('Item not found');
+    }
+    
+    const record = await response.json();
+    const fields = record.fields || {};
+    
+    const productName = fields.ProductName || 'Untitled Item';
+    const brand = fields.Brand || '';
+    const imageUrl = fields.ImageURL || '';
+    const price = fields.Price ? `$${fields.Price}` : '';
+    const size = fields.Size || '';
+    const marketplace = fields.Marketplace || '';
+    // Prefer ShopMy link for affiliate credit, fallback to direct ProductURL
+    const productUrl = fields.ShopmyLink || fields.ProductURL || '#';
+    
+    // Build title for og:title
+    const title = brand ? `${brand} - ${productName}` : productName;
+    
+    // Build description for og:description
+    const descParts = [];
+    if (size) descParts.push(`Size: ${size}`);
+    if (price) descParts.push(price);
+    if (marketplace) descParts.push(`Available on ${marketplace}`);
+    const description = descParts.join(' | ') || 'Curated vintage find from Well Spent Style';
+    
+    // Determine button text
+    const buttonText = marketplace ? `Shop on ${marketplace}` : 'Shop Now';
+    
+    // Get the domain for canonical URL
+    const domain = process.env.REPLIT_DEPLOYMENT_URL || 
+                   process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 
+                   'https://wellspentstyle.com';
+    const canonicalUrl = `${domain}/gem/${recordId}`;
+    
+    // Render the HTML page with Open Graph meta tags
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)} | Well Spent Style</title>
+  
+  <!-- Open Graph meta tags for Instagram/social unfurling -->
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(imageUrl)}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="1200" />
+  <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />
+  <meta property="og:type" content="product" />
+  <meta property="og:site_name" content="Well Spent Style" />
+  
+  <!-- Twitter Card meta tags -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(title)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(imageUrl)}" />
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: #faf9f7;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .header {
+      padding: 16px 24px;
+      display: flex;
+      justify-content: center;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    
+    .logo {
+      font-family: 'Crimson Pro', serif;
+      font-size: 24px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+      text-decoration: none;
+    }
+    
+    .container {
+      flex: 1;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .product-image {
+      width: 100%;
+      max-width: 400px;
+      aspect-ratio: 1;
+      object-fit: cover;
+      border-radius: 8px;
+      background-color: #f0f0f0;
+      margin-bottom: 24px;
+    }
+    
+    .brand {
+      font-size: 14px;
+      font-weight: 500;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+    
+    .product-name {
+      font-family: 'Crimson Pro', serif;
+      font-size: 24px;
+      font-weight: 500;
+      text-align: center;
+      margin-bottom: 16px;
+      line-height: 1.3;
+    }
+    
+    .details {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    .detail-item {
+      text-align: center;
+    }
+    
+    .detail-label {
+      font-size: 12px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    
+    .detail-value {
+      font-size: 18px;
+      font-weight: 500;
+    }
+    
+    .shop-button {
+      display: inline-block;
+      background-color: #1a1a1a;
+      color: white;
+      font-size: 16px;
+      font-weight: 500;
+      padding: 16px 48px;
+      border-radius: 4px;
+      text-decoration: none;
+      transition: background-color 0.2s;
+      margin-top: 8px;
+    }
+    
+    .shop-button:hover {
+      background-color: #333;
+    }
+    
+    .footer {
+      padding: 24px;
+      text-align: center;
+      font-size: 12px;
+      color: #888;
+      border-top: 1px solid #e5e5e5;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <a href="/" class="logo">WELL SPENT STYLE</a>
+  </header>
+  
+  <main class="container">
+    ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(productName)}" class="product-image" />` : ''}
+    
+    ${brand ? `<div class="brand">${escapeHtml(brand)}</div>` : ''}
+    
+    <h1 class="product-name">${escapeHtml(productName)}</h1>
+    
+    <div class="details">
+      ${size ? `
+      <div class="detail-item">
+        <div class="detail-label">Size</div>
+        <div class="detail-value">${escapeHtml(size)}</div>
+      </div>
+      ` : ''}
+      ${price ? `
+      <div class="detail-item">
+        <div class="detail-label">Price</div>
+        <div class="detail-value">${escapeHtml(price)}</div>
+      </div>
+      ` : ''}
+    </div>
+    
+    <a href="${escapeHtml(productUrl)}" class="shop-button" target="_blank" rel="noopener">${escapeHtml(buttonText)}</a>
+  </main>
+  
+  <footer class="footer">
+    Curated by Well Spent Style
+  </footer>
+</body>
+</html>`;
+    
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    res.send(html);
+    
+  } catch (error) {
+    console.error('Error fetching Gem item:', error);
+    res.status(500).send('Error loading item');
+  }
+});
+
 // Handle client-side routing - serve index.html for all non-API/webhook routes
 // This must be the LAST route to avoid intercepting API calls
 app.use((req, res) => {
