@@ -502,6 +502,121 @@ export async function getAndRemoveRejectedBrand(id) {
 }
 
 // ============================================
+// PENDING SALES (Email Approval Workflow)
+// ============================================
+
+export async function getAllPendingSales() {
+  const result = await pool.query(`
+    SELECT * FROM pending_sales 
+    ORDER BY received_at DESC
+  `);
+  return result.rows.map(mapPendingSaleRow);
+}
+
+export async function getPendingSaleById(saleId) {
+  const result = await pool.query(
+    'SELECT * FROM pending_sales WHERE sale_id = $1',
+    [saleId]
+  );
+  return result.rows[0] ? mapPendingSaleRow(result.rows[0]) : null;
+}
+
+export async function createPendingSale(data) {
+  const saleId = Date.now().toString();
+  const result = await pool.query(`
+    INSERT INTO pending_sales (
+      sale_id, company, percent_off, sale_url, clean_url, discount_code,
+      start_date, end_date, confidence, reasoning, company_record_id,
+      email_from, email_subject, missing_url, url_source, received_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    RETURNING *
+  `, [
+    saleId,
+    data.company,
+    data.percentOff,
+    data.saleUrl,
+    data.cleanUrl,
+    data.discountCode,
+    data.startDate,
+    data.endDate,
+    data.confidence || 100,
+    data.reasoning,
+    data.companyRecordId,
+    data.emailFrom,
+    data.emailSubject,
+    data.missingUrl || false,
+    data.urlSource,
+    new Date()
+  ]);
+  return mapPendingSaleRow(result.rows[0]);
+}
+
+export async function deletePendingSale(saleId) {
+  const result = await pool.query(
+    'DELETE FROM pending_sales WHERE sale_id = $1 RETURNING *',
+    [saleId]
+  );
+  return result.rows[0] ? mapPendingSaleRow(result.rows[0]) : null;
+}
+
+export async function deleteAllPendingSales() {
+  const result = await pool.query(
+    'DELETE FROM pending_sales RETURNING *'
+  );
+  return result.rows.map(mapPendingSaleRow);
+}
+
+function mapPendingSaleRow(row) {
+  return {
+    id: row.sale_id,
+    company: row.company,
+    percentOff: row.percent_off,
+    saleUrl: row.sale_url,
+    cleanUrl: row.clean_url,
+    discountCode: row.discount_code,
+    startDate: row.start_date ? row.start_date.toISOString().split('T')[0] : null,
+    endDate: row.end_date ? row.end_date.toISOString().split('T')[0] : null,
+    confidence: row.confidence,
+    reasoning: row.reasoning,
+    companyRecordId: row.company_record_id,
+    emailFrom: row.email_from,
+    emailSubject: row.email_subject,
+    missingUrl: row.missing_url,
+    urlSource: row.url_source,
+    receivedAt: row.received_at ? row.received_at.toISOString() : null
+  };
+}
+
+// ============================================
+// APPROVAL SETTINGS
+// ============================================
+
+export async function isApprovalsEnabled() {
+  const result = await pool.query(
+    "SELECT setting_value FROM approval_settings WHERE setting_key = 'approvalsEnabled'"
+  );
+  return result.rows.length > 0 && result.rows[0].setting_value === true;
+}
+
+export async function setApprovalsEnabled(enabled) {
+  await pool.query(
+    `INSERT INTO approval_settings (setting_key, setting_value) 
+     VALUES ('approvalsEnabled', $1)
+     ON CONFLICT (setting_key) DO UPDATE SET setting_value = $1`,
+    [enabled]
+  );
+}
+
+export async function getApprovalSettings() {
+  const result = await pool.query(
+    "SELECT setting_value FROM approval_settings WHERE setting_key = 'approvalsEnabled'"
+  );
+  return {
+    approvalsEnabled: result.rows.length > 0 && result.rows[0].setting_value === true
+  };
+}
+
+// ============================================
 // UTILITY FUNCTIONS
 // ============================================
 
