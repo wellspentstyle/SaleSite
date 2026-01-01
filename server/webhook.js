@@ -1467,6 +1467,7 @@ Return a JSON object with these fields:
 }
 
 Guidelines:
+- For company: NEVER use "Well Spent Style", "WellSpentStyle", or "wellspentstyle" as the company name - that is the newsletter name, not the brand running the sale.
 - For percentOff, extract the primary discount number (e.g., "Up to 50% off" = 50)
 - Dates should be in YYYY-MM-DD format. If unclear, use reasonable estimates.
 - If dates say "this weekend" or similar, estimate based on current date context
@@ -4308,7 +4309,7 @@ Confidence scoring:
 - Below 60: Questionable - likely welcome email or unclear offer
 
 Rules:
-- company: Extract exact brand name from email
+- company: Extract exact brand name from email. NEVER use "Well Spent Style", "WellSpentStyle", or "wellspentstyle" as the company name - that is the newsletter name, not the brand running the sale.
 - percentOff: Extract percentage as number (estimate if range like "up to 30%", use midpoint)
 - saleUrl: ONLY use a URL that ACTUALLY appears in the email content. If no sale URL is found in the email, return null. NEVER make up or guess a URL. Do not use example.com or placeholder URLs.
 - discountCode: Only if explicitly mentioned (use null if auto-applied at checkout)
