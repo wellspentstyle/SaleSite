@@ -20,6 +20,7 @@ export interface Sale {
   brandLogo: string;
   discount: string;
   discountCode?: string;
+  extraDiscount?: number;
   startDate?: string;
   endDate?: string;
   saleUrl: string;

@@ -70,10 +70,15 @@ export function SaleCard({ sale, onViewPicks }: SaleCardProps) {
           <div className="text-4xl mb-2" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700 }}>
             {sale.discount}
           </div>
+          {sale.extraDiscount && (
+            <div className="text-lg text-foreground" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}>
+              + extra {sale.extraDiscount}% off{sale.discountCode ? ` with code ${sale.discountCode}` : ''}
+            </div>
+          )}
         </div>
 
-        {/* Discount Code */}
-        {sale.discountCode && (
+        {/* Discount Code - only show if no extra discount (otherwise it's shown above) */}
+        {sale.discountCode && !sale.extraDiscount && (
           <div className="text-base" style={{ fontFamily: 'Crimson Pro, serif' }}>
             <span className="text-muted-foreground">Code:</span>{' '}
             <span className="tracking-wider" style={{ fontWeight: 500 }}>{sale.discountCode}</span>

@@ -798,6 +798,7 @@ app.get('/sales', async (req, res) => {
         brandLogo: companyName,
         discount: `${record.fields.PercentOff || 0}% Off`,
         discountCode: record.fields.PromoCode || record.fields.DiscountCode || undefined,
+        extraDiscount: record.fields.ExtraDiscount || undefined,
         startDate: record.fields.StartDate,
         endDate: record.fields.EndDate,
         saleUrl: saleUrl,
