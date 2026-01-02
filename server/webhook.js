@@ -5158,6 +5158,9 @@ app.post('/approve-sale/:id', async (req, res) => {
     if (pendingSale.discountCode) {
       fields.PromoCode = pendingSale.discountCode;
     }
+    if (pendingSale.extraDiscount) {
+      fields.ExtraDiscount = pendingSale.extraDiscount;
+    }
     if (pendingSale.endDate) {
       fields.EndDate = pendingSale.endDate;
     }

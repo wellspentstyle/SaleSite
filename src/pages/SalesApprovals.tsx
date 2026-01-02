@@ -31,6 +31,7 @@ interface PendingSale {
   id: string;
   company: string;
   percentOff: number;
+  extraDiscount?: number;
   saleUrl: string;
   cleanUrl: string;
   discountCode?: string;
@@ -281,7 +282,7 @@ export function SalesApprovals() {
     }
   };
 
-  const handleEditSale = (updatedData: { company: string; percentOff: number; saleUrl: string; discountCode?: string; startDate: string; endDate?: string }) => {
+  const handleEditSale = (updatedData: { company: string; percentOff: number; extraDiscount?: number; saleUrl: string; discountCode?: string; startDate: string; endDate?: string }) => {
     if (!editingSale) return;
     
     setPendingSales(prev => prev.map(sale => {
@@ -290,6 +291,7 @@ export function SalesApprovals() {
           ...sale,
           company: updatedData.company,
           percentOff: updatedData.percentOff,
+          extraDiscount: updatedData.extraDiscount,
           saleUrl: updatedData.saleUrl,
           cleanUrl: updatedData.saleUrl,
           discountCode: updatedData.discountCode,
@@ -455,6 +457,12 @@ export function SalesApprovals() {
                           <div>
                             <span className="text-muted-foreground">Promo Code:</span>
                             <p className="font-medium font-mono">{sale.discountCode}</p>
+                          </div>
+                        )}
+                        {sale.extraDiscount && (
+                          <div>
+                            <span className="text-muted-foreground">Extra Discount:</span>
+                            <p className="font-medium">+ {sale.extraDiscount}% off</p>
                           </div>
                         )}
                         <div>
@@ -694,6 +702,7 @@ export function SalesApprovals() {
           saleData={{
             company: editingSale.company,
             percentOff: editingSale.percentOff,
+            extraDiscount: editingSale.extraDiscount,
             saleUrl: editingSale.saleUrl,
             discountCode: editingSale.discountCode,
             startDate: editingSale.startDate,

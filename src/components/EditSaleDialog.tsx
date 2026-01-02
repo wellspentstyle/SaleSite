@@ -14,6 +14,7 @@ import { Label } from './ui/label';
 interface SaleData {
   company: string;
   percentOff: number;
+  extraDiscount?: number;
   saleUrl: string;
   discountCode?: string;
   startDate: string;
@@ -75,15 +76,30 @@ export function EditSaleDialog({ open, onOpenChange, saleData, onSave }: EditSal
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="discountCode" style={{ fontWeight: 600 }}>Promo Code (optional)</Label>
-            <Input
-              id="discountCode"
-              value={editedData.discountCode || ''}
-              onChange={(e) => setEditedData({ ...editedData, discountCode: e.target.value || undefined })}
-              placeholder="e.g., SAVE25"
-              className="font-mono"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="extraDiscount" style={{ fontWeight: 600 }}>Extra % Off (optional)</Label>
+              <Input
+                id="extraDiscount"
+                type="number"
+                min="0"
+                max="100"
+                value={editedData.extraDiscount || ''}
+                onChange={(e) => setEditedData({ ...editedData, extraDiscount: e.target.value ? parseInt(e.target.value) : undefined })}
+                placeholder="e.g., 20"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="discountCode" style={{ fontWeight: 600 }}>Promo Code (optional)</Label>
+              <Input
+                id="discountCode"
+                value={editedData.discountCode || ''}
+                onChange={(e) => setEditedData({ ...editedData, discountCode: e.target.value || undefined })}
+                placeholder="e.g., SAVE25"
+                className="font-mono"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
