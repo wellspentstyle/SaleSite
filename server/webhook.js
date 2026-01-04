@@ -6079,7 +6079,6 @@ const handleTelegramApproval = async (action, saleId) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Webhook server running on port ${PORT}`);
   console.log(`📬 AgentMail webhook endpoint: http://0.0.0.0:${PORT}/webhook/agentmail`);
-  console.log(`📦 Serving React build from: ${buildPath}`);
   
   // For autoscale deployments (production), skip background tasks entirely
   // These will run on-demand via webhooks or admin actions
