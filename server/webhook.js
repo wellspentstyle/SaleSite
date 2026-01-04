@@ -704,7 +704,7 @@ app.get('/sales', async (req, res) => {
       FROM sales s
       LEFT JOIN companies c ON s.company_id = c.id
       WHERE s.live = 'YES'
-      ORDER BY s.created_at DESC
+      ORDER BY s.original_created_at DESC NULLS LAST
     `);
     
     const salesRows = salesResult.rows;
