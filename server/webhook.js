@@ -681,6 +681,7 @@ app.get('/health', (req, res) => {
 // ============================================
 
 // Get live sales with picks (no auth required - for public homepage)
+// Now reads from PostgreSQL instead of Airtable
 app.get('/sales', async (req, res) => {
   try {
     // Check cache first
@@ -689,129 +690,105 @@ app.get('/sales', async (req, res) => {
       return res.json({ success: true, sales: cachedSales });
     }
     
-    // Fetch ALL live sales with pagination
-    const salesRecords = await fetchAllAirtableRecords(TABLE_NAME, {
-      filterByFormula: `{Live}='YES'`,
-      pageSize: '100'
-    });
+    console.log('💾 Fetching sales from PostgreSQL...');
     
-    // Extract sale IDs to filter picks efficiently
-    const liveSaleIds = salesRecords.map(record => record.id);
+    // Fetch live sales with company data joined
+    const salesResult = await pool.query(`
+      SELECT 
+        s.id, s.airtable_id, s.company_id, s.original_company_name, s.sale_name,
+        s.percent_off, s.promo_code, s.start_date, s.end_date, 
+        s.sale_url, s.clean_url, s.live, s.featured,
+        s.extra_discount, s.image_url, s.created_at,
+        c.name as company_name, c.type as company_type, c.price_range,
+        c.max_womens_size, c.values as company_values, c.description
+      FROM sales s
+      LEFT JOIN companies c ON s.company_id = c.id
+      WHERE s.live = 'YES'
+      ORDER BY s.created_at DESC
+    `);
     
-    console.log(`📊 Found ${liveSaleIds.length} live sales, fetching only their picks...`);
+    const salesRows = salesResult.rows;
+    console.log(`📊 Found ${salesRows.length} live sales in PostgreSQL`);
     
-    // Build filter formula to only fetch picks for live sales
-    // Uses SaleRecordIDs lookup field to search for record IDs
-    // Example: OR(FIND("rec123", {SaleRecordIDs} & ''), FIND("rec456", {SaleRecordIDs} & ''))
-    let picksRecords = [];
+    // Get sale IDs for picks query
+    const saleIds = salesRows.map(s => s.id);
     
-    if (liveSaleIds.length > 0) {
-      const filterConditions = liveSaleIds.map(saleId => 
-        `FIND("${saleId}", {SaleRecordIDs} & '')`
-      ).join(', ');
-      
-      const picksFilter = liveSaleIds.length === 1 
-        ? filterConditions  // No OR needed for single sale
-        : `OR(${filterConditions})`;
-      
-      console.log(`🔍 Picks filter formula: ${picksFilter}`);
-      
-      // Fetch ONLY picks linked to live sales with pagination
-      picksRecords = await fetchAllAirtableRecords(PICKS_TABLE_NAME, {
-        filterByFormula: picksFilter,
-        pageSize: '100'
-      });
-    } else {
-      console.log('⚠️  No live sales found, skipping picks fetch');
+    // Fetch picks for these sales
+    let picksRows = [];
+    if (saleIds.length > 0) {
+      const picksResult = await pool.query(`
+        SELECT 
+          id, airtable_id, sale_id, product_name, brand, product_url, image_url,
+          original_price, sale_price, percent_off, shopmy_url
+        FROM picks
+        WHERE sale_id = ANY($1)
+      `, [saleIds]);
+      picksRows = picksResult.rows;
     }
     
-    // Group picks by SaleID
+    console.log(`📦 Found ${picksRows.length} picks for live sales`);
+    
+    // Group picks by sale_id
     const picksBySale = new Map();
-    picksRecords.forEach(record => {
-      const saleIds = record.fields.SaleID || [];
-      saleIds.forEach(saleId => {
-        if (!picksBySale.has(saleId)) {
-          picksBySale.set(saleId, []);
-        }
-        picksBySale.get(saleId).push({
-          id: record.id,
-          name: record.fields.ProductName || '',
-          brand: record.fields.Brand || null,
-          url: record.fields.ProductURL || '',
-          imageUrl: record.fields.ImageURL || '',
-          originalPrice: record.fields.OriginalPrice || 0,
-          salePrice: record.fields.SalePrice || 0,
-          percentOff: record.fields.PercentOff || 0,
-          shopMyUrl: record.fields.ShopMyURL || '#',
-          company: record.fields.Company || [], // Company lookup for display
-          companyLink: record.fields.CompanyLink || [] // Linked record IDs for relationships
-        });
+    picksRows.forEach(pick => {
+      if (!picksBySale.has(pick.sale_id)) {
+        picksBySale.set(pick.sale_id, []);
+      }
+      picksBySale.get(pick.sale_id).push({
+        id: pick.airtable_id || `pg_${pick.id}`,
+        name: pick.product_name || '',
+        brand: pick.brand || null,
+        url: pick.product_url || '',
+        imageUrl: pick.image_url || '',
+        originalPrice: parseFloat(pick.original_price) || 0,
+        salePrice: parseFloat(pick.sale_price) || 0,
+        percentOff: parseFloat(pick.percent_off) || 0,
+        shopMyUrl: pick.shopmy_url || '#'
       });
     });
     
     // Map sales to frontend format
-    const sales = salesRecords.map(record => {
+    const sales = salesRows.map(row => {
       // Generate clean ShopMy URL by stripping tracking params
       let saleUrl = '#';
-      const rawUrl = record.fields.CleanURL || record.fields.SaleURL;
+      const rawUrl = row.clean_url || row.sale_url;
       if (rawUrl) {
         const cleanedUrl = cleanUrl(rawUrl);
         saleUrl = `https://go.shopmy.us/apx/l9N1lH?url=${encodeURIComponent(cleanedUrl)}`;
       }
       
-      // Extract company data (use CompanyName lookup, fallback to OriginalCompanyName plain text)
-      const companyName = record.fields.CompanyName || record.fields.OriginalCompanyName || 'Unknown Brand';
-      
-      const priceRange = Array.isArray(record.fields.PriceRange) 
-        ? record.fields.PriceRange[0] 
-        : record.fields.PriceRange;
-      
-      const companyType = Array.isArray(record.fields.Type) 
-        ? record.fields.Type[0] 
-        : record.fields.Type;
-      
-      const maxWomensSize = Array.isArray(record.fields.MaxWomensSize) 
-        ? record.fields.MaxWomensSize[0] 
-        : record.fields.MaxWomensSize;
-      
-      // Values is likely a multi-select, keep as array
-      let values = Array.isArray(record.fields.Values) 
-        ? record.fields.Values 
-        : (record.fields.Values ? [record.fields.Values] : []);
+      // Get company name (from joined company or original_company_name)
+      const companyName = row.company_name || row.original_company_name || 'Unknown Brand';
       
       // Normalize legacy values for backward compatibility
+      let values = Array.isArray(row.company_values) ? row.company_values : [];
       values = values.map(v => {
         if (v === 'Female-founded') return 'Women-owned';
         if (v === 'BIPOC-founded') return 'BIPOC-owned';
-        if (v === 'Ethical manufacturing') return null; // Remove deprecated value
+        if (v === 'Ethical manufacturing') return null;
         return v;
-      }).filter(v => v !== null); // Remove nulls
-      
-      // Extract description from Company lookup field
-      const description = Array.isArray(record.fields.Description) 
-        ? record.fields.Description[0] 
-        : record.fields.Description;
+      }).filter(v => v !== null);
       
       return {
-        id: record.id,
+        id: row.airtable_id || `pg_${row.id}`,
         brandName: companyName,
         brandLogo: companyName,
-        discount: `${record.fields.PercentOff || 0}% Off`,
-        discountCode: record.fields.PromoCode || record.fields.DiscountCode || undefined,
-        extraDiscount: record.fields.ExtraDiscount || undefined,
-        startDate: record.fields.StartDate,
-        endDate: record.fields.EndDate,
+        discount: `${row.percent_off || 0}% Off`,
+        discountCode: row.promo_code || undefined,
+        extraDiscount: row.extra_discount ? parseFloat(row.extra_discount) : undefined,
+        startDate: row.start_date,
+        endDate: row.end_date,
         saleUrl: saleUrl,
-        featured: record.fields.Featured === 'YES',
-        imageUrl: record.fields.Image && record.fields.Image.length > 0 ? record.fields.Image[0].url : undefined,
-        createdTime: record.createdTime,
-        picks: picksBySale.get(record.id) || [],
+        featured: row.featured === 'YES',
+        imageUrl: row.image_url || undefined,
+        createdTime: row.created_at,
+        picks: picksBySale.get(row.id) || [],
         // Company metadata for filtering
-        priceRange: priceRange,
-        companyType: companyType,
-        maxWomensSize: maxWomensSize,
+        priceRange: row.price_range,
+        companyType: row.company_type,
+        maxWomensSize: row.max_womens_size,
         values: values,
-        description: description
+        description: row.description
       };
     });
     
@@ -820,7 +797,7 @@ app.get('/sales', async (req, res) => {
     
     res.json({ success: true, sales });
   } catch (error) {
-    console.error('❌ Error fetching sales:', error);
+    console.error('❌ Error fetching sales from PostgreSQL:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
