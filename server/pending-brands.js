@@ -31,7 +31,7 @@ export async function addPendingBrand(brandData) {
   }
   
   // Also check name for common retailers
-  const retailerNames = ['saks', 'nordstrom', 'neiman marcus', 'bergdorf', 'net-a-porter', 'matchesfashion', 'farfetch', 'ssense', 'mytheresa', 'wolf and badger'];
+  const retailerNames = ['saks', 'nordstrom', 'neiman marcus', 'bergdorf', 'net-a-porter', 'matchesfashion', 'farfetch', 'ssense', 'mytheresa', 'wolf and badger', 'club monaco', 'bloomingdales', 'shopbop', 'revolve', 'asos'];
   const lowerName = (brandData.name || '').toLowerCase();
   if (retailerNames.some(r => lowerName.includes(r))) {
     console.log(`⚠️ Skipping known retailer: ${brandData.name}`);

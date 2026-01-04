@@ -900,8 +900,13 @@ app.patch('/admin/companies/:companyId', async (req, res) => {
     
     for (const [key, dbField] of Object.entries(fieldMap)) {
       if (updates[key] !== undefined) {
+        let value = updates[key];
+        // Convert category string to array if needed
+        if (key === 'category' && typeof value === 'string') {
+          value = value.split(',').map(v => v.trim()).filter(v => v);
+        }
         setClauses.push(`${dbField} = $${paramCount}`);
-        values.push(updates[key]);
+        values.push(value);
         paramCount++;
       }
     }
