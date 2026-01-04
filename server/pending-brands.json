@@ -846,5 +846,21 @@
     "qualityScore": 83,
     "id": "brand_1767538548302_w4c5vi6nx",
     "createdAt": "2026-01-04T14:55:48.302Z"
+  },
+  {
+    "name": "Frank & Eileen",
+    "airtableRecordId": "recQpYmoHEaEIjX75",
+    "type": "Brand",
+    "priceRange": "$$",
+    "category": "Clothing",
+    "values": "Independent label, Sustainable, Women-owned",
+    "maxWomensSize": "Up to 14",
+    "sizingSource": "brand size chart",
+    "description": "If you're tired of choosing between the perfect white shirt and actually affordable pricing, Frank & Eileen has cracked the code that brands like Equipment and Theory never quite managed. Audrey McLoghlin builds everything around obsessively perfected shirting—Italian cottons, French seaming, and cuts that somehow work on everyone—then expands that same meticulous approach to blazers, joggers, and polovers that feel like elevated basics without the inflated price tag.",
+    "notes": "Price: From 40 products via Shopping API | Categories: From 40 Shopping API products",
+    "url": "https://frankandeileen.com",
+    "qualityScore": 95,
+    "id": "brand_1767538560160_ci1135v1i",
+    "createdAt": "2026-01-04T14:56:00.160Z"
   }
 ]
