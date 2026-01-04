@@ -6100,12 +6100,12 @@ app.listen(PORT, '0.0.0.0', () => {
     console.warn('⚠️  Brand auto-detection failed:', err.message);
   });
   
-  // Run brand auto-detection every 15 minutes (development only)
+  // Run brand auto-detection every 1 hour
   setInterval(() => {
     checkForIncompleteBrands().catch(err => {
       console.warn('⚠️  Scheduled brand check failed:', err.message);
     });
-  }, 15 * 60 * 1000);
+  }, 60 * 60 * 1000);
   
   // Initialize Telegram bot with polling (development only)
   if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {

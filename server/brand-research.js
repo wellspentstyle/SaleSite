@@ -504,7 +504,7 @@ If you can't estimate, return 250 (default contemporary price).`
         const productContext = products.slice(0, 20).map(p => p.name).join('\n');
 
         const categoryCompletion = await openai.chat.completions.create({
-          model: 'gpt-4o',
+          model: 'gpt-4o-mini',
           messages: [
             {
               role: 'system',
@@ -561,7 +561,7 @@ Examples:
           const contextText = searchResults.map(r => `${r.title} ${r.snippet}`).join(' ');
 
           const categoryCompletion = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-4o-mini',
             messages: [
               {
                 role: 'system',
@@ -701,7 +701,7 @@ Return as comma-separated list. Default to "Clothing" if unclear.`
 
                 if (sizeText) {
                   const sizeCompletion = await openai.chat.completions.create({
-                    model: 'gpt-4o',
+                    model: 'gpt-4o-mini',
                     messages: [
                       {
                         role: 'system',
@@ -815,7 +815,7 @@ Return ONLY the size value.`
       console.log(`🤖 Phase 8: Analyzing values with AI...`);
 
       const valuesCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
