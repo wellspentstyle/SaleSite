@@ -34,8 +34,10 @@ The application is built using React 18, TypeScript, and Vite, with Tailwind CSS
 - **Brand Watchlist Directory**: Public `/brands` page displaying curated brands from Airtable with filtering and links.
 - **Newsletter Signup**: Dual system (popup modal and footer form) for email capture, saving to Airtable with validation and duplicate prevention.
 
-## Database Migration Status (Phase 2 & 3 Complete)
-The following admin endpoints have been migrated from Airtable to PostgreSQL:
+## Database Migration Status (Complete)
+All core endpoints have been migrated from Airtable to PostgreSQL:
+
+**Admin Endpoints:**
 - **GET /admin/sales**: Reads all sales from PostgreSQL with company data and picks counts
 - **PATCH /admin/sales/:saleId**: Updates sales in PostgreSQL (percent_off, live, promo_code, end_date, extra_discount, image_url)
 - **GET /admin/picks**: Reads all picks with freshness tracking data from PostgreSQL
@@ -45,9 +47,18 @@ The following admin endpoints have been migrated from Airtable to PostgreSQL:
 - **POST /admin/picks/mark-sold-out**: Marks picks as sold out in PostgreSQL
 - **POST /admin/update-brand-in-airtable**: Creates/updates companies in PostgreSQL (endpoint name kept for backward compatibility)
 
-All endpoints support both Airtable IDs (rec...) and PostgreSQL IDs (pg_...) for backward compatibility.
+**Public Endpoints:**
+- **GET /sales**: Reads all live sales from PostgreSQL
+- **GET /companies**: Reads all companies/brands from PostgreSQL for brand directory
 
-Public endpoint /sales has been reading from PostgreSQL since Phase 1.
+**CloudMailin Email Webhook:**
+- Company lookup/creation uses PostgreSQL
+- Duplicate detection uses PostgreSQL
+- Sale creation uses PostgreSQL
+- Brand homepage lookup uses PostgreSQL
+- Rejected emails stored in PostgreSQL
+
+All endpoints support both Airtable IDs (rec...) and PostgreSQL IDs (pg_...) for backward compatibility.
 
 ## External Dependencies
 - **PostgreSQL**: Primary data storage (migrated from Airtable).

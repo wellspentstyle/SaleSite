@@ -811,46 +811,48 @@ app.get('/sales', async (req, res) => {
 // Get all companies/brands (no auth required - for public brands directory)
 app.get('/companies', async (req, res) => {
   try {
-    // Fetch ALL companies from Airtable with pagination
-    const companyRecords = await fetchAllAirtableRecords(COMPANY_TABLE_NAME, {
-      pageSize: '100'
-    });
+    // Fetch ALL companies from PostgreSQL
+    const result = await pool.query(`
+      SELECT id, airtable_id, name, type, price_range, category, values, 
+             max_womens_size, description, website, shopmy_url, priority
+      FROM companies
+      ORDER BY name ASC
+    `);
     
-    console.log(`📦 Fetched ${companyRecords.length} companies from Airtable`);
+    console.log(`📦 Fetched ${result.rows.length} companies from PostgreSQL`);
     
     // Map companies to frontend format
-    const companies = companyRecords.map(record => {
-      // Values is likely a multi-select, keep as array
-      let values = Array.isArray(record.fields.Values) 
-        ? record.fields.Values 
-        : (record.fields.Values ? [record.fields.Values] : []);
+    const companies = result.rows.map(row => {
+      // Values is an array in PostgreSQL
+      let values = Array.isArray(row.values) ? row.values : [];
       
       // Normalize legacy values for backward compatibility
       values = values.map(v => {
         if (v === 'Female-founded') return 'Women-owned';
         if (v === 'BIPOC-founded') return 'BIPOC-owned';
-        if (v === 'Ethical manufacturing') return null; // Remove deprecated value
+        if (v === 'Ethical manufacturing') return null;
         return v;
-      }).filter(v => v !== null); // Remove nulls
+      }).filter(v => v !== null);
       
       return {
-        id: record.id,
-        name: record.fields.Name || '',
-        type: record.fields.Type || '',
-        priceRange: record.fields.PriceRange || '',
-        category: record.fields.Category || '',
-        maxWomensSize: record.fields.MaxWomensSize || '',
+        id: row.airtable_id || `pg_${row.id}`,
+        pgId: row.id,
+        name: row.name || '',
+        type: row.type || '',
+        priceRange: row.price_range || '',
+        category: Array.isArray(row.category) ? row.category.join(', ') : (row.category || ''),
+        maxWomensSize: row.max_womens_size || '',
         values: values,
-        description: record.fields.Description || '',
-        url: record.fields.URL || '', // Keep for backward compatibility
-        shopmyUrl: record.fields.ShopmyURL || '', // Primary affiliate link
-        priority: record.fields.Priority || ''
+        description: row.description || '',
+        url: row.website || '',
+        shopmyUrl: row.shopmy_url || '',
+        priority: row.priority || ''
       };
     });
     
     res.json({ success: true, companies });
   } catch (error) {
-    console.error('❌ Error fetching companies:', error);
+    console.error('❌ Error fetching companies from PostgreSQL:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -3840,81 +3842,62 @@ function calculateSimilarity(str1, str2) {
 }
 
 /**
- * Find existing Company record in Airtable or create a new one
- * Returns the Company record ID to use for linking
+ * Find existing Company record in PostgreSQL or create a new one
+ * Returns the Company PostgreSQL ID (prefixed with pg_) to use for linking
  */
 async function findOrCreateCompany(companyName) {
   const normalized = normalizeCompanyName(companyName);
   console.log(`🔍 Searching for company: "${companyName}" (normalized: "${normalized}")`);
   
   try {
-    // Query Companies table - use Name field with case-insensitive search
-    const searchUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Companies?filterByFormula=FIND(LOWER("${normalized.replace(/"/g, '\\"')}"), LOWER({Name}))`;
-    
-    const searchResponse = await fetch(searchUrl, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`
-      }
-    });
-    
-    if (!searchResponse.ok) {
-      console.error('❌ Company search failed:', await searchResponse.text());
-      return null;
-    }
-    
-    const searchData = await searchResponse.json();
+    // Query Companies table from PostgreSQL with case-insensitive search
+    const searchResult = await pool.query(
+      `SELECT id, airtable_id, name FROM companies 
+       WHERE LOWER(name) LIKE $1 OR LOWER(name) = $2`,
+      [`%${normalized.toLowerCase()}%`, normalized.toLowerCase()]
+    );
     
     // If exact or close match found, use it
-    if (searchData.records && searchData.records.length > 0) {
-      // Find best match using fuzzy matching
+    if (searchResult.rows.length > 0) {
       let bestMatch = null;
       let bestSimilarity = 0;
       
-      for (const record of searchData.records) {
-        const recordName = normalizeCompanyName(record.fields.Name || '');
+      for (const row of searchResult.rows) {
+        const recordName = normalizeCompanyName(row.name || '');
         const similarity = calculateSimilarity(normalized, recordName);
         
-        console.log(`   Candidate: "${record.fields.Name}" (similarity: ${(similarity * 100).toFixed(1)}%)`);
+        console.log(`   Candidate: "${row.name}" (similarity: ${(similarity * 100).toFixed(1)}%)`);
         
         if (similarity > bestSimilarity) {
           bestSimilarity = similarity;
-          bestMatch = record;
+          bestMatch = row;
         }
       }
       
       // Use match if similarity >= 90%
       if (bestMatch && bestSimilarity >= 0.9) {
-        console.log(`✅ Matched existing company: "${bestMatch.fields.Name}" (${(bestSimilarity * 100).toFixed(1)}% match)`);
-        return bestMatch.id;
+        console.log(`✅ Matched existing company: "${bestMatch.name}" (${(bestSimilarity * 100).toFixed(1)}% match)`);
+        // Return airtable_id for backward compatibility (if exists), or pg_ prefixed ID
+        if (bestMatch.airtable_id && bestMatch.airtable_id.startsWith('rec')) {
+          return bestMatch.airtable_id;
+        }
+        return `pg_${bestMatch.id}`;
       }
     }
     
-    // No match found - create new Company record
+    // No match found - create new Company record in PostgreSQL
     console.log(`➕ Creating new company record: "${companyName}"`);
     
-    const createUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Companies`;
-    const createResponse = await fetch(createUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fields: {
-          Name: companyName,
-          Type: 'Brand' // Default type
-        }
-      })
-    });
+    const insertResult = await pool.query(
+      `INSERT INTO companies (name, type, created_at) 
+       VALUES ($1, $2, NOW()) 
+       RETURNING id`,
+      [companyName, 'Brand']
+    );
     
-    if (!createResponse.ok) {
-      console.error('❌ Company creation failed:', await createResponse.text());
-      return null;
-    }
-    
-    const newCompany = await createResponse.json();
-    console.log(`✅ Created new company: ${newCompany.id}`);
-    return newCompany.id;
+    const newId = insertResult.rows[0].id;
+    console.log(`✅ Created new company: pg_${newId}`);
+    return `pg_${newId}`;
     
   } catch (error) {
     console.error('❌ Company lookup/create error:', error);
@@ -3927,49 +3910,72 @@ async function findOrCreateCompany(companyName) {
 // ========================================
 
 /**
- * Find existing live sale for a company
+ * Find existing live sale for a company (using PostgreSQL)
  * Returns the sale record if found, null otherwise
  */
 async function findLiveSaleForCompany(companyRecordId, companyName) {
   console.log(`🔍 Checking for existing live sale for company: ${companyName || companyRecordId}`);
   
   try {
-    // Build filter formula - check by BOTH company record ID AND OriginalCompanyName
-    // This ensures we catch all live sales for a company regardless of how they were linked
-    let filterFormula;
-    const escaped = companyName ? companyName.replace(/"/g, '\\"') : '';
+    // Resolve company ID for PostgreSQL
+    let pgCompanyId = null;
+    if (companyRecordId) {
+      if (companyRecordId.startsWith('pg_')) {
+        pgCompanyId = parseInt(companyRecordId.replace('pg_', ''));
+      } else if (companyRecordId.startsWith('rec')) {
+        const companyResult = await pool.query(
+          'SELECT id FROM companies WHERE airtable_id = $1',
+          [companyRecordId]
+        );
+        if (companyResult.rows.length > 0) {
+          pgCompanyId = companyResult.rows[0].id;
+        }
+      }
+    }
     
-    if (companyRecordId && companyName) {
-      // Check both linked Company record AND OriginalCompanyName
-      filterFormula = `AND({Live}='YES', OR(FIND("${companyRecordId}", ARRAYJOIN({Company})), LOWER({OriginalCompanyName})=LOWER("${escaped}")))`;
-    } else if (companyRecordId) {
-      filterFormula = `AND({Live}='YES', FIND("${companyRecordId}", ARRAYJOIN({Company})))`;
+    // Build query based on available identifiers
+    let result;
+    if (pgCompanyId && companyName) {
+      result = await pool.query(
+        `SELECT s.*, c.name as company_name FROM sales s
+         LEFT JOIN companies c ON s.company_id = c.id
+         WHERE s.live = 'YES' AND (s.company_id = $1 OR LOWER(c.name) = LOWER($2))
+         ORDER BY s.created_at DESC LIMIT 1`,
+        [pgCompanyId, companyName]
+      );
+    } else if (pgCompanyId) {
+      result = await pool.query(
+        `SELECT s.*, c.name as company_name FROM sales s
+         LEFT JOIN companies c ON s.company_id = c.id
+         WHERE s.live = 'YES' AND s.company_id = $1
+         ORDER BY s.created_at DESC LIMIT 1`,
+        [pgCompanyId]
+      );
     } else if (companyName) {
-      // Check OriginalCompanyName when no company record ID
-      filterFormula = `AND({Live}='YES', LOWER({OriginalCompanyName})=LOWER("${escaped}"))`;
+      result = await pool.query(
+        `SELECT s.*, c.name as company_name FROM sales s
+         LEFT JOIN companies c ON s.company_id = c.id
+         WHERE s.live = 'YES' AND LOWER(c.name) = LOWER($1)
+         ORDER BY s.created_at DESC LIMIT 1`,
+        [companyName]
+      );
     } else {
       return null;
     }
     
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?filterByFormula=${encodeURIComponent(filterFormula)}`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`
-      }
-    });
-    
-    if (!response.ok) {
-      console.error('❌ Error searching for live sales:', await response.text());
-      return null;
-    }
-    
-    const data = await response.json();
-    
-    if (data.records && data.records.length > 0) {
-      console.log(`📦 Found ${data.records.length} existing live sale(s) for company`);
-      // Return the first (should typically only be one)
-      return data.records[0];
+    if (result.rows.length > 0) {
+      console.log(`📦 Found existing live sale for company`);
+      const row = result.rows[0];
+      return {
+        id: row.airtable_id || `pg_${row.id}`,
+        pgId: row.id,
+        fields: {
+          PercentOff: row.percent_off,
+          Live: row.live,
+          SaleURL: row.sale_url,
+          Company: row.company_name ? [row.company_name] : [] // Return as array for compatibility
+        }
+      };
     }
     
     console.log('✅ No existing live sale found for company');
@@ -3982,81 +3988,55 @@ async function findLiveSaleForCompany(companyRecordId, companyName) {
 }
 
 /**
- * Transfer picks from one sale to another
- * Updates the SaleRecordIDs field on pick records
+ * Transfer picks from one sale to another (using PostgreSQL)
+ * Updates the sale_id field on pick records
  */
 async function transferPicksToNewSale(oldSaleId, newSaleId) {
   console.log(`🔄 Transferring picks from sale ${oldSaleId} to ${newSaleId}`);
   
   try {
-    // Find all picks linked to the old sale
-    const filterFormula = `FIND("${oldSaleId}", ARRAYJOIN({SaleRecordIDs}))`;
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?filterByFormula=${encodeURIComponent(filterFormula)}`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`
-      }
-    });
-    
-    if (!response.ok) {
-      console.error('❌ Error fetching picks:', await response.text());
-      return { transferred: 0, error: 'Failed to fetch picks' };
-    }
-    
-    const data = await response.json();
-    const picks = data.records || [];
-    
-    if (picks.length === 0) {
-      console.log('ℹ️  No picks to transfer');
-      return { transferred: 0 };
-    }
-    
-    console.log(`📦 Found ${picks.length} picks to transfer`);
-    
-    // Update each pick to link to the new sale
-    // NOTE: SaleID is the actual linked record field, SaleRecordIDs is a formula/lookup
-    let transferred = 0;
-    for (const pick of picks) {
-      // Get current linked sale IDs (from SaleID field which is the actual link)
-      const currentSaleIds = pick.fields.SaleID || [];
-      
-      // Build new sale IDs array - replace old with new, or just set to new
-      let finalSaleIds = [newSaleId];
-      
-      // If there were multiple sales linked, preserve the others (except old one)
-      if (currentSaleIds.length > 1) {
-        finalSaleIds = currentSaleIds
-          .filter(id => id !== oldSaleId)
-          .concat(newSaleId);
-        // Remove duplicates
-        finalSaleIds = [...new Set(finalSaleIds)];
-      }
-      
-      const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pick.id}`;
-      const updateResponse = await fetch(updateUrl, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_PAT}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fields: {
-            SaleID: finalSaleIds  // Use SaleID (the linked record field), not SaleRecordIDs
-          }
-        })
-      });
-      
-      if (updateResponse.ok) {
-        transferred++;
-        console.log(`  ✅ Transferred pick ${pick.id}`);
-      } else {
-        console.error(`  ❌ Failed to transfer pick ${pick.id}:`, await updateResponse.text());
+    // Resolve old sale ID to PostgreSQL ID
+    let pgOldSaleId = null;
+    if (oldSaleId.startsWith('pg_')) {
+      pgOldSaleId = parseInt(oldSaleId.replace('pg_', ''));
+    } else if (oldSaleId.startsWith('rec')) {
+      const saleResult = await pool.query(
+        'SELECT id FROM sales WHERE airtable_id = $1',
+        [oldSaleId]
+      );
+      if (saleResult.rows.length > 0) {
+        pgOldSaleId = saleResult.rows[0].id;
       }
     }
     
-    console.log(`✅ Transferred ${transferred}/${picks.length} picks`);
-    return { transferred, total: picks.length };
+    // Resolve new sale ID to PostgreSQL ID
+    let pgNewSaleId = null;
+    if (newSaleId.startsWith('pg_')) {
+      pgNewSaleId = parseInt(newSaleId.replace('pg_', ''));
+    } else if (newSaleId.startsWith('rec')) {
+      const saleResult = await pool.query(
+        'SELECT id FROM sales WHERE airtable_id = $1',
+        [newSaleId]
+      );
+      if (saleResult.rows.length > 0) {
+        pgNewSaleId = saleResult.rows[0].id;
+      }
+    }
+    
+    if (!pgOldSaleId || !pgNewSaleId) {
+      console.log('⚠️ Could not resolve sale IDs');
+      return { transferred: 0, error: 'Could not resolve sale IDs' };
+    }
+    
+    // Update picks linked to the old sale
+    const result = await pool.query(
+      'UPDATE picks SET sale_id = $1 WHERE sale_id = $2 RETURNING id',
+      [pgNewSaleId, pgOldSaleId]
+    );
+    
+    const transferred = result.rowCount;
+    console.log(`✅ Transferred ${transferred} picks`);
+    return { transferred, total: transferred };
     
   } catch (error) {
     console.error('❌ Error transferring picks:', error);
@@ -4065,28 +4045,38 @@ async function transferPicksToNewSale(oldSaleId, newSaleId) {
 }
 
 /**
- * Deactivate (set Live=NO) an existing sale
+ * Deactivate (set Live=NO) an existing sale (using PostgreSQL)
  */
 async function deactivateSale(saleId) {
   console.log(`🔒 Deactivating sale ${saleId}`);
   
   try {
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`;
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fields: {
-          Live: 'NO'
-        }
-      })
-    });
+    // Resolve sale ID to PostgreSQL ID
+    let pgSaleId = null;
+    if (saleId.startsWith('pg_')) {
+      pgSaleId = parseInt(saleId.replace('pg_', ''));
+    } else if (saleId.startsWith('rec')) {
+      const saleResult = await pool.query(
+        'SELECT id FROM sales WHERE airtable_id = $1',
+        [saleId]
+      );
+      if (saleResult.rows.length > 0) {
+        pgSaleId = saleResult.rows[0].id;
+      }
+    }
     
-    if (!response.ok) {
-      console.error('❌ Error deactivating sale:', await response.text());
+    if (!pgSaleId) {
+      console.error('❌ Could not resolve sale ID');
+      return false;
+    }
+    
+    const result = await pool.query(
+      'UPDATE sales SET live = $1 WHERE id = $2',
+      ['NO', pgSaleId]
+    );
+    
+    if (result.rowCount === 0) {
+      console.error('❌ No sale found to deactivate');
       return false;
     }
     
@@ -4396,42 +4386,22 @@ ${emailContent.substring(0, 4000)}`
       console.log('⚠️ Missing or placeholder URL detected, searching for brand homepage...');
       missingUrl = true;
       
-      // Try to find brand homepage from Company table
+      // Try to find brand homepage from PostgreSQL companies table
       if (saleData.company) {
         try {
-          const normalizedBrandName = saleData.company
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9\s]/g, '')
-            .trim();
-          
-          const companiesResponse = await fetch(
-            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}?fields[]=Name&fields[]=Website`,
-            {
-              headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
-            }
+          // Use SQL-based case-insensitive search for efficiency
+          const companiesResult = await pool.query(
+            `SELECT name, website FROM companies 
+             WHERE website IS NOT NULL AND website != '' 
+             AND LOWER(name) = LOWER($1)
+             LIMIT 1`,
+            [saleData.company.trim()]
           );
           
-          if (companiesResponse.ok) {
-            const companiesData = await companiesResponse.json();
-            
-            // Find matching company
-            const match = companiesData.records.find(record => {
-              const companyName = (record.fields.Name || '')
-                .toLowerCase()
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '')
-                .replace(/[^a-z0-9\s]/g, '')
-                .trim();
-              return companyName === normalizedBrandName;
-            });
-            
-            if (match && match.fields.Website) {
-              console.log(`✅ Found brand homepage: ${match.fields.Website}`);
-              saleData.saleUrl = match.fields.Website;
-              urlSource = 'brand_homepage';
-            }
+          if (companiesResult.rows.length > 0 && companiesResult.rows[0].website) {
+            console.log(`✅ Found brand homepage: ${companiesResult.rows[0].website}`);
+            saleData.saleUrl = companiesResult.rows[0].website;
+            urlSource = 'brand_homepage';
           }
         } catch (error) {
           console.error('Error looking up brand homepage:', error.message);
@@ -4499,11 +4469,10 @@ ${emailContent.substring(0, 4000)}`
     const companyRecordId = await findOrCreateCompany(saleData.company);
     console.log(`✅ Company record: ${companyRecordId}`);
     
-    // IMPROVED: Smarter duplicate detection with fuzzy matching
-    console.log('🔍 Checking for duplicates...');
+    // IMPROVED: Smarter duplicate detection with fuzzy matching (using PostgreSQL)
+    console.log('🔍 Checking for duplicates in PostgreSQL...');
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-    const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
     
     // Normalize company name for comparison
     const normalizedCompany = saleData.company
@@ -4511,65 +4480,55 @@ ${emailContent.substring(0, 4000)}`
       .replace(/\s+/g, '')
       .replace(/[^a-z0-9]/g, '');
     
-    // Fetch recent sales from same company (within 2 weeks)
-    const recentSalesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?filterByFormula=IS_AFTER({StartDate},'${twoWeeksAgoStr}')&fields[]=OriginalCompanyName&fields[]=PercentOff&fields[]=StartDate`;
+    // Fetch recent sales from PostgreSQL (within 2 weeks)
+    const recentSalesResult = await pool.query(
+      `SELECT s.id, s.percent_off, s.start_date, c.name as company_name
+       FROM sales s
+       LEFT JOIN companies c ON s.company_id = c.id
+       WHERE s.start_date >= $1`,
+      [twoWeeksAgo]
+    );
     
-    const recentSalesResponse = await fetch(recentSalesUrl, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`
-      }
-    });
-    
-    if (recentSalesResponse.ok) {
-      const recentSalesData = await recentSalesResponse.json();
+    // Check for fuzzy duplicates
+    let isDuplicate = false;
+    for (const row of recentSalesResult.rows) {
+      const companyValue = row.company_name;
       
-      // Check for fuzzy duplicates
-      const isDuplicate = recentSalesData.records.some(record => {
-        // Use OriginalCompanyName field (plain text) instead of linked Company field
-        const companyValue = record.fields.OriginalCompanyName;
-        
-        if (!companyValue) {
-          return false; // Skip records without company name
-        }
-        
-        // Normalize company name for comparison
-        const recordCompany = companyValue
-          .toLowerCase()
-          .replace(/\s+/g, '')
-          .replace(/[^a-z0-9]/g, '');
-        
-        const recordPercent = record.fields.PercentOff;
-        
-        // Match if company name is similar AND percent is within 5%
-        const companySimilar = recordCompany === normalizedCompany || 
-                               recordCompany.includes(normalizedCompany) || 
-                               normalizedCompany.includes(recordCompany);
-        
-        const percentSimilar = Math.abs(recordPercent - saleData.percentOff) <= 5;
-        
-        if (companySimilar && percentSimilar) {
-          console.log(`⏭️  Duplicate found: ${companyValue} ${recordPercent}%`);
-          return true;
-        }
-        
-        return false;
+      if (!companyValue) continue;
+      
+      const recordCompany = companyValue
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/[^a-z0-9]/g, '');
+      
+      const recordPercent = row.percent_off;
+      
+      const companySimilar = recordCompany === normalizedCompany || 
+                             recordCompany.includes(normalizedCompany) || 
+                             normalizedCompany.includes(recordCompany);
+      
+      const percentSimilar = Math.abs(recordPercent - saleData.percentOff) <= 5;
+      
+      if (companySimilar && percentSimilar) {
+        console.log(`⏭️  Duplicate found: ${companyValue} ${recordPercent}%`);
+        isDuplicate = true;
+        break;
+      }
+    }
+    
+    if (isDuplicate) {
+      await addRejectedEmail({
+        brand: saleData.company,
+        subject: subject,
+        reason: `Duplicate - similar ${saleData.percentOff}% sale already exists`,
+        from: from
       });
       
-      if (isDuplicate) {
-        // Track rejected email
-        await addRejectedEmail({
-          brand: saleData.company,
-          subject: subject,
-          reason: `Duplicate - similar ${saleData.percentOff}% sale already exists`,
-          from: from
-        });
-        
-        return res.status(200).json({ 
-          success: false, 
-          message: 'Duplicate sale - similar sale exists in past 2 weeks',
-          newSale: saleData
-        });
-      }
+      return res.status(200).json({ 
+        success: false, 
+        message: 'Duplicate sale - similar sale exists in past 2 weeks',
+        newSale: saleData
+      });
     }
     
     console.log('✅ No duplicates found');
@@ -4631,89 +4590,91 @@ ${emailContent.substring(0, 4000)}`
       });
     }
     
-    // Create Airtable record
-    console.log('💾 Creating Airtable record...');
-    const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
+    // Create PostgreSQL record
+    console.log('💾 Creating PostgreSQL record...');
     
     const today = new Date().toISOString().split('T')[0];
-    const isLive = saleData.startDate <= today ? 'YES' : 'NO';
+    const isLive = saleData.startDate <= today;
     
-    const fields = {
-      OriginalCompanyName: saleData.company, // Plain text company name from email
-      PercentOff: saleData.percentOff,
-      SaleURL: saleData.saleUrl,
-      CleanURL: cleanUrl !== saleData.saleUrl ? cleanUrl : saleData.saleUrl,
-      StartDate: saleData.startDate,
-      Confidence: saleData.confidence || 60,
-      Live: isLive,
-      Description: JSON.stringify({
-        source: 'email',
-        aiReasoning: saleData.reasoning,
-        confidence: saleData.confidence,
-        originalEmail: {
-          from: from,
-          subject: subject,
-          receivedAt: new Date().toISOString()
-        }
-      })
-    };
-    
-    // Link Company field if lookup/create was successful
+    // Resolve company ID for PostgreSQL
+    let pgCompanyId = null;
     if (companyRecordId) {
-      fields.Company = [companyRecordId]; // Linked records are arrays of record IDs
+      if (companyRecordId.startsWith('pg_')) {
+        pgCompanyId = parseInt(companyRecordId.replace('pg_', ''));
+      } else if (companyRecordId.startsWith('rec')) {
+        const companyResult = await pool.query(
+          'SELECT id FROM companies WHERE airtable_id = $1',
+          [companyRecordId]
+        );
+        if (companyResult.rows.length > 0) {
+          pgCompanyId = companyResult.rows[0].id;
+        }
+      }
     }
     
-    if (saleData.discountCode) {
-      fields.PromoCode = saleData.discountCode;
-    }
-    if (saleData.endDate) {
-      fields.EndDate = saleData.endDate;
-    }
-    
-    const airtableResponse = await fetch(airtableUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ fields })
+    const descriptionJson = JSON.stringify({
+      source: 'email',
+      aiReasoning: saleData.reasoning,
+      confidence: saleData.confidence,
+      originalEmail: {
+        from: from,
+        subject: subject,
+        receivedAt: new Date().toISOString()
+      }
     });
     
-    if (!airtableResponse.ok) {
-      const errorText = await airtableResponse.text();
-      console.error('❌ Airtable error:', errorText);
+    try {
+      const insertResult = await pool.query(
+        `INSERT INTO sales (
+          company_id, percent_off, sale_url, clean_url, start_date, end_date,
+          promo_code, live, description, created_at, original_created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+        RETURNING id`,
+        [
+          pgCompanyId,
+          saleData.percentOff,
+          saleData.saleUrl,
+          cleanUrl !== saleData.saleUrl ? cleanUrl : saleData.saleUrl,
+          saleData.startDate,
+          saleData.endDate || null,
+          saleData.discountCode || null,
+          isLive ? 'YES' : 'NO',
+          descriptionJson
+        ]
+      );
       
-      // Send critical error alert for Airtable failures
+      const newSaleId = insertResult.rows[0].id;
+      console.log('✅ Created PostgreSQL record:', `pg_${newSaleId}`);
+      
+      // Clear sales cache
+      clearSalesCache();
+      
+      res.status(200).json({ 
+        success: true, 
+        message: 'Sale processed and added to PostgreSQL',
+        recordId: `pg_${newSaleId}`,
+        saleData: {
+          company: saleData.company,
+          percentOff: saleData.percentOff,
+          cleanUrl: cleanUrl,
+          confidence: saleData.confidence,
+          reasoning: saleData.reasoning
+        }
+      });
+    } catch (dbError) {
+      console.error('❌ PostgreSQL error:', dbError.message);
+      
       sendCriticalErrorAlert(
-        'Airtable API Error',
-        `Failed to save sale for ${saleData.company}: ${errorText.substring(0, 100)}`
+        'Database Error',
+        `Failed to save sale for ${saleData.company}: ${dbError.message.substring(0, 100)}`
       );
       
       return res.status(200).json({ 
         success: false, 
-        message: 'Airtable error',
-        error: errorText
+        message: 'Database error',
+        error: dbError.message
       });
     }
-    
-    const airtableData = await airtableResponse.json();
-    console.log('✅ Created Airtable record:', airtableData.id);
-    
-    // Clear sales cache
-    clearSalesCache();
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'Sale processed and added to Airtable',
-      recordId: airtableData.id,
-      saleData: {
-        company: saleData.company,
-        percentOff: saleData.percentOff,
-        cleanUrl: cleanUrl,
-        confidence: saleData.confidence,
-        reasoning: saleData.reasoning
-      }
-    });
     
   } catch (error) {
     console.error('❌ Webhook processing error:', error);
