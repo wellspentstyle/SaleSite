@@ -5590,9 +5590,15 @@ app.delete('/admin/finalize-drafts/:id', async (req, res) => {
 const generatedAssetsPath = path.join(__dirname, '..', 'public', 'generated-assets');
 app.use('/generated-assets', express.static(generatedAssetsPath));
 
-// Serve static files from the React build directory
-const buildPath = path.join(__dirname, '..', 'build');
-app.use(express.static(buildPath));
+// Only serve frontend static files when NOT on Railway (Railway = backend only, Vercel = frontend)
+if (!process.env.RAILWAY_ENVIRONMENT) {
+  // Serve static files from the React build directory (for Replit or local dev)
+  const buildPath = path.join(__dirname, '..', 'build');
+  app.use(express.static(buildPath));
+  console.log('📦 Serving frontend static files from:', buildPath);
+} else {
+  console.log('🚂 Railway detected - skipping frontend static files (Vercel handles frontend)');
+}
 
 // ============================================
 // GEM ITEM PAGES (for Instagram unfurling)
