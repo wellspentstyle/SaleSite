@@ -15,6 +15,7 @@ import { Freshness } from './pages/Freshness';
 import { SalesApprovals } from './pages/SalesApprovals';
 import { ManualSaleEntry } from './pages/ManualSaleEntry';
 import { ManageSales } from './pages/ManageSales';
+import { ManageBrands } from './pages/ManageBrands';
 import { Toaster } from './components/ui/sonner';
 
 function ScrollToTop() {
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="sales-approvals" element={<SalesApprovals />} />
           <Route path="sales-approvals/manual" element={<ManualSaleEntry />} />
           <Route path="manage-sales" element={<ManageSales />} />
+          <Route path="manage-brands" element={<ManageBrands />} />
           <Route path="brands" element={<AddBrands />} />
           <Route path="assets" element={<GenerateAssets />} />
           <Route path="assets/configure/:saleId" element={<ConfigureAssets />} />

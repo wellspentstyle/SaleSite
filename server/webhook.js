@@ -857,6 +857,124 @@ app.get('/companies', async (req, res) => {
   }
 });
 
+// Update a company (admin only)
+app.patch('/admin/companies/:companyId', async (req, res) => {
+  const { auth } = req.headers;
+  const { companyId } = req.params;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    // Resolve ID (support both rec... and pg_... formats)
+    let pgId;
+    if (companyId.startsWith('rec')) {
+      const lookup = await pool.query('SELECT id FROM companies WHERE airtable_id = $1', [companyId]);
+      if (lookup.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Company not found' });
+      }
+      pgId = lookup.rows[0].id;
+    } else if (companyId.startsWith('pg_')) {
+      pgId = parseInt(companyId.replace('pg_', ''));
+    } else {
+      pgId = parseInt(companyId);
+    }
+    
+    const updates = req.body;
+    const setClauses = [];
+    const values = [];
+    let paramCount = 1;
+    
+    const fieldMap = {
+      name: 'name',
+      type: 'type',
+      price_range: 'price_range',
+      category: 'category',
+      max_womens_size: 'max_womens_size',
+      description: 'description',
+      website: 'website',
+      shopmy_url: 'shopmy_url',
+      priority: 'priority'
+    };
+    
+    for (const [key, dbField] of Object.entries(fieldMap)) {
+      if (updates[key] !== undefined) {
+        setClauses.push(`${dbField} = $${paramCount}`);
+        values.push(updates[key]);
+        paramCount++;
+      }
+    }
+    
+    if (setClauses.length === 0) {
+      return res.json({ success: true, message: 'No updates provided' });
+    }
+    
+    setClauses.push(`updated_at = NOW()`);
+    values.push(pgId);
+    
+    const query = `UPDATE companies SET ${setClauses.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const result = await pool.query(query, values);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+    
+    console.log(`✅ Updated company ${companyId}`);
+    res.json({ success: true, company: result.rows[0] });
+  } catch (error) {
+    console.error('❌ Error updating company:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete a company (admin only)
+app.delete('/admin/companies/:companyId', async (req, res) => {
+  const { auth } = req.headers;
+  const { companyId } = req.params;
+  
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  
+  try {
+    // Resolve ID (support both rec... and pg_... formats)
+    let pgId;
+    if (companyId.startsWith('rec')) {
+      const lookup = await pool.query('SELECT id FROM companies WHERE airtable_id = $1', [companyId]);
+      if (lookup.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Company not found' });
+      }
+      pgId = lookup.rows[0].id;
+    } else if (companyId.startsWith('pg_')) {
+      pgId = parseInt(companyId.replace('pg_', ''));
+    } else {
+      pgId = parseInt(companyId);
+    }
+    
+    // Check if company has associated sales
+    const salesCheck = await pool.query('SELECT COUNT(*) FROM sales WHERE company_id = $1', [pgId]);
+    if (parseInt(salesCheck.rows[0].count) > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Cannot delete: this brand has ${salesCheck.rows[0].count} associated sales. Remove the sales first.` 
+      });
+    }
+    
+    const result = await pool.query('DELETE FROM companies WHERE id = $1 RETURNING *', [pgId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+    
+    console.log(`🗑️ Deleted company ${companyId}`);
+    res.json({ success: true, message: 'Company deleted' });
+  } catch (error) {
+    console.error('❌ Error deleting company:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Newsletter subscription endpoint (public)
 app.post('/newsletter/subscribe', async (req, res) => {
   try {

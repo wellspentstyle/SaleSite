@@ -19,6 +19,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
     { path: '/admin/manage-sales', label: 'Manage Sales', icon: Settings },
     { path: '/admin/picks', label: 'Add Picks', icon: Package, badge: draftsCount },
     { path: '/admin/brands', label: 'Add Brands', icon: Tag, badge: pendingBrandsCount },
+    { path: '/admin/manage-brands', label: 'Manage Brands', icon: Settings },
     { path: '/admin/assets', label: 'Generate Assets', icon: Image },
     { path: '/admin/freshness', label: 'Freshness', icon: RefreshCw },
     { path: '/admin/sync', label: 'Sync Gem', icon: Gem },

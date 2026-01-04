@@ -22,6 +22,22 @@ export async function getPendingBrands() {
 }
 
 export async function addPendingBrand(brandData) {
+  // Filter out stores/retailers - only allow brands
+  const storeTypes = ['shop', 'store', 'retailer', 'marketplace', 'department store'];
+  const brandType = (brandData.type || '').toLowerCase();
+  if (storeTypes.some(t => brandType.includes(t))) {
+    console.log(`⚠️ Skipping store/retailer: ${brandData.name} (type: ${brandData.type})`);
+    return await getPendingBrands();
+  }
+  
+  // Also check name for common retailers
+  const retailerNames = ['saks', 'nordstrom', 'neiman marcus', 'bergdorf', 'net-a-porter', 'matchesfashion', 'farfetch', 'ssense', 'mytheresa', 'wolf and badger'];
+  const lowerName = (brandData.name || '').toLowerCase();
+  if (retailerNames.some(r => lowerName.includes(r))) {
+    console.log(`⚠️ Skipping known retailer: ${brandData.name}`);
+    return await getPendingBrands();
+  }
+  
   const brands = await getPendingBrands();
   
   const existing = brands.find(b => 
