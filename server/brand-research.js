@@ -1,4 +1,5 @@
 import express from 'express';
+import { getCompanyByName } from './db.js';
 
 // Helper function to convert S/M/L or European sizes to US numeric equivalents
 function convertSizeToUS(sizeString) {
@@ -106,7 +107,7 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
   // Brand research endpoint - uses Google Shopping API + web search
   router.post('/', async (req, res) => {
     const { auth } = req.headers;
-    const { brandName } = req.body;
+    const { brandName, force } = req.body;
 
     if (auth !== adminPassword) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -117,6 +118,34 @@ function createBrandResearchRouter({ openai, anthropic, adminPassword, serperApi
     }
 
     try {
+      // ============================================
+      // CHECK IF BRAND ALREADY EXISTS
+      // ============================================
+      console.log(`\n🔍 Checking if brand exists: ${brandName}`);
+
+      const existingBrand = await getCompanyByName(brandName);
+
+      if (existingBrand && !force) {
+        console.log(`⏭️  Brand "${brandName}" already exists in database - skipping research`);
+        console.log(`   Use force=true to re-research this brand`);
+        return res.json({
+          success: false,
+          error: `Brand "${brandName}" has already been researched`,
+          message: 'This brand already exists in the database. Brand research only runs once per brand.',
+          existingBrand: {
+            name: existingBrand.name,
+            priceRange: existingBrand.price_range,
+            category: existingBrand.category,
+            maxSize: existingBrand.max_womens_size,
+            description: existingBrand.description
+          }
+        });
+      }
+
+      if (force) {
+        console.log(`🔄 Force re-research enabled for: ${brandName}`);
+      }
+
       console.log(`\n🔍 Researching brand: ${brandName}`);
 
       // ============================================
