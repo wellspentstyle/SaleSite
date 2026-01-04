@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Loader2, ExternalLink, Save, X, Edit2, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -79,11 +80,21 @@ export function ManageBrands() {
     }
   };
 
-  const filteredCompanies = companies.filter(c =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.category?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const isBrand = (c: Company) => c.type?.toLowerCase() === 'brand';
+  const isShop = (c: Company) => c.type?.toLowerCase() === 'shop';
+  const hasResearch = (c: Company) => !!(c.description && c.description.trim().length > 10);
+
+  const filterBySearch = (items: Company[]) => 
+    items.filter(c =>
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.category?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+  const allBrands = companies.filter(isBrand);
+  const allShops = companies.filter(isShop);
+  const researchedBrands = filterBySearch(allBrands.filter(hasResearch));
+  const unresearchedBrands = filterBySearch(allBrands.filter(c => !hasResearch(c)));
+  const shops = filterBySearch(allShops);
 
   const startEditing = (company: Company) => {
     setEditingId(company.id);
@@ -262,11 +273,6 @@ export function ManageBrands() {
                       <ExternalLink size={16} />
                     </a>
                   )}
-                  {company.type && (
-                    <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
-                      {company.type}
-                    </span>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-3 text-sm text-gray-600">
                   {company.priceRange && <span>{company.priceRange}</span>}
@@ -341,7 +347,7 @@ export function ManageBrands() {
     <div style={{ fontFamily: 'DM Sans, sans-serif' }} className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-1">Manage Brands</h1>
-        <p className="text-gray-600">Edit or delete brands from your directory.</p>
+        <p className="text-gray-600">Edit or delete brands and shops from your directory.</p>
       </div>
 
       <div className="mb-4 relative">
@@ -349,23 +355,65 @@ export function ManageBrands() {
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search brands..."
+          placeholder="Search..."
           className="pl-10"
         />
       </div>
 
-      <p className="text-sm text-gray-500 mb-4">
-        {filteredCompanies.length} of {companies.length} brands
-      </p>
+      <Tabs defaultValue="researched" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="researched" className="px-4">
+            Researched ({researchedBrands.length})
+          </TabsTrigger>
+          <TabsTrigger value="unresearched" className="px-4">
+            Unresearched ({unresearchedBrands.length})
+          </TabsTrigger>
+          <TabsTrigger value="shops" className="px-4">
+            Shops ({shops.length})
+          </TabsTrigger>
+        </TabsList>
 
-      <div>
-        {filteredCompanies.map(renderCompanyRow)}
-      </div>
+        <TabsContent value="researched">
+          {researchedBrands.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              No researched brands found
+            </div>
+          ) : (
+            <div>
+              {researchedBrands.map(renderCompanyRow)}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="unresearched">
+          {unresearchedBrands.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              No unresearched brands found
+            </div>
+          ) : (
+            <div>
+              {unresearchedBrands.map(renderCompanyRow)}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="shops">
+          {shops.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              No shops found
+            </div>
+          ) : (
+            <div>
+              {shops.map(renderCompanyRow)}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Brand</AlertDialogTitle>
+            <AlertDialogTitle>Delete {deleteConfirm?.type === 'Shop' ? 'Shop' : 'Brand'}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete "{deleteConfirm?.name}"? This action cannot be undone.
             </AlertDialogDescription>

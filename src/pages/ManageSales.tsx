@@ -329,7 +329,7 @@ export function ManageSales() {
   }
 
   return (
-    <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
+    <div style={{ fontFamily: 'DM Sans, sans-serif' }} className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-1">Manage Sales</h1>
         <p className="text-gray-600">Edit sales and toggle them on or off.</p>
