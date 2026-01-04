@@ -34,8 +34,24 @@ The application is built using React 18, TypeScript, and Vite, with Tailwind CSS
 - **Brand Watchlist Directory**: Public `/brands` page displaying curated brands from Airtable with filtering and links.
 - **Newsletter Signup**: Dual system (popup modal and footer form) for email capture, saving to Airtable with validation and duplicate prevention.
 
+## Database Migration Status (Phase 2 & 3 Complete)
+The following admin endpoints have been migrated from Airtable to PostgreSQL:
+- **GET /admin/sales**: Reads all sales from PostgreSQL with company data and picks counts
+- **PATCH /admin/sales/:saleId**: Updates sales in PostgreSQL (percent_off, live, promo_code, end_date, extra_discount, image_url)
+- **GET /admin/picks**: Reads all picks with freshness tracking data from PostgreSQL
+- **GET /admin/sale/:saleId/picks**: Reads picks for a specific sale from PostgreSQL
+- **POST /admin/picks**: Creates picks in PostgreSQL
+- **POST /admin/picks/refresh**: Updates pick availability status in PostgreSQL
+- **POST /admin/picks/mark-sold-out**: Marks picks as sold out in PostgreSQL
+- **POST /admin/update-brand-in-airtable**: Creates/updates companies in PostgreSQL (endpoint name kept for backward compatibility)
+
+All endpoints support both Airtable IDs (rec...) and PostgreSQL IDs (pg_...) for backward compatibility.
+
+Public endpoint /sales has been reading from PostgreSQL since Phase 1.
+
 ## External Dependencies
-- **Airtable**: Primary data storage.
+- **PostgreSQL**: Primary data storage (migrated from Airtable).
+- **Airtable**: Legacy data storage (some newsletter/email endpoints still use Airtable).
 - **ShopMy**: Affiliate marketing platform.
 - **OpenAI**: AI for data extraction and processing.
 - **Serper.dev**: Google search API for brand research.

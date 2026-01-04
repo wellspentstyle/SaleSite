@@ -1052,7 +1052,7 @@ app.post('/admin/check-url-protection', (req, res) => {
   }
 });
 
-// Get all sales for admin
+// Get all sales for admin (PostgreSQL)
 app.get('/admin/sales', async (req, res) => {
   const { auth } = req.headers;
   
@@ -1061,43 +1061,47 @@ app.get('/admin/sales', async (req, res) => {
   }
   
   try {
-    // Fetch ALL sales from Airtable with pagination, sorted by created time (newest first)
-    const salesRecords = await fetchAllAirtableRecords(TABLE_NAME, {
-      'sort[0][field]': 'Created',
-      'sort[0][direction]': 'desc',
-      pageSize: '100'
-    });
+    // Fetch ALL sales from PostgreSQL with company data, sorted by created time (newest first)
+    const salesResult = await pool.query(`
+      SELECT 
+        s.id, s.airtable_id, s.company_id, s.original_company_name, s.sale_name,
+        s.percent_off, s.promo_code, s.start_date, s.end_date, s.sale_url, s.clean_url,
+        s.live, s.featured, s.featured_asset_url, s.featured_asset_date,
+        s.extra_discount, s.image_url, s.original_created_at, s.created_at,
+        c.name as company_name
+      FROM sales s
+      LEFT JOIN companies c ON s.company_id = c.id
+      ORDER BY COALESCE(s.original_created_at, s.created_at) DESC
+    `);
     
-    // Fetch ALL picks to count them per sale
-    const picksRecords = await fetchAllAirtableRecords('Picks', {
-      pageSize: '100'
-    });
+    // Fetch picks count per sale
+    const picksResult = await pool.query(`
+      SELECT sale_id, COUNT(*) as count FROM picks GROUP BY sale_id
+    `);
     
-    // Count picks per sale
     const picksCountBySale = new Map();
-    picksRecords.forEach(record => {
-      const saleIds = record.fields.SaleID || [];
-      saleIds.forEach(saleId => {
-        picksCountBySale.set(saleId, (picksCountBySale.get(saleId) || 0) + 1);
-      });
+    picksResult.rows.forEach(row => {
+      picksCountBySale.set(row.sale_id, parseInt(row.count));
     });
     
-    const sales = salesRecords.map(record => {
-      // Extract company name (use CompanyName lookup, fallback to OriginalCompanyName plain text)
-      const companyName = record.fields.CompanyName || record.fields.OriginalCompanyName || 'Unknown Brand';
+    const sales = salesResult.rows.map(row => {
+      const companyName = row.company_name || row.original_company_name || 'Unknown Brand';
       
       return {
-        id: record.id,
-        saleName: record.fields.SaleName || companyName || 'Unnamed Sale',
+        id: row.airtable_id || `pg_${row.id}`,
+        pgId: row.id,
+        saleName: row.sale_name || companyName || 'Unnamed Sale',
         company: companyName,
-        percentOff: record.fields.PercentOff,
-        startDate: record.fields.StartDate,
-        endDate: record.fields.EndDate,
-        live: record.fields.Live,
-        saleUrl: record.fields.SaleURL || record.fields.CleanURL,
-        picksCount: picksCountBySale.get(record.id) || 0,
-        featuredAssetUrl: record.fields.FeaturedAssetURL || null,
-        featuredAssetDate: record.fields.FeaturedAssetDate || null
+        percentOff: row.percent_off,
+        startDate: row.start_date,
+        endDate: row.end_date,
+        live: row.live,
+        saleUrl: row.sale_url || row.clean_url,
+        picksCount: picksCountBySale.get(row.id) || 0,
+        featuredAssetUrl: row.featured_asset_url || null,
+        featuredAssetDate: row.featured_asset_date || null,
+        extraDiscount: row.extra_discount ? parseFloat(row.extra_discount) : null,
+        imageUrl: row.image_url || null
       };
     });
     
@@ -1108,62 +1112,97 @@ app.get('/admin/sales', async (req, res) => {
   }
 });
 
-// Update a sale (PATCH)
+// Update a sale (PATCH) - PostgreSQL
 app.patch('/admin/sales/:saleId', async (req, res) => {
   const { auth } = req.headers;
   const { saleId } = req.params;
-  const { percentOff, live, promoCode, endDate } = req.body;
+  const { percentOff, live, promoCode, endDate, extraDiscount, imageUrl } = req.body;
   
   if (auth !== ADMIN_PASSWORD) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   
-  // Build fields object with only provided values
-  const fields = {};
+  // Build SET clauses for PostgreSQL update
+  const setClauses = [];
+  const values = [];
+  let paramCount = 1;
   
   if (percentOff !== undefined) {
     if (isNaN(percentOff)) {
       return res.status(400).json({ success: false, message: 'Valid percentOff is required' });
     }
-    fields.PercentOff = parseInt(percentOff);
+    setClauses.push(`percent_off = $${paramCount++}`);
+    values.push(parseInt(percentOff));
   }
   
   if (live !== undefined) {
-    fields.Live = live;
+    setClauses.push(`live = $${paramCount++}`);
+    values.push(live);
   }
   
   if (promoCode !== undefined) {
-    fields.PromoCode = promoCode;
+    setClauses.push(`promo_code = $${paramCount++}`);
+    values.push(promoCode);
   }
   
   if (endDate !== undefined) {
-    fields.EndDate = endDate;
+    setClauses.push(`end_date = $${paramCount++}`);
+    values.push(endDate || null);
   }
   
-  if (Object.keys(fields).length === 0) {
+  if (extraDiscount !== undefined) {
+    setClauses.push(`extra_discount = $${paramCount++}`);
+    values.push(extraDiscount || null);
+  }
+  
+  if (imageUrl !== undefined) {
+    setClauses.push(`image_url = $${paramCount++}`);
+    values.push(imageUrl || null);
+  }
+  
+  if (setClauses.length === 0) {
     return res.status(400).json({ success: false, message: 'At least one field to update is required' });
   }
   
+  // Add updated_at
+  setClauses.push(`updated_at = NOW()`);
+  
   try {
-    const response = await airtableFetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ fields })
-      }
+    // Support both airtable_id and pg_id formats
+    let whereClause;
+    if (saleId.startsWith('pg_')) {
+      whereClause = `id = $${paramCount}`;
+      values.push(parseInt(saleId.replace('pg_', '')));
+    } else if (saleId.startsWith('rec')) {
+      whereClause = `airtable_id = $${paramCount}`;
+      values.push(saleId);
+    } else {
+      whereClause = `id = $${paramCount}`;
+      values.push(parseInt(saleId));
+    }
+    
+    const result = await pool.query(
+      `UPDATE sales SET ${setClauses.join(', ')} WHERE ${whereClause} RETURNING *`,
+      values
     );
     
-    const data = await response.json();
-    console.log(`✅ Updated sale ${saleId}:`, fields);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Sale not found' });
+    }
     
-    res.json({ success: true, sale: data });
+    console.log(`✅ Updated sale ${saleId}`);
+    
+    // Invalidate sales cache
+    salesCache = null;
+    
+    res.json({ success: true, sale: result.rows[0] });
   } catch (error) {
     console.error('Error updating sale:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// Update or create a brand in Airtable Companies table
+// Update or create a brand in PostgreSQL Companies table
 app.post('/admin/update-brand-in-airtable', async (req, res) => {
   const { auth } = req.headers;
   const { brandData } = req.body;
@@ -1177,34 +1216,17 @@ app.post('/admin/update-brand-in-airtable', async (req, res) => {
   }
   
   try {
-    console.log(`🔍 Looking up brand "${brandData.name}" in Airtable...`);
+    console.log(`🔍 Looking up brand "${brandData.name}" in PostgreSQL...`);
     
-    // Search for existing brand by name
-    const searchUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${COMPANY_TABLE_NAME}`;
-    // Properly escape Airtable formula - single quotes in names must be doubled
-    const escapedName = brandData.name.replace(/'/g, "''");
-    const searchParams = new URLSearchParams({
-      filterByFormula: `{Name} = '${escapedName}'`,
-      maxRecords: '1'
-    });
+    // Search for existing brand by name (case-insensitive)
+    const searchResult = await pool.query(
+      'SELECT * FROM companies WHERE LOWER(name) = LOWER($1) LIMIT 1',
+      [brandData.name]
+    );
     
-    const searchResponse = await fetch(`${searchUrl}?${searchParams}`, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`
-      }
-    });
+    const existingRecord = searchResult.rows[0] || null;
     
-    if (!searchResponse.ok) {
-      const error = await searchResponse.json();
-      console.error('❌ Airtable search error:', error);
-      return res.status(500).json({ success: false, message: 'Failed to search Airtable' });
-    }
-    
-    const searchData = await searchResponse.json();
-    const existingRecord = searchData.records && searchData.records.length > 0 ? searchData.records[0] : null;
-    
-    // Prepare fields for Airtable
-    // Category and Values may already be arrays from frontend
+    // Prepare fields for PostgreSQL
     const categoryArray = Array.isArray(brandData.category)
       ? brandData.category
       : (brandData.category ? brandData.category.split(',').map(c => c.trim()) : []);
@@ -1213,70 +1235,67 @@ app.post('/admin/update-brand-in-airtable', async (req, res) => {
       ? brandData.values
       : (brandData.values ? brandData.values.split(',').map(v => v.trim()).filter(v => v) : []);
     
-    const fields = {
-      Name: brandData.name,
-      Type: brandData.type || 'Brand',
-      PriceRange: brandData.priceRange || '',
-      Category: categoryArray,
-      MaxWomensSize: brandData.maxWomensSize || '',
-      SizingSource: brandData.sizingSource || '',
-      Notes: brandData.notes || '',
-      Values: valuesArray,
-      Description: brandData.description || '',
-      Website: brandData.url || ''
-    };
-    
     let result;
     
     if (existingRecord) {
       // Update existing record
       console.log(`✏️ Updating existing brand record ${existingRecord.id}...`);
       
-      const updateResponse = await fetch(`${searchUrl}/${existingRecord.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_PAT}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ fields })
-      });
+      const updateResult = await pool.query(`
+        UPDATE companies SET
+          name = $1,
+          type = $2,
+          price_range = $3,
+          category = $4,
+          max_womens_size = $5,
+          values = $6,
+          description = $7,
+          website = $8,
+          updated_at = NOW()
+        WHERE id = $9
+        RETURNING *
+      `, [
+        brandData.name,
+        brandData.type || 'Brand',
+        brandData.priceRange || '',
+        categoryArray,
+        brandData.maxWomensSize || '',
+        valuesArray,
+        brandData.description || '',
+        brandData.url || '',
+        existingRecord.id
+      ]);
       
-      if (!updateResponse.ok) {
-        const error = await updateResponse.json();
-        console.error('❌ Airtable update error:', error);
-        return res.status(500).json({ success: false, message: 'Failed to update brand in Airtable' });
-      }
-      
-      result = await updateResponse.json();
-      console.log(`✅ Updated brand "${brandData.name}" in Airtable`);
+      result = updateResult.rows[0];
+      console.log(`✅ Updated brand "${brandData.name}" in PostgreSQL`);
       
       res.json({ success: true, action: 'updated', record: result });
     } else {
       // Create new record
       console.log(`➕ Creating new brand record...`);
       
-      const createResponse = await fetch(searchUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_PAT}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ fields })
-      });
+      const createResult = await pool.query(`
+        INSERT INTO companies (name, type, price_range, category, max_womens_size, values, description, website)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+      `, [
+        brandData.name,
+        brandData.type || 'Brand',
+        brandData.priceRange || '',
+        categoryArray,
+        brandData.maxWomensSize || '',
+        valuesArray,
+        brandData.description || '',
+        brandData.url || ''
+      ]);
       
-      if (!createResponse.ok) {
-        const error = await createResponse.json();
-        console.error('❌ Airtable create error:', error);
-        return res.status(500).json({ success: false, message: 'Failed to create brand in Airtable' });
-      }
-      
-      result = await createResponse.json();
-      console.log(`✅ Created new brand "${brandData.name}" in Airtable`);
+      result = createResult.rows[0];
+      console.log(`✅ Created new brand "${brandData.name}" in PostgreSQL`);
       
       res.json({ success: true, action: 'created', record: result });
     }
   } catch (error) {
-    console.error('❌ Error updating brand in Airtable:', error);
+    console.error('❌ Error updating brand in PostgreSQL:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -1886,7 +1905,7 @@ app.post('/admin/scrape-product', async (req, res) => {
   }
 });
 
-// Save picks to Airtable
+// Save picks to PostgreSQL
 app.post('/admin/picks', async (req, res) => {
   const { auth } = req.headers;
   const { saleId, picks } = req.body;
@@ -1926,88 +1945,62 @@ app.post('/admin/picks', async (req, res) => {
       console.log(`⚠️ Filtered out ${picks.length - validPicks.length} incomplete picks`);
     }
     
-    // Fetch the sale record to get its Company field
-    const saleUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${saleId}`;
-    const saleResponse = await fetch(saleUrl, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`,
-      },
-    });
-    
-    if (!saleResponse.ok) {
-      throw new Error('Failed to fetch sale record');
+    // Resolve the sale ID to PostgreSQL ID with validation
+    let pgSaleId;
+    if (saleId.startsWith('pg_')) {
+      const numericPart = saleId.replace('pg_', '');
+      if (!/^\d+$/.test(numericPart)) {
+        return res.status(400).json({ success: false, message: 'Invalid sale ID format' });
+      }
+      pgSaleId = parseInt(numericPart);
+    } else if (saleId.startsWith('rec')) {
+      // Look up by airtable_id
+      const saleResult = await pool.query('SELECT id FROM sales WHERE airtable_id = $1', [saleId]);
+      if (saleResult.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Sale not found' });
+      }
+      pgSaleId = saleResult.rows[0].id;
+    } else if (/^\d+$/.test(saleId)) {
+      pgSaleId = parseInt(saleId);
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid sale ID format' });
     }
     
-    const saleData = await saleResponse.json();
-    const companyIds = saleData.fields.Company || [];
+    console.log(`📦 Resolved sale ID to PostgreSQL ID: ${pgSaleId}`);
     
-    console.log(`📦 Sale company: ${companyIds.length > 0 ? companyIds[0] : 'None'}`);
-    
-    // Create records for each valid pick
-    // Note: ShopMyURL, PercentOff, and Company are computed fields in Airtable, don't send them
-    const records = validPicks.map(pick => {
-      const fields = {
-        ProductURL: cleanUrl(pick.url), // Clean URL to remove tracking parameters
-        ProductName: pick.name,
-        ImageURL: pick.imageUrl,
-        SaleID: [saleId] // Link to Sales table (Company will be auto-populated via lookup)
-      };
-      
-      // Add brand if available
-      if (pick.brand) {
-        fields.Brand = pick.brand;
-      }
-      
-      // Only add prices if they exist
-      if (pick.originalPrice) {
-        fields.OriginalPrice = pick.originalPrice;
-      }
-      if (pick.salePrice) {
-        fields.SalePrice = pick.salePrice;
-      }
-      
-      // Add confidence score if available (manual entries always get 100)
-      if (pick.confidence !== undefined && pick.confidence !== null) {
-        fields.Confidence = pick.confidence;
-      }
-      
-      // Add entry type (manual vs automatic)
-      if (pick.entryType) {
-        fields.EntryType = pick.entryType;
-      }
-      
-      return { fields };
-    });
-    
-    // Airtable has a 10-record limit per request, so batch the picks
-    const BATCH_SIZE = 10;
+    // Insert picks into PostgreSQL
     const allRecordIds = [];
     
-    for (let i = 0; i < records.length; i += BATCH_SIZE) {
-      const batch = records.slice(i, i + BATCH_SIZE);
-      
-      const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}`;
-      const airtableResponse = await fetch(airtableUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_PAT}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ records: batch })
-      });
-      
-      if (!airtableResponse.ok) {
-        const errorText = await airtableResponse.text();
-        console.error('❌ Airtable error:', errorText);
-        return res.status(500).json({ 
-          success: false, 
-          message: `Failed to save picks (batch ${Math.floor(i / BATCH_SIZE) + 1})` 
-        });
+    for (const pick of validPicks) {
+      // Calculate percentOff if not provided but prices are available
+      let percentOff = pick.percentOff;
+      if ((percentOff === undefined || percentOff === null) && pick.originalPrice && pick.salePrice) {
+        percentOff = Math.round((1 - (pick.salePrice / pick.originalPrice)) * 100);
       }
       
-      const data = await airtableResponse.json();
-      allRecordIds.push(...data.records.map(r => r.id));
-      console.log(`✅ Saved batch ${Math.floor(i / BATCH_SIZE) + 1}: ${data.records.length} picks`);
+      const result = await pool.query(`
+        INSERT INTO picks (
+          sale_id, product_name, brand, product_url, image_url,
+          original_price, sale_price, percent_off, shopmy_url,
+          confidence, entry_type, sizes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING id
+      `, [
+        pgSaleId,
+        pick.name,
+        pick.brand || null,
+        cleanUrl(pick.url),
+        pick.imageUrl,
+        pick.originalPrice || null,
+        pick.salePrice || null,
+        percentOff || null,
+        pick.shopmyUrl || null,
+        pick.confidence !== undefined ? pick.confidence : null,
+        pick.entryType || null,
+        pick.sizes || null
+      ]);
+      
+      allRecordIds.push(`pg_${result.rows[0].id}`);
     }
     
     console.log(`✅ Total saved: ${allRecordIds.length} picks`);
@@ -2465,7 +2458,7 @@ app.post('/admin/generate-featured-assets', async (req, res) => {
   }
 });
 
-// Get picks for a specific sale
+// Get picks for a specific sale (PostgreSQL)
 app.get('/admin/sale/:saleId/picks', async (req, res) => {
   const { auth } = req.headers;
   
@@ -2476,37 +2469,41 @@ app.get('/admin/sale/:saleId/picks', async (req, res) => {
   try {
     const { saleId } = req.params;
     
-    const filterFormula = `FIND("${saleId}",{SaleRecordIDs}&'')`;
-    const fields = ['ProductName', 'ImageURL', 'OriginalPrice', 'SalePrice', 'PercentOff', 'Brand'];
-    
-    const params = new URLSearchParams({
-      filterByFormula: filterFormula,
-      'fields[]': fields.join(',')
-    });
-    
-    fields.forEach(field => {
-      params.append('fields[]', field);
-    });
-    
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?filterByFormula=${encodeURIComponent(filterFormula)}`;
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Airtable error: ${response.status}`);
+    // Support both airtable_id and pg_id formats
+    let whereClause, queryValue;
+    if (saleId.startsWith('pg_')) {
+      whereClause = 'p.sale_id = $1';
+      queryValue = parseInt(saleId.replace('pg_', ''));
+    } else if (saleId.startsWith('rec')) {
+      whereClause = 's.airtable_id = $1';
+      queryValue = saleId;
+    } else {
+      whereClause = 'p.sale_id = $1';
+      queryValue = parseInt(saleId);
     }
     
-    const data = await response.json();
+    const result = await pool.query(`
+      SELECT p.*, s.airtable_id as sale_airtable_id
+      FROM picks p
+      LEFT JOIN sales s ON p.sale_id = s.id
+      WHERE ${whereClause}
+      ORDER BY p.created_at DESC
+    `, [queryValue]);
     
-    const picks = (data.records || []).map(record => ({
-      id: record.id,
-      productName: record.fields.ProductName || 'Untitled',
-      imageUrl: record.fields.ImageURL || '',
-      originalPrice: record.fields.OriginalPrice || 0,
-      salePrice: record.fields.SalePrice || 0,
-      percentOff: record.fields.PercentOff || 0,
-      brand: record.fields.Brand || ''
+    const picks = result.rows.map(row => ({
+      id: row.airtable_id || `pg_${row.id}`,
+      pgId: row.id,
+      productName: row.product_name || 'Untitled',
+      imageUrl: row.image_url || '',
+      originalPrice: parseFloat(row.original_price) || 0,
+      salePrice: parseFloat(row.sale_price) || 0,
+      percentOff: parseFloat(row.percent_off) || 0,
+      brand: row.brand || '',
+      productUrl: row.product_url || '',
+      shopmyUrl: row.shopmy_url || '',
+      sizes: row.sizes || [],
+      confidence: row.confidence ? parseFloat(row.confidence) : null,
+      entryType: row.entry_type || null
     }));
     
     res.json({ success: true, picks });
@@ -3393,7 +3390,7 @@ app.post('/admin/generate-and-post', async (req, res) => {
 
 // ========== FRESHNESS TRACKING ENDPOINTS ==========
 
-// Get all picks with freshness data for admin panel
+// Get all picks with freshness data for admin panel (PostgreSQL)
 app.get('/admin/picks', async (req, res) => {
   const { auth } = req.headers;
   
@@ -3402,75 +3399,55 @@ app.get('/admin/picks', async (req, res) => {
   }
   
   try {
-    // Fetch all picks from Airtable with freshness fields
-    const allRecords = [];
-    let offset = undefined;
+    // Fetch all picks from PostgreSQL with sale and company data
+    const picksResult = await pool.query(`
+      SELECT 
+        p.*,
+        s.airtable_id as sale_airtable_id,
+        s.live as sale_live,
+        s.original_company_name,
+        c.name as company_name
+      FROM picks p
+      LEFT JOIN sales s ON p.sale_id = s.id
+      LEFT JOIN companies c ON s.company_id = c.id
+      ORDER BY p.created_at DESC
+    `);
     
-    const fields = [
-      'ProductURL', 'ProductName', 'ImageURL', 'OriginalPrice', 'SalePrice', 'PercentOff', 
-      'SaleID', 'Company', 'CompanyLink', 'ShopMyURL', 'AvailabilityStatus', 'LastValidatedAt', 
-      'NextCheckDue', 'HiddenUntilFresh'
-    ];
-    
-    do {
-      const params = new URLSearchParams({
-        fields: fields.join(','),
-        pageSize: '100'
-      });
-      
-      if (offset) {
-        params.set('offset', offset);
-      }
-      
-      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}?${params}`;
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_PAT}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Airtable API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      allRecords.push(...data.records);
-      offset = data.offset;
-    } while (offset);
-    
-    // Also fetch sales to get active sales list
-    const salesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}?fields[]=Company&fields[]=Live&fields[]=StartDate&fields[]=EndDate`;
-    const salesResponse = await fetch(salesUrl, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`,
-      },
-    });
-    
-    const salesData = await salesResponse.json();
+    // Get set of active sale IDs
     const activeSaleIds = new Set(
-      salesData.records
-        .filter(r => r.fields.Live === 'YES')
-        .map(r => r.id)
+      picksResult.rows
+        .filter(r => r.sale_live === 'YES')
+        .map(r => r.sale_id)
     );
     
     // Transform picks data
-    const picks = allRecords.map(record => ({
-      id: record.id,
-      name: record.fields.ProductName,
-      url: record.fields.ProductURL,
-      imageUrl: record.fields.ImageURL,
-      originalPrice: record.fields.OriginalPrice,
-      salePrice: record.fields.SalePrice,
-      percentOff: record.fields.PercentOff,
-      saleIds: record.fields.SaleID || [],
-      company: record.fields.Company || [], // Company is a lookup field for display
-      companyLink: record.fields.CompanyLink || [], // CompanyLink is the actual link to Companies table
-      availabilityStatus: record.fields.AvailabilityStatus || 'Unknown',
-      lastValidatedAt: record.fields.LastValidatedAt,
-      nextCheckDue: record.fields.NextCheckDue,
-      hiddenUntilFresh: record.fields.HiddenUntilFresh || false,
-      isActivelyDisplayed: (record.fields.SaleID || []).some(id => activeSaleIds.has(id))
-    }));
+    const picks = picksResult.rows.map(row => {
+      // Convert percent_off from decimal (0.3) to percentage (30) if needed
+      let percentOff = parseFloat(row.percent_off) || 0;
+      if (percentOff > 0 && percentOff <= 1) {
+        percentOff = Math.round(percentOff * 100);
+      }
+      
+      return {
+        id: row.airtable_id || `pg_${row.id}`,
+        pgId: row.id,
+        name: row.product_name,
+        url: row.product_url,
+        imageUrl: row.image_url,
+        originalPrice: parseFloat(row.original_price) || 0,
+        salePrice: parseFloat(row.sale_price) || 0,
+        percentOff: percentOff,
+        saleIds: row.sale_id ? [row.sale_airtable_id || `pg_${row.sale_id}`] : [],
+        company: row.company_name ? [row.company_name] : (row.original_company_name ? [row.original_company_name] : []),
+        companyLink: row.company_name ? [row.company_name] : [],
+        shopmyUrl: row.shopmy_url || '',
+        availabilityStatus: row.availability_status || 'Unknown',
+        lastValidatedAt: row.last_validated_at,
+        nextCheckDue: row.next_check_due,
+        hiddenUntilFresh: row.hidden_until_fresh || false,
+        isActivelyDisplayed: activeSaleIds.has(row.sale_id)
+      };
+    });
     
     res.json({
       success: true,
@@ -3486,7 +3463,7 @@ app.get('/admin/picks', async (req, res) => {
   }
 });
 
-// Refresh specific picks (check availability)
+// Refresh specific picks (check availability) - PostgreSQL
 app.post('/admin/picks/refresh', async (req, res) => {
   const { auth } = req.headers;
   
@@ -3510,28 +3487,46 @@ app.post('/admin/picks/refresh', async (req, res) => {
     
     for (const pickId of pickIds) {
       try {
-        // Fetch the pick data
-        const pickUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pickId}`;
-        const pickResponse = await fetch(pickUrl, {
-          headers: {
-            'Authorization': `Bearer ${AIRTABLE_PAT}`,
-          },
-        });
+        // Resolve pick ID to PostgreSQL ID with validation
+        let pgPickId;
+        if (pickId.startsWith('pg_')) {
+          const numericPart = pickId.replace('pg_', '');
+          if (!/^\d+$/.test(numericPart)) {
+            results.push({ pickId, success: false, error: 'Invalid pick ID format' });
+            continue;
+          }
+          pgPickId = parseInt(numericPart);
+        } else if (pickId.startsWith('rec')) {
+          const pickResult = await pool.query('SELECT id, product_url, product_name FROM picks WHERE airtable_id = $1', [pickId]);
+          if (pickResult.rows.length === 0) {
+            results.push({ pickId, success: false, error: 'Pick not found' });
+            continue;
+          }
+          pgPickId = pickResult.rows[0].id;
+        } else if (/^\d+$/.test(pickId)) {
+          pgPickId = parseInt(pickId);
+        } else {
+          results.push({ pickId, success: false, error: 'Invalid pick ID format' });
+          continue;
+        }
         
-        if (!pickResponse.ok) {
+        // Fetch the pick data
+        const pickResult = await pool.query('SELECT * FROM picks WHERE id = $1', [pgPickId]);
+        
+        if (pickResult.rows.length === 0) {
           results.push({ pickId, success: false, error: 'Pick not found' });
           continue;
         }
         
-        const pickData = await pickResponse.json();
-        const productUrl = pickData.fields.ProductURL;
+        const pickData = pickResult.rows[0];
+        const productUrl = pickData.product_url;
         
         if (!productUrl) {
           results.push({ pickId, success: false, error: 'No product URL' });
           continue;
         }
         
-        console.log(`  Checking: ${pickData.fields.ProductName}`);
+        console.log(`  Checking: ${pickData.product_name}`);
         
         // Use the existing hybrid scraper to check the product
         const scrapeResult = await scrapeProduct(productUrl);
@@ -3541,13 +3536,8 @@ app.post('/admin/picks/refresh', async (req, res) => {
         
         // Determine availability based on scrape results
         if (scrapeResult.success && confidence > 50) {
-          // Product found with good confidence - assume in stock
           availabilityStatus = 'In Stock';
-          
-          // Check for low stock indicators in the HTML (if we had it)
-          // For now, we'll default to "In Stock" if scrape succeeds
         } else if (confidence <= 50) {
-          // Low confidence or product not found clearly
           availabilityStatus = 'Unknown';
         }
         
@@ -3555,35 +3545,24 @@ app.post('/admin/picks/refresh', async (req, res) => {
         const today = new Date();
         const nextCheckDue = new Date(today.getTime() + (14 * 24 * 60 * 60 * 1000));
         
-        // Update the pick in Airtable
-        const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pickId}`;
-        const updateResponse = await fetch(updateUrl, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${AIRTABLE_PAT}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            fields: {
-              AvailabilityStatus: availabilityStatus,
-              LastValidatedAt: today.toISOString().split('T')[0],
-              NextCheckDue: nextCheckDue.toISOString().split('T')[0],
-              HiddenUntilFresh: false // Unhide when refreshed
-            }
-          })
-        });
+        // Update the pick in PostgreSQL
+        await pool.query(`
+          UPDATE picks SET
+            availability_status = $1,
+            last_validated_at = $2,
+            next_check_due = $3,
+            hidden_until_fresh = false,
+            updated_at = NOW()
+          WHERE id = $4
+        `, [availabilityStatus, today, nextCheckDue, pgPickId]);
         
-        if (updateResponse.ok) {
-          results.push({ 
-            pickId, 
-            success: true, 
-            status: availabilityStatus,
-            confidence
-          });
-          console.log(`  ✅ Updated: ${availabilityStatus} (confidence: ${confidence}%)`);
-        } else {
-          results.push({ pickId, success: false, error: 'Update failed' });
-        }
+        results.push({ 
+          pickId, 
+          success: true, 
+          status: availabilityStatus,
+          confidence
+        });
+        console.log(`  ✅ Updated: ${availabilityStatus} (confidence: ${confidence}%)`);
         
       } catch (error) {
         console.error(`  ❌ Error checking pick ${pickId}:`, error.message);
@@ -3611,7 +3590,7 @@ app.post('/admin/picks/refresh', async (req, res) => {
   }
 });
 
-// Mark picks as sold out
+// Mark picks as sold out - PostgreSQL
 app.post('/admin/picks/mark-sold-out', async (req, res) => {
   const { auth } = req.headers;
   
@@ -3632,31 +3611,43 @@ app.post('/admin/picks/mark-sold-out', async (req, res) => {
     console.log(`\n🚫 Marking ${pickIds.length} picks as sold out...`);
     
     const results = [];
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
     
     for (const pickId of pickIds) {
       try {
-        const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pickId}`;
-        const updateResponse = await fetch(updateUrl, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${AIRTABLE_PAT}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            fields: {
-              AvailabilityStatus: 'Sold Out',
-              LastValidatedAt: today
-            }
-          })
-        });
-        
-        if (updateResponse.ok) {
-          results.push({ pickId, success: true });
-          console.log(`  ✅ Marked sold out: ${pickId}`);
+        // Resolve pick ID to PostgreSQL ID with validation
+        let pgPickId;
+        if (pickId.startsWith('pg_')) {
+          const numericPart = pickId.replace('pg_', '');
+          if (!/^\d+$/.test(numericPart)) {
+            results.push({ pickId, success: false, error: 'Invalid pick ID format' });
+            continue;
+          }
+          pgPickId = parseInt(numericPart);
+        } else if (pickId.startsWith('rec')) {
+          const pickResult = await pool.query('SELECT id FROM picks WHERE airtable_id = $1', [pickId]);
+          if (pickResult.rows.length === 0) {
+            results.push({ pickId, success: false, error: 'Pick not found' });
+            continue;
+          }
+          pgPickId = pickResult.rows[0].id;
+        } else if (/^\d+$/.test(pickId)) {
+          pgPickId = parseInt(pickId);
         } else {
-          results.push({ pickId, success: false, error: 'Update failed' });
+          results.push({ pickId, success: false, error: 'Invalid pick ID format' });
+          continue;
         }
+        
+        await pool.query(`
+          UPDATE picks SET
+            availability_status = 'Sold Out',
+            last_validated_at = $1,
+            updated_at = NOW()
+          WHERE id = $2
+        `, [today, pgPickId]);
+        
+        results.push({ pickId, success: true });
+        console.log(`  ✅ Marked sold out: ${pickId}`);
         
       } catch (error) {
         results.push({ pickId, success: false, error: error.message });
