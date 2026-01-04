@@ -787,7 +787,7 @@ app.get('/sales', async (req, res) => {
         saleUrl: saleUrl,
         featured: row.featured === 'YES',
         imageUrl: row.image_url || undefined,
-        createdTime: row.created_at,
+        createdTime: row.original_created_at || row.created_at,
         picks: picksBySale.get(row.id) || [],
         // Company metadata for filtering
         priceRange: row.price_range,
