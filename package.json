@@ -75,6 +75,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test:scraper": "node tests/run-scraper-tests.js"
+    "test:scraper": "node tests/run-scraper-tests.js",
+    "start": "node server/webhook.js"
   }
 }

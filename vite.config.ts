@@ -6,6 +6,9 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const getSiteUrl = () => {
+  if (process.env.VITE_SITE_URL) {
+    return process.env.VITE_SITE_URL;
+  }
   if (process.env.REPLIT_DEPLOYMENT) {
     return 'https://www.wellspentstyle.com';
   }
@@ -15,12 +18,20 @@ const getSiteUrl = () => {
   return 'http://localhost:5000';
 };
 
+const getApiUrl = () => {
+  if (process.env.VITE_API_URL) {
+    return process.env.VITE_API_URL;
+  }
+  return 'http://localhost:3001';
+};
+
 export default defineConfig({
   plugins: [react()],
   define: {
     'import.meta.env.VITE_AIRTABLE_PAT': JSON.stringify(process.env.AIRTABLE_PAT),
     'import.meta.env.VITE_AIRTABLE_BASE_ID': JSON.stringify(process.env.AIRTABLE_BASE_ID),
     'import.meta.env.VITE_SITE_URL': JSON.stringify(getSiteUrl()),
+    'import.meta.env.VITE_API_URL': JSON.stringify(getApiUrl()),
   },
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
@@ -89,7 +100,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: getApiUrl(),
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
