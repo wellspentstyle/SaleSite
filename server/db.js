@@ -170,8 +170,8 @@ export async function createSale(data) {
     INSERT INTO sales (
       airtable_id, company_id, original_company_name, sale_name,
       percent_off, promo_code, start_date, end_date, sale_url, clean_url,
-      live, featured, featured_asset_url, featured_asset_date
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      live, featured, featured_asset_url, featured_asset_date, original_created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
     RETURNING *
   `, [
     data.airtableId || null,
@@ -187,7 +187,8 @@ export async function createSale(data) {
     data.live || 'NO',
     data.featured || 'NO',
     data.featuredAssetUrl || null,
-    data.featuredAssetDate || null
+    data.featuredAssetDate || null,
+    data.originalCreatedAt || new Date()
   ]);
   return result.rows[0];
 }
