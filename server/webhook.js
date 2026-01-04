@@ -693,21 +693,27 @@ app.get('/sales', async (req, res) => {
     console.log('💾 Fetching sales from PostgreSQL...');
     
     // Fetch live sales with company data joined
+    // DISTINCT ON keeps only the most recent sale per company (deduplication)
     const salesResult = await pool.query(`
-      SELECT 
+      SELECT DISTINCT ON (COALESCE(s.company_id::text, s.original_company_name))
         s.id, s.airtable_id, s.company_id, s.original_company_name, s.sale_name,
         s.percent_off, s.promo_code, s.start_date, s.end_date, 
         s.sale_url, s.clean_url, s.live, s.featured,
-        s.extra_discount, s.image_url, s.created_at,
+        s.extra_discount, s.image_url, s.created_at, s.original_created_at,
         c.name as company_name, c.type as company_type, c.price_range,
         c.max_womens_size, c.values as company_values, c.description
       FROM sales s
       LEFT JOIN companies c ON s.company_id = c.id
       WHERE s.live = 'YES'
-      ORDER BY s.original_created_at DESC NULLS LAST
+      ORDER BY COALESCE(s.company_id::text, s.original_company_name), s.original_created_at DESC NULLS LAST
     `);
     
-    const salesRows = salesResult.rows;
+    // Re-sort by date after deduplication (DISTINCT ON requires specific ORDER BY)
+    const salesRows = salesResult.rows.sort((a, b) => {
+      const dateA = a.original_created_at ? new Date(a.original_created_at) : new Date(0);
+      const dateB = b.original_created_at ? new Date(b.original_created_at) : new Date(0);
+      return dateB - dateA;
+    });
     console.log(`📊 Found ${salesRows.length} live sales in PostgreSQL`);
     
     // Get sale IDs for picks query
