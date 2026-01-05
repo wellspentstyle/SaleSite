@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS sales (
   featured_asset_date TIMESTAMP,
   extra_discount DECIMAL(5,2),
   image_url TEXT,
+  description TEXT,
   original_created_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
