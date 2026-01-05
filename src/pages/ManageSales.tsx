@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Switch } from '../components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Loader2, ExternalLink, Check, X, Edit2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -28,6 +27,8 @@ interface EditingState {
   endDate: string;
 }
 
+type FilterType = 'active' | 'complete';
+
 export function ManageSales() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +40,7 @@ export function ManageSales() {
     endDate: ''
   });
   const [saving, setSaving] = useState(false);
+  const [filterType, setFilterType] = useState<FilterType>('active');
 
   const getAuth = () => localStorage.getItem('adminAuth') || 'dev-mode';
 
@@ -65,6 +67,7 @@ export function ManageSales() {
 
   const activeSales = sales.filter(s => s.live === 'YES');
   const completeSales = sales.filter(s => s.live !== 'YES');
+  const filteredSales = filterType === 'active' ? activeSales : completeSales;
 
   const handleToggleLive = async (sale: Sale) => {
     const newLiveStatus = sale.live === 'YES' ? 'NO' : 'YES';
@@ -106,7 +109,8 @@ export function ManageSales() {
     }
   };
 
-  const startEditing = (sale: Sale) => {
+  const startEditing = (sale: Sale, e: React.MouseEvent) => {
+    e.stopPropagation();
     setEditingId(sale.id);
     setEditingState({
       percentOff: sale.percentOff?.toString() || '',
@@ -116,7 +120,8 @@ export function ManageSales() {
     });
   };
 
-  const cancelEditing = () => {
+  const cancelEditing = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setEditingId(null);
     setEditingState({
       percentOff: '',
@@ -126,7 +131,8 @@ export function ManageSales() {
     });
   };
 
-  const saveEditing = async (saleId: string) => {
+  const saveEditing = async (saleId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     setSaving(true);
 
     const updates: Record<string, any> = {};
@@ -178,143 +184,186 @@ export function ManageSales() {
     }
   };
 
-  const renderSaleRow = (sale: Sale) => {
+  const renderSaleCard = (sale: Sale) => {
     const isEditing = editingId === sale.id;
 
     return (
       <div
         key={sale.id}
-        className="border border-border bg-white p-4 mb-3"
-        style={{ borderRadius: '4px' }}
+        className="border bg-white transition-all hover:shadow-md"
+        style={{
+          padding: '20px',
+          paddingRight: '80px',
+          borderRadius: '4px',
+          borderColor: '#e5e7eb',
+          position: 'relative'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = '#9ca3af';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = '#e5e7eb';
+        }}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-2">
-              <h3 
-                className="font-semibold text-lg truncate"
-                style={{ fontFamily: 'DM Sans, sans-serif' }}
-              >
-                {sale.saleName}
-              </h3>
-              {sale.saleUrl && (
-                <a
-                  href={sale.saleUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-gray-600"
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <h3
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontWeight: 600,
+                fontSize: '16px'
+              }}
+            >
+              {sale.saleName}
+            </h3>
+          </div>
+
+          {isEditing ? (
+            <div className="space-y-2 mt-3">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">% Off</label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={editingState.percentOff}
+                  onChange={(e) => setEditingState({ ...editingState, percentOff: e.target.value })}
+                  className="h-8 text-sm"
                   onClick={(e) => e.stopPropagation()}
-                >
-                  <ExternalLink size={16} />
-                </a>
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Extra % Off</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={editingState.extraDiscount}
+                  onChange={(e) => setEditingState({ ...editingState, extraDiscount: e.target.value })}
+                  className="h-8 text-sm"
+                  placeholder="optional"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Promo Code</label>
+                <Input
+                  value={editingState.promoCode}
+                  onChange={(e) => setEditingState({ ...editingState, promoCode: e.target.value })}
+                  className="h-8 text-sm font-mono"
+                  placeholder="optional"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">End Date</label>
+                <Input
+                  type="date"
+                  value={editingState.endDate}
+                  onChange={(e) => setEditingState({ ...editingState, endDate: e.target.value })}
+                  className="h-8 text-sm"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1 text-sm text-gray-600">
+              <div>
+                <strong>{sale.percentOff}% off</strong>
+                {sale.extraDiscount && sale.extraDiscount > 0 && (
+                  <span className="text-green-600 ml-1">+ {sale.extraDiscount}% extra</span>
+                )}
+              </div>
+              {sale.promoCode && (
+                <div className="font-mono bg-gray-100 px-2 py-0.5 rounded text-xs inline-block">
+                  {sale.promoCode}
+                </div>
+              )}
+              <div className="text-gray-400">
+                {sale.picksCount} {sale.picksCount === 1 ? 'pick' : 'picks'}
+              </div>
+              {sale.endDate && (
+                <div className="text-gray-400">
+                  ends {formatDate(sale.endDate)}
+                </div>
               )}
             </div>
+          )}
+        </div>
 
-            {isEditing ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">% Off</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={editingState.percentOff}
-                    onChange={(e) => setEditingState({ ...editingState, percentOff: e.target.value })}
-                    className="h-8 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Extra % Off</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={editingState.extraDiscount}
-                    onChange={(e) => setEditingState({ ...editingState, extraDiscount: e.target.value })}
-                    className="h-8 text-sm"
-                    placeholder="optional"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Promo Code</label>
-                  <Input
-                    value={editingState.promoCode}
-                    onChange={(e) => setEditingState({ ...editingState, promoCode: e.target.value })}
-                    className="h-8 text-sm font-mono"
-                    placeholder="optional"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">End Date</label>
-                  <Input
-                    type="date"
-                    value={editingState.endDate}
-                    onChange={(e) => setEditingState({ ...editingState, endDate: e.target.value })}
-                    className="h-8 text-sm"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                <span>
-                  <strong>{sale.percentOff}% off</strong>
-                  {sale.extraDiscount && sale.extraDiscount > 0 && (
-                    <span className="text-green-600 ml-1">+ {sale.extraDiscount}% extra</span>
-                  )}
-                </span>
-                {sale.promoCode && (
-                  <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-xs">
-                    {sale.promoCode}
-                  </span>
-                )}
-                <span className="text-gray-400">
-                  {sale.picksCount} {sale.picksCount === 1 ? 'pick' : 'picks'}
-                </span>
-                {sale.endDate && (
-                  <span className="text-gray-400">
-                    ends {formatDate(sale.endDate)}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            alignItems: 'center'
+          }}
+        >
+          {sale.saleUrl && (
+            <a
+              href={sale.saleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: '#6b7280' }}
+            >
+              <ExternalLink size={16} />
+            </a>
+          )}
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {isEditing ? (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={cancelEditing}
-                  disabled={saving}
-                >
-                  <X size={16} />
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => saveEditing(sale.id)}
-                  disabled={saving}
-                  style={{ backgroundColor: '#000', color: '#fff' }}
-                >
-                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => startEditing(sale)}
-                  title="Edit sale"
-                >
-                  <Edit2 size={16} />
-                </Button>
-                <Switch
-                  checked={sale.live === 'YES'}
-                  onCheckedChange={() => handleToggleLive(sale)}
-                />
-              </>
-            )}
-          </div>
+          {isEditing ? (
+            <>
+              <button
+                onClick={(e) => cancelEditing(e)}
+                disabled={saving}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: '#6b7280'
+                }}
+              >
+                <X size={16} />
+              </button>
+              <button
+                onClick={(e) => saveEditing(sale.id, e)}
+                disabled={saving}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: '#000'
+                }}
+              >
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={(e) => startEditing(sale, e)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: '#6b7280'
+                }}
+              >
+                <Edit2 size={16} />
+              </button>
+              <Switch
+                checked={sale.live === 'YES'}
+                onCheckedChange={() => handleToggleLive(sale)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </>
+          )}
         </div>
       </div>
     );
@@ -329,46 +378,85 @@ export function ManageSales() {
   }
 
   return (
-    <div style={{ fontFamily: 'DM Sans, sans-serif' }} className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">Manage Sales</h1>
-        <p className="text-gray-600">Edit sales and toggle them on or off.</p>
-      </div>
+    <div style={{ fontFamily: 'DM Sans, sans-serif' }} className="p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Manage Sales</h1>
+            <p className="text-gray-600 mt-1 text-sm md:text-base">Edit sales and toggle them on or off</p>
+          </div>
+        </div>
 
-      <Tabs defaultValue="active" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="active" className="px-6">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setFilterType('active')}
+            className="text-xs md:text-sm px-2 py-1.5 md:px-4 md:py-2"
+            style={{
+              fontFamily: 'DM Sans, sans-serif',
+              backgroundColor: filterType === 'active' ? '#000' : '#fff',
+              color: filterType === 'active' ? '#fff' : '#000',
+              border: '1px solid',
+              borderColor: filterType === 'active' ? '#000' : '#ddd',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: filterType === 'active' ? 600 : 400,
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (filterType !== 'active') {
+                e.currentTarget.style.borderColor = '#999';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (filterType !== 'active') {
+                e.currentTarget.style.borderColor = '#ddd';
+              }
+            }}
+          >
             Active ({activeSales.length})
-          </TabsTrigger>
-          <TabsTrigger value="complete" className="px-6">
+          </button>
+
+          <button
+            onClick={() => setFilterType('complete')}
+            className="text-xs md:text-sm px-2 py-1.5 md:px-4 md:py-2"
+            style={{
+              fontFamily: 'DM Sans, sans-serif',
+              backgroundColor: filterType === 'complete' ? '#000' : '#fff',
+              color: filterType === 'complete' ? '#fff' : '#000',
+              border: '1px solid',
+              borderColor: filterType === 'complete' ? '#000' : '#ddd',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: filterType === 'complete' ? 600 : 400,
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (filterType !== 'complete') {
+                e.currentTarget.style.borderColor = '#999';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (filterType !== 'complete') {
+                e.currentTarget.style.borderColor = '#ddd';
+              }
+            }}
+          >
             Complete ({completeSales.length})
-          </TabsTrigger>
-        </TabsList>
+          </button>
+        </div>
 
-        <TabsContent value="active">
-          {activeSales.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              No active sales
-            </div>
-          ) : (
-            <div>
-              {activeSales.map(renderSaleRow)}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="complete">
-          {completeSales.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              No completed sales
-            </div>
-          ) : (
-            <div>
-              {completeSales.map(renderSaleRow)}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+        {filteredSales.length === 0 ? (
+          <div className="border border-dashed border-border bg-muted/20" style={{ padding: '60px', textAlign: 'center', borderRadius: '8px' }}>
+            <p className="text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              {filterType === 'active' ? 'No active sales found.' : 'No complete sales found.'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredSales.map((sale) => renderSaleCard(sale))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
