@@ -779,7 +779,7 @@ app.get('/sales', async (req, res) => {
         id: row.airtable_id || `pg_${row.id}`,
         brandName: companyName,
         brandLogo: companyName,
-        discount: `${row.percent_off || 0}% Off`,
+        discount: `${Math.round(parseFloat(row.percent_off) || 0)}% Off`,
         discountCode: row.promo_code || undefined,
         extraDiscount: row.extra_discount ? parseFloat(row.extra_discount) : undefined,
         startDate: row.start_date,
