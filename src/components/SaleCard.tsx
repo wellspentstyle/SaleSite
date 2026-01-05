@@ -71,7 +71,7 @@ export function SaleCard({ sale, onViewPicks }: SaleCardProps) {
             {sale.discount}
           </div>
           {sale.extraDiscount && (
-            <div className="text-lg text-foreground" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}>
+            <div className="text-lg text-destructive" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600 }}>
               + extra {sale.extraDiscount}% off{sale.discountCode ? ` with code ${sale.discountCode}` : ''}
             </div>
           )}
