@@ -6,6 +6,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://salesite-production.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
