@@ -4724,17 +4724,32 @@ ${emailContent.substring(0, 4000)}`
         urlSource: saleData.urlSource
       });
       
-      // Send Telegram alert with approve/reject buttons (only for new/different sales)
+      // Send Telegram alert with approve/reject buttons (only for new sales or additional markdowns)
       if (TELEGRAM_CHAT_ID) {
-        // Check if this is a duplicate (same brand + same percent off already exists)
-        const isDuplicate = recentSalesResult.rows.some(row => {
+        // Check for duplicate: is there an ACTIVE sale for this brand with the SAME percent off?
+        const activeSalesResult = await pool.query(
+          `SELECT s.percent_off, c.name as company_name
+           FROM sales s
+           LEFT JOIN companies c ON s.company_id = c.id
+           WHERE s.live = 'YES'
+             AND (LOWER(s.original_company_name) = LOWER($1) OR LOWER(c.name) = LOWER($1))`,
+          [saleData.company]
+        );
+
+        const isDuplicate = activeSalesResult.rows.some(row => {
           const rowPercentOff = Math.round(parseFloat(row.percent_off) || 0);
           return rowPercentOff === saleData.percentOff;
         });
 
         if (isDuplicate) {
-          console.log('⏭️  Skipping Telegram alert - duplicate sale (same brand + percent off)');
+          console.log(`⏭️  Skipping Telegram alert - active sale already exists for ${saleData.company} at ${saleData.percentOff}% off`);
         } else {
+          const hasActiveSale = activeSalesResult.rows.length > 0;
+          console.log(hasActiveSale
+            ? `📱 Sending Telegram alert - additional markdown detected for ${saleData.company}`
+            : `📱 Sending Telegram alert - new sale for ${saleData.company}`
+          );
+
           sendSaleApprovalAlert(TELEGRAM_CHAT_ID, {
             id: pendingSale.id,
             company: saleData.company,
