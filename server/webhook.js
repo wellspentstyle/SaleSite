@@ -5867,20 +5867,24 @@ app.get('/gem/:recordId', async (req, res) => {
 
 // Handle client-side routing - serve index.html for all non-API/webhook routes
 // This must be the LAST route to avoid intercepting API calls
-app.use((req, res) => {
-  // Only serve index.html for GET requests
-  if (req.method !== 'GET') {
-    return res.status(404).json({ error: 'Not found' });
-  }
-  
-  // Don't serve index.html for /api or /webhook paths that didn't match earlier routes
-  if (req.path.startsWith('/api') || req.path.startsWith('/webhook')) {
-    return res.status(404).json({ error: 'Not found' });
-  }
-  
-  // Everything else (/, /admin, etc.) is a SPA route and should get index.html
-  res.sendFile(path.join(buildPath, 'index.html'));
-});
+// SPA catch-all - only when serving frontend (NOT on Railway)
+if (!process.env.RAILWAY_ENVIRONMENT) {
+  app.use((req, res) => {
+    // Only serve index.html for GET requests
+    if (req.method !== 'GET') {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    // Don't serve index.html for /api or /webhook paths that didn't match earlier routes
+    if (req.path.startsWith('/api') || req.path.startsWith('/webhook')) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    // Everything else (/, /admin, etc.) is a SPA route and should get index.html
+    const buildPath = path.join(__dirname, '..', 'build');
+    res.sendFile(path.join(buildPath, 'index.html'));
+  });
+}
 
 // Background job to auto-detect incomplete companies and research them
 async function checkForIncompleteBrands() {
