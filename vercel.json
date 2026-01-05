@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://your-railway-app.railway.app/:path*"
+      "destination": "https://salesite-production.up.railway.app/api/:path*"
     }
   ]
 }
