@@ -5217,45 +5217,65 @@ app.post('/approve-sale/:id', async (req, res) => {
     }
     
     console.log(`✅ Approving sale: ${pendingSale.company} ${pendingSale.percentOff}%`);
-    
-    // Track old sale for pick transfer and cleanup (will be set if we find an existing live sale)
-    let oldSaleToTransferFrom = null;
-    let shouldDeleteOldSale = false;
-    
-    // Identify old sale BEFORE creating new one (but don't delete/deactivate yet)
-    if (replaceSaleId) {
-      console.log(`🔄 Will replace existing sale: ${replaceSaleId}`);
-      oldSaleToTransferFrom = replaceSaleId;
-      shouldDeleteOldSale = true; // Delete after new sale created and picks transferred
-    } else {
-      // Check for existing live sale for this company (one-live-sale-per-company rule)
-      const existingLiveSale = await findLiveSaleForCompany(
-        pendingSale.companyRecordId, 
-        pendingSale.company
-      );
-      
-      if (existingLiveSale) {
-        console.log(`📦 Found existing live sale for ${pendingSale.company}: ${existingLiveSale.id}`);
-        oldSaleToTransferFrom = existingLiveSale.id;
-        // Don't delete - just deactivate after new sale is created
+
+    // Resolve company ID to PostgreSQL integer ID
+    let pgCompanyId = null;
+    if (pendingSale.companyRecordId) {
+      if (pendingSale.companyRecordId.startsWith('pg_')) {
+        pgCompanyId = parseInt(pendingSale.companyRecordId.replace('pg_', ''));
+      } else if (pendingSale.companyRecordId.startsWith('rec')) {
+        const companyResult = await pool.query(
+          'SELECT id FROM companies WHERE airtable_id = $1',
+          [pendingSale.companyRecordId]
+        );
+        if (companyResult.rows.length > 0) {
+          pgCompanyId = companyResult.rows[0].id;
+        }
       }
     }
-    
-    // Create Airtable record
-    const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
-    
+
+    // Track old sale for pick transfer and cleanup
+    let oldSalePgId = null;
+    let shouldDeleteOldSale = false;
+
+    // Identify old sale BEFORE creating new one
+    if (replaceSaleId) {
+      console.log(`🔄 Will replace existing sale: ${replaceSaleId}`);
+      if (replaceSaleId.startsWith('pg_')) {
+        oldSalePgId = parseInt(replaceSaleId.replace('pg_', ''));
+      } else if (replaceSaleId.startsWith('rec')) {
+        const saleResult = await pool.query('SELECT id FROM sales WHERE airtable_id = $1', [replaceSaleId]);
+        if (saleResult.rows.length > 0) {
+          oldSalePgId = saleResult.rows[0].id;
+        }
+      }
+      shouldDeleteOldSale = true;
+    } else {
+      // Check for existing live sale for this company
+      const existingLiveSale = await findLiveSaleForCompany(
+        pendingSale.companyRecordId,
+        pendingSale.company
+      );
+
+      if (existingLiveSale && existingLiveSale.pgId) {
+        console.log(`📦 Found existing live sale for ${pendingSale.company}: pg_${existingLiveSale.pgId}`);
+        oldSalePgId = existingLiveSale.pgId;
+      }
+    }
+
+    // Create PostgreSQL record
     const today = new Date().toISOString().split('T')[0];
     const isLive = pendingSale.startDate <= today ? 'YES' : 'NO';
-    
-    const fields = {
-      OriginalCompanyName: pendingSale.company,
-      PercentOff: pendingSale.percentOff,
-      SaleURL: pendingSale.saleUrl,
-      CleanURL: pendingSale.cleanUrl,
-      StartDate: pendingSale.startDate,
-      Confidence: pendingSale.confidence || 60,
-      Live: isLive,
-      Description: JSON.stringify({
+
+    const saleData = {
+      companyId: pgCompanyId,
+      originalCompanyName: pendingSale.company,
+      percentOff: pendingSale.percentOff,
+      saleUrl: pendingSale.saleUrl,
+      cleanUrl: pendingSale.cleanUrl,
+      startDate: pendingSale.startDate,
+      live: isLive,
+      description: JSON.stringify({
         source: 'email',
         aiReasoning: pendingSale.reasoning,
         confidence: pendingSale.confidence,
@@ -5268,99 +5288,63 @@ app.post('/approve-sale/:id', async (req, res) => {
         approvedAt: new Date().toISOString()
       })
     };
-    
-    if (pendingSale.companyRecordId) {
-      fields.Company = [pendingSale.companyRecordId];
-    }
-    
+
     if (pendingSale.discountCode) {
-      fields.PromoCode = pendingSale.discountCode;
+      saleData.promoCode = pendingSale.discountCode;
     }
     if (pendingSale.extraDiscount) {
-      fields.ExtraDiscount = pendingSale.extraDiscount;
+      saleData.extraDiscount = pendingSale.extraDiscount;
     }
     if (pendingSale.endDate) {
-      fields.EndDate = pendingSale.endDate;
+      saleData.endDate = pendingSale.endDate;
     }
-    
-    const airtableResponse = await fetch(airtableUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_PAT}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ fields })
-    });
-    
-    if (!airtableResponse.ok) {
-      const errorText = await airtableResponse.text();
-      console.error('❌ Airtable error:', errorText);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Airtable error',
-        details: errorText
-      });
-    }
-    
-    const airtableData = await airtableResponse.json();
-    const newSaleId = airtableData.id;
-    console.log('✅ Created Airtable record:', newSaleId);
+
+    const createdSale = await createSale(saleData);
+    const newSalePgId = createdSale.id;
+    console.log(`✅ Created PostgreSQL sale: pg_${newSalePgId}`);
     
     // Transfer picks and cleanup old sale with proper error handling
     let picksTransferred = 0;
-    let cleanupError = null;
-    
-    if (oldSaleToTransferFrom && newSaleId) {
+
+    if (oldSalePgId) {
       try {
-        // Step 1: Transfer picks
-        console.log(`🔄 Transferring picks from ${oldSaleToTransferFrom} to ${newSaleId}`);
-        const transferResult = await transferPicksToNewSale(oldSaleToTransferFrom, newSaleId);
-        picksTransferred = transferResult.transferred || 0;
+        // Step 1: Transfer picks from old sale to new sale
+        console.log(`🔄 Transferring picks from sale ${oldSalePgId} to ${newSalePgId}`);
+
+        const transferResult = await pool.query(
+          'UPDATE picks SET sale_id = $1, updated_at = NOW() WHERE sale_id = $2 RETURNING id',
+          [newSalePgId, oldSalePgId]
+        );
+
+        picksTransferred = transferResult.rowCount || 0;
         if (picksTransferred > 0) {
           console.log(`✅ Transferred ${picksTransferred} picks to new sale`);
         }
-        
+
         // Step 2: Cleanup old sale (delete if replacing, deactivate otherwise)
         if (shouldDeleteOldSale) {
-          console.log(`🗑️  Deleting old sale: ${oldSaleToTransferFrom}`);
-          const deleteUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${oldSaleToTransferFrom}`;
-          const deleteResponse = await fetch(deleteUrl, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${AIRTABLE_PAT}`
-            }
-          });
-          
-          if (!deleteResponse.ok) {
-            throw new Error(`Failed to delete old sale: ${await deleteResponse.text()}`);
-          }
+          console.log(`🗑️  Deleting old sale ${oldSalePgId}`);
+          await pool.query('DELETE FROM sales WHERE id = $1', [oldSalePgId]);
           console.log('✅ Deleted old sale successfully');
         } else {
-          // Deactivate the old sale to prevent duplicate live sales
-          const deactivated = await deactivateSale(oldSaleToTransferFrom);
-          if (!deactivated) {
-            throw new Error('Failed to deactivate old sale');
-          }
-          console.log(`✅ Deactivated old sale ${oldSaleToTransferFrom}`);
+          console.log(`📦 Deactivating old sale ${oldSalePgId}`);
+          await pool.query(
+            'UPDATE sales SET live = $1, updated_at = NOW() WHERE id = $2',
+            ['NO', oldSalePgId]
+          );
+          console.log(`✅ Deactivated old sale ${oldSalePgId}`);
         }
       } catch (error) {
-        cleanupError = error;
         console.error('❌ Cleanup failed, rolling back new sale:', error.message);
-        
+
         // Rollback: Delete the newly created sale to prevent duplicate live sales
         try {
-          const rollbackUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${newSaleId}`;
-          await fetch(rollbackUrl, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${AIRTABLE_PAT}`
-            }
-          });
+          await pool.query('DELETE FROM sales WHERE id = $1', [newSalePgId]);
           console.log('✅ Rolled back new sale creation');
         } catch (rollbackError) {
           console.error('❌ Rollback failed:', rollbackError.message);
         }
-        
+
         return res.status(500).json({
           success: false,
           error: 'Failed to cleanup old sale. Approval rolled back.',
@@ -5368,18 +5352,18 @@ app.post('/approve-sale/:id', async (req, res) => {
         });
       }
     }
-    
+
     // Clear sales cache only after successful completion
     clearSalesCache();
-    
-    const message = picksTransferred > 0 
-      ? `Sale approved and added to Airtable. Transferred ${picksTransferred} picks from previous sale.`
-      : 'Sale approved and added to Airtable';
-    
-    res.json({ 
-      success: true, 
+
+    const message = picksTransferred > 0
+      ? `Sale approved and added to database. Transferred ${picksTransferred} picks from previous sale.`
+      : 'Sale approved and added to database';
+
+    res.json({
+      success: true,
       message,
-      recordId: newSaleId,
+      recordId: `pg_${newSalePgId}`,
       picksTransferred
     });
     
@@ -6059,83 +6043,128 @@ async function checkForIncompleteBrands() {
 const handleTelegramApproval = async (action, saleId) => {
   try {
     console.log(`📱 Telegram ${action} request for sale: ${saleId}`);
-    
+
     if (action === 'approve') {
       // Get the pending sale
-      const pendingSales = await getPendingSales();
-      const sale = pendingSales.find(s => s.id === saleId);
-      
-      if (!sale) {
+      const pendingSale = await removePendingSale(saleId);
+
+      if (!pendingSale) {
         return { success: false, error: 'Sale not found or already processed' };
       }
-      
-      // Add to Airtable
+
+      console.log(`✅ Approving sale via Telegram: ${pendingSale.company} ${pendingSale.percentOff}%`);
+
+      // Resolve company ID to PostgreSQL integer ID
+      let pgCompanyId = null;
+      if (pendingSale.companyRecordId) {
+        if (pendingSale.companyRecordId.startsWith('pg_')) {
+          pgCompanyId = parseInt(pendingSale.companyRecordId.replace('pg_', ''));
+        } else if (pendingSale.companyRecordId.startsWith('rec')) {
+          const companyResult = await pool.query(
+            'SELECT id FROM companies WHERE airtable_id = $1',
+            [pendingSale.companyRecordId]
+          );
+          if (companyResult.rows.length > 0) {
+            pgCompanyId = companyResult.rows[0].id;
+          }
+        }
+      }
+
+      // Check for existing live sale for this company
+      const existingLiveSale = await findLiveSaleForCompany(
+        pendingSale.companyRecordId,
+        pendingSale.company
+      );
+
+      let oldSalePgId = null;
+      if (existingLiveSale && existingLiveSale.pgId) {
+        console.log(`📦 Found existing live sale for ${pendingSale.company}: pg_${existingLiveSale.pgId}`);
+        oldSalePgId = existingLiveSale.pgId;
+      }
+
+      // Create PostgreSQL record
       const today = new Date().toISOString().split('T')[0];
-      const isLive = sale.startDate <= today ? 'YES' : 'NO';
-      
-      const fields = {
-        OriginalCompanyName: sale.company,
-        PercentOff: Math.round(parseInt(sale.percentOff) || 0), // Ensure integer
-        StartDate: sale.startDate,
-        Confidence: sale.confidence || 100,
-        Live: isLive,
-        Description: JSON.stringify({
+      const isLive = pendingSale.startDate <= today ? 'YES' : 'NO';
+
+      const saleData = {
+        companyId: pgCompanyId,
+        originalCompanyName: pendingSale.company,
+        percentOff: pendingSale.percentOff,
+        saleUrl: pendingSale.saleUrl,
+        cleanUrl: pendingSale.cleanUrl,
+        startDate: pendingSale.startDate,
+        live: isLive,
+        description: JSON.stringify({
           source: 'email',
+          aiReasoning: pendingSale.reasoning,
+          confidence: pendingSale.confidence,
+          originalEmail: {
+            from: pendingSale.emailFrom,
+            subject: pendingSale.emailSubject,
+            receivedAt: pendingSale.receivedAt
+          },
+          approved: true,
           approvedVia: 'telegram',
           approvedAt: new Date().toISOString()
         })
       };
 
-      if (sale.saleUrl) {
-        fields.SaleURL = sale.saleUrl;
-        fields.CleanURL = sale.cleanUrl || sale.saleUrl;
+      if (pendingSale.discountCode) {
+        saleData.promoCode = pendingSale.discountCode;
       }
-      if (sale.companyRecordId) {
-        fields.Company = [sale.companyRecordId];
+      if (pendingSale.extraDiscount) {
+        saleData.extraDiscount = pendingSale.extraDiscount;
       }
-      if (sale.discountCode) {
-        fields.PromoCode = sale.discountCode;
+      if (pendingSale.endDate) {
+        saleData.endDate = pendingSale.endDate;
       }
-      if (sale.extraDiscount) {
-        fields.ExtraDiscount = Math.round(parseInt(sale.extraDiscount) || 0);
+
+      const createdSale = await createSale(saleData);
+      const newSalePgId = createdSale.id;
+      console.log(`✅ Created PostgreSQL sale via Telegram: pg_${newSalePgId}`);
+
+      // Transfer picks and deactivate old sale if exists
+      let picksTransferred = 0;
+      if (oldSalePgId) {
+        try {
+          console.log(`🔄 Transferring picks from sale ${oldSalePgId} to ${newSalePgId}`);
+          const transferResult = await pool.query(
+            'UPDATE picks SET sale_id = $1, updated_at = NOW() WHERE sale_id = $2 RETURNING id',
+            [newSalePgId, oldSalePgId]
+          );
+          picksTransferred = transferResult.rowCount || 0;
+          if (picksTransferred > 0) {
+            console.log(`✅ Transferred ${picksTransferred} picks to new sale`);
+          }
+
+          console.log(`📦 Deactivating old sale ${oldSalePgId}`);
+          await pool.query(
+            'UPDATE sales SET live = $1, updated_at = NOW() WHERE id = $2',
+            ['NO', oldSalePgId]
+          );
+          console.log(`✅ Deactivated old sale ${oldSalePgId}`);
+        } catch (error) {
+          console.error('❌ Cleanup failed, rolling back new sale:', error.message);
+          await pool.query('DELETE FROM sales WHERE id = $1', [newSalePgId]);
+          return { success: false, error: 'Failed to cleanup old sale. Approval rolled back.' };
+        }
       }
-      if (sale.endDate) {
-        fields.EndDate = sale.endDate;
-      }
-      
-      const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`;
-      const response = await fetch(airtableUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_PAT}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ fields })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        return { success: false, error: errorText };
-      }
-      
-      // Remove from pending
-      await removePendingSale(saleId);
+
       clearSalesCache();
-      
-      console.log(`✅ Sale approved via Telegram: ${sale.company}`);
+      console.log(`✅ Sale approved via Telegram: ${pendingSale.company}`);
       return { success: true };
-      
+
     } else if (action === 'reject') {
       // Just remove from pending
       const sale = await removePendingSale(saleId);
       if (!sale) {
         return { success: false, error: 'Sale not found or already processed' };
       }
-      
+
       console.log(`❌ Sale rejected via Telegram: ${sale.company}`);
       return { success: true };
     }
-    
+
     return { success: false, error: 'Unknown action' };
   } catch (error) {
     console.error('Telegram approval error:', error);
