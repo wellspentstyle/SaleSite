@@ -5440,9 +5440,9 @@ app.post('/approval-settings', async (req, res) => {
     
     await setApprovalsEnabled(approvalsEnabled);
     console.log(`⚙️  Approval mode ${approvalsEnabled ? 'ENABLED' : 'DISABLED'}`);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `Approvals ${approvalsEnabled ? 'enabled' : 'disabled'}`,
       settings: { approvalsEnabled }
     });
@@ -5450,6 +5450,57 @@ app.post('/approval-settings', async (req, res) => {
   } catch (error) {
     console.error('Error updating approval settings:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Test Telegram connection
+app.post('/test-telegram', async (req, res) => {
+  const { auth } = req.headers;
+
+  if (auth !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  try {
+    // Check if Telegram is configured
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+      return res.json({
+        success: false,
+        configured: false,
+        message: 'Telegram not configured',
+        details: {
+          hasToken: !!TELEGRAM_BOT_TOKEN,
+          hasChatId: !!TELEGRAM_CHAT_ID
+        }
+      });
+    }
+
+    // Send test message
+    const testMessage = `🧪 *Telegram Test*\n\nConnection successful!\n\n_Sent at: ${new Date().toLocaleString()}_`;
+
+    const sent = await sendAlertToTelegram(TELEGRAM_CHAT_ID, testMessage);
+
+    if (sent) {
+      res.json({
+        success: true,
+        configured: true,
+        message: 'Test message sent successfully',
+        chatId: TELEGRAM_CHAT_ID.substring(0, 3) + '...' // Show partial for security
+      });
+    } else {
+      res.json({
+        success: false,
+        configured: true,
+        message: 'Failed to send test message. Check server logs for details.',
+        chatId: TELEGRAM_CHAT_ID.substring(0, 3) + '...'
+      });
+    }
+  } catch (error) {
+    console.error('Telegram test error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
