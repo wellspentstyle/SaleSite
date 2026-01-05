@@ -4724,19 +4724,30 @@ ${emailContent.substring(0, 4000)}`
         urlSource: saleData.urlSource
       });
       
-      // Send Telegram alert with approve/reject buttons
+      // Send Telegram alert with approve/reject buttons (only for new/different sales)
       if (TELEGRAM_CHAT_ID) {
-        sendSaleApprovalAlert(TELEGRAM_CHAT_ID, {
-          id: pendingSale.id,
-          company: saleData.company,
-          percentOff: saleData.percentOff,
-          confidence: saleData.confidence,
-          discountCode: saleData.discountCode,
-          saleUrl: cleanUrl || saleData.saleUrl,
-          emailFrom: from
-        }).catch(err => {
-          console.error('Failed to send Telegram alert:', err.message);
+        // Check if this is a duplicate (same brand + same percent off already exists)
+        const isDuplicate = recentSalesResult.rows.some(row => {
+          const rowPercentOff = Math.round(parseFloat(row.percent_off) || 0);
+          return rowPercentOff === saleData.percentOff;
         });
+
+        if (isDuplicate) {
+          console.log('⏭️  Skipping Telegram alert - duplicate sale (same brand + percent off)');
+        } else {
+          sendSaleApprovalAlert(TELEGRAM_CHAT_ID, {
+            id: pendingSale.id,
+            company: saleData.company,
+            percentOff: saleData.percentOff,
+            extraDiscount: saleData.extraDiscount,
+            confidence: saleData.confidence,
+            discountCode: saleData.discountCode,
+            saleUrl: cleanUrl || saleData.saleUrl,
+            emailFrom: from
+          }).catch(err => {
+            console.error('Failed to send Telegram alert:', err.message);
+          });
+        }
       }
       
       return res.status(200).json({
@@ -6049,7 +6060,7 @@ const handleTelegramApproval = async (action, saleId) => {
       
       const fields = {
         OriginalCompanyName: sale.company,
-        PercentOff: sale.percentOff,
+        PercentOff: Math.round(parseInt(sale.percentOff) || 0), // Ensure integer
         StartDate: sale.startDate,
         Confidence: sale.confidence || 100,
         Live: isLive,
@@ -6059,7 +6070,7 @@ const handleTelegramApproval = async (action, saleId) => {
           approvedAt: new Date().toISOString()
         })
       };
-      
+
       if (sale.saleUrl) {
         fields.SaleURL = sale.saleUrl;
         fields.CleanURL = sale.cleanUrl || sale.saleUrl;
@@ -6069,6 +6080,9 @@ const handleTelegramApproval = async (action, saleId) => {
       }
       if (sale.discountCode) {
         fields.PromoCode = sale.discountCode;
+      }
+      if (sale.extraDiscount) {
+        fields.ExtraDiscount = Math.round(parseInt(sale.extraDiscount) || 0);
       }
       if (sale.endDate) {
         fields.EndDate = sale.endDate;

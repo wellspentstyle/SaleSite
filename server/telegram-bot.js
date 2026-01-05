@@ -135,11 +135,12 @@ export async function sendSaleApprovalAlert(chatId, sale) {
   try {
     const message = `🛍️ *New Sale to Approve*\n\n` +
       `*${sale.company}* - ${sale.percentOff}% off\n` +
+      (sale.extraDiscount ? `+ Extra ${sale.extraDiscount}% off${sale.discountCode ? ' with code' : ''}\n` : '') +
       `Confidence: ${sale.confidence}%\n` +
       (sale.discountCode ? `Code: \`${sale.discountCode}\`\n` : '') +
       (sale.saleUrl ? `\n🔗 ${sale.saleUrl}\n` : '') +
       `\n_From: ${sale.emailFrom}_`;
-    
+
     const keyboard = {
       inline_keyboard: [
         [
