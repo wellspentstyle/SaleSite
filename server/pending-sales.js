@@ -117,7 +117,8 @@ function mapRowToSale(row) {
   return {
     id: row.sale_id,
     company: row.company,
-    percentOff: row.percent_off,
+    percentOff: Math.round(parseFloat(row.percent_off) || 0),
+    extraDiscount: row.extra_discount ? Math.round(parseFloat(row.extra_discount)) : null,
     saleUrl: row.sale_url,
     cleanUrl: row.clean_url,
     discountCode: row.discount_code,

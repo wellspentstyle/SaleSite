@@ -4274,10 +4274,29 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
       emailContent = emailData.plain;
       console.log('✅ Using plain text content');
     } 
-    // Fallback to HTML, but strip tags
+    // Fallback to HTML, but preserve URLs while stripping tags
     else if (emailData.html) {
       console.log('⚠️  No plain text, parsing HTML...');
-      emailContent = emailData.html
+      let htmlContent = emailData.html;
+
+      // Extract all href URLs before removing tags
+      const urlsFound = [];
+      const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>/gi;
+      let match;
+      while ((match = linkRegex.exec(htmlContent)) !== null) {
+        const url = match[1];
+        // Skip tracking/unsubscribe/email links
+        if (!url.includes('unsubscribe') &&
+            !url.includes('mailto:') &&
+            !url.includes('tracking') &&
+            !url.match(/\{.*\}/) // Skip template variables
+        ) {
+          urlsFound.push(url);
+        }
+      }
+
+      // Clean HTML
+      emailContent = htmlContent
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove styles
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
         .replace(/<[^>]+>/g, ' ') // Remove HTML tags
@@ -4287,6 +4306,12 @@ app.post('/webhook/agentmail', upload.none(), async (req, res) => {
         .replace(/&gt;/g, '>')
         .replace(/\s+/g, ' ') // Normalize whitespace
         .trim();
+
+      // Append found URLs to content for AI to see
+      if (urlsFound.length > 0) {
+        console.log(`🔗 Extracted ${urlsFound.length} URLs from HTML:`, urlsFound);
+        emailContent += '\n\nFound URLs:\n' + urlsFound.join('\n');
+      }
     }
     // Last resort fallbacks
     else if (emailData.text) {
@@ -4396,9 +4421,18 @@ Confidence scoring:
 - Below 60: Questionable - likely welcome email or unclear offer
 
 Rules:
-- company: Extract exact brand name from email. NEVER use "Well Spent Style", "WellSpentStyle", or "wellspentstyle" as the company name - that is the newsletter name, not the brand running the sale.
+- company: Extract the BRAND running the sale. Look for the brand name in:
+  1. Email "From" address (e.g., "promo@jcrew.com" → "J.Crew")
+  2. Email content/signature
+  3. Product/shop names mentioned
+  NEVER use "Well Spent Style", "WellSpentStyle", or "wellspentstyle" - that's the newsletter, not the brand.
+  Examples: "J.Crew", "Madewell", "Everlane", "Reformation"
 - percentOff: Extract percentage as number (estimate if range like "up to 30%", use midpoint)
-- saleUrl: ONLY use a URL that ACTUALLY appears in the email content. If no sale URL is found in the email, return null. NEVER make up or guess a URL. Do not use example.com or placeholder URLs.
+- saleUrl: CRITICAL - ONLY use URLs that ACTUALLY appear in the email content (check the "Found URLs" section if present).
+  If no sale-specific URL is found, return null.
+  NEVER make up, guess, or construct URLs.
+  NEVER use placeholder URLs like example.com, brand.com/sale, etc.
+  Valid example: "https://www.jcrew.com/promo/black-friday-2025"
 - discountCode: Only if explicitly mentioned (use null if auto-applied at checkout)
 - startDate: Use today's date (2025-11-22) in YYYY-MM-DD format
 - endDate: Extract if mentioned, otherwise null
