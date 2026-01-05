@@ -1217,7 +1217,7 @@ app.get('/admin/sales', async (req, res) => {
         pgId: row.id,
         saleName: row.sale_name || companyName || 'Unnamed Sale',
         company: companyName,
-        percentOff: row.percent_off,
+        percentOff: Math.round(parseFloat(row.percent_off) || 0),
         startDate: row.start_date,
         endDate: row.end_date,
         live: row.live,
@@ -1225,7 +1225,7 @@ app.get('/admin/sales', async (req, res) => {
         picksCount: picksCountBySale.get(row.id) || 0,
         featuredAssetUrl: row.featured_asset_url || null,
         featuredAssetDate: row.featured_asset_date || null,
-        extraDiscount: row.extra_discount ? parseFloat(row.extra_discount) : null,
+        extraDiscount: row.extra_discount ? Math.round(parseFloat(row.extra_discount)) : null,
         imageUrl: row.image_url || null
       };
     });
