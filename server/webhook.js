@@ -6104,17 +6104,17 @@ app.listen(PORT, '0.0.0.0', () => {
     console.warn('⚠️  Failed to pre-fetch companies:', err.message);
   });
   
-  // Run initial brand auto-detection (non-blocking, with error handling)
-  Promise.resolve().then(() => checkForIncompleteBrands()).catch(err => {
-    console.warn('⚠️  Brand auto-detection failed:', err.message);
-  });
-  
-  // Run brand auto-detection every 1 hour
-  setInterval(() => {
-    checkForIncompleteBrands().catch(err => {
-      console.warn('⚠️  Scheduled brand check failed:', err.message);
-    });
-  }, 60 * 60 * 1000);
+  // Brand auto-detection disabled (not using Airtable anymore)
+  // To re-enable, uncomment the code below and update to use PostgreSQL
+  // Promise.resolve().then(() => checkForIncompleteBrands()).catch(err => {
+  //   console.warn('⚠️  Brand auto-detection failed:', err.message);
+  // });
+  //
+  // setInterval(() => {
+  //   checkForIncompleteBrands().catch(err => {
+  //     console.warn('⚠️  Scheduled brand check failed:', err.message);
+  //   });
+  // }, 60 * 60 * 1000);
   
   // Initialize Telegram bot with polling (development only)
   if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
