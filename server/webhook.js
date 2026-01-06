@@ -50,12 +50,16 @@ import {
   removeRejectedBrand,
   getAndRemoveRejectedBrand
 } from './rejected-brands.js';
-import { 
-  postToInstagram, 
-  postCarouselToInstagram, 
-  scheduleInstagramPost, 
-  testConnection as testInstagramConnection, 
-  getConnectedAccounts 
+import {
+  createSale,
+  findLiveSaleForCompany
+} from './db.js';
+import {
+  postToInstagram,
+  postCarouselToInstagram,
+  scheduleInstagramPost,
+  testConnection as testInstagramConnection,
+  getConnectedAccounts
 } from './instagram-poster.js';
 
 const __filename = fileURLToPath(import.meta.url);
