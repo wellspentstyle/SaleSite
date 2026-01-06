@@ -169,9 +169,9 @@ export async function createSale(data) {
   const result = await pool.query(`
     INSERT INTO sales (
       airtable_id, company_id, original_company_name, sale_name,
-      percent_off, promo_code, start_date, end_date, sale_url, clean_url,
-      live, featured, featured_asset_url, featured_asset_date, original_created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      percent_off, extra_discount, promo_code, start_date, end_date, sale_url, clean_url,
+      live, featured, featured_asset_url, featured_asset_date, original_created_at, description
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
     RETURNING *
   `, [
     data.airtableId || null,
@@ -179,6 +179,7 @@ export async function createSale(data) {
     data.originalCompanyName || null,
     data.saleName || null,
     data.percentOff || null,
+    data.extraDiscount || null,
     data.promoCode || null,
     data.startDate || null,
     data.endDate || null,
@@ -188,7 +189,8 @@ export async function createSale(data) {
     data.featured || 'NO',
     data.featuredAssetUrl || null,
     data.featuredAssetDate || null,
-    data.originalCreatedAt || new Date()
+    data.originalCreatedAt || new Date(),
+    data.description || null
   ]);
   return result.rows[0];
 }
@@ -203,6 +205,7 @@ export async function updateSale(id, data) {
     originalCompanyName: 'original_company_name',
     saleName: 'sale_name',
     percentOff: 'percent_off',
+    extraDiscount: 'extra_discount',
     promoCode: 'promo_code',
     startDate: 'start_date',
     endDate: 'end_date',
@@ -211,7 +214,8 @@ export async function updateSale(id, data) {
     live: 'live',
     featured: 'featured',
     featuredAssetUrl: 'featured_asset_url',
-    featuredAssetDate: 'featured_asset_date'
+    featuredAssetDate: 'featured_asset_date',
+    description: 'description'
   };
 
   for (const [key, column] of Object.entries(fieldMap)) {

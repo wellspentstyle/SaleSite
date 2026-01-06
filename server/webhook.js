@@ -5295,7 +5295,10 @@ app.post('/approve-sale/:id', async (req, res) => {
     
   } catch (error) {
     console.error('Error approving sale:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({
+      success: false,
+      error: error?.message || error?.toString() || 'Unknown error occurred'
+    });
   }
 });
 
