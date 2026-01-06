@@ -540,7 +540,7 @@ export function SalesApprovals() {
                           ) : (
                             <Check className="h-4 w-4 mr-2" />
                           )}
-                          {duplicates[sale.id]?.length > 0 ? 'Approve Anyway' : 'Approve & Add to Airtable'}
+                          {duplicates[sale.id]?.length > 0 ? 'Approve Anyway' : 'Approve & Add'}
                         </Button>
                         <Button
                           variant="outline"
