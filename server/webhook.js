@@ -3661,15 +3661,15 @@ app.post('/admin/picks/refresh', async (req, res) => {
         const scrapeResult = await scrapeProduct(productUrl);
         
         let availabilityStatus = 'Unknown';
-        let confidence = scrapeResult.confidence || 0;
-        
+        let confidence = scrapeResult.meta?.confidence || 0;
+
         // Determine availability based on scrape results
         if (scrapeResult.success && confidence > 50) {
           availabilityStatus = 'In Stock';
         } else if (confidence <= 50) {
           availabilityStatus = 'Unknown';
         }
-        
+
         // Calculate next check date (14 days from now)
         const today = new Date();
         const nextCheckDue = new Date(today.getTime() + (14 * 24 * 60 * 60 * 1000));
@@ -3876,16 +3876,16 @@ app.post('/admin/picks/nightly-check', async (req, res) => {
         console.log(`  Checking: ${pickData.fields.ProductName}`);
         
         const scrapeResult = await scrapeProduct(productUrl);
-        
+
         let availabilityStatus = 'Unknown';
-        let confidence = scrapeResult.confidence || 0;
-        
+        let confidence = scrapeResult.meta?.confidence || 0;
+
         if (scrapeResult.success && confidence > 50) {
           availabilityStatus = 'In Stock';
         } else if (confidence <= 50) {
           availabilityStatus = 'Unknown';
         }
-        
+
         const nextCheckDue = new Date(new Date().getTime() + (14 * 24 * 60 * 60 * 1000));
         
         const updateUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${PICKS_TABLE_NAME}/${pickId}`;
