@@ -90,6 +90,8 @@ export function PicksAdmin() {
     endDate: ''
   });
   const [deactivateSale, setDeactivateSale] = useState<Sale | null>(null);
+  const [clearPicksSale, setClearPicksSale] = useState<Sale | null>(null);
+  const [clearingPicks, setClearingPicks] = useState(false);
 
   useEffect(() => {
     fetchSales();
@@ -267,6 +269,32 @@ export function PicksAdmin() {
         )
       );
       toast.error('Failed to update sale status');
+    }
+  };
+
+  const handleClearPicks = async () => {
+    if (!clearPicksSale) return;
+    setClearingPicks(true);
+    const auth = localStorage.getItem('adminAuth') || 'dev-mode';
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/picks/sale/${clearPicksSale.id}`, {
+        method: 'DELETE',
+        headers: { 'auth': auth }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`Cleared ${data.count} picks from ${clearPicksSale.saleName}`);
+        fetchSales();
+      } else {
+        toast.error(data.message || 'Failed to clear picks');
+      }
+    } catch (error) {
+      toast.error('Failed to clear picks');
+    } finally {
+      setClearingPicks(false);
+      setClearPicksSale(null);
     }
   };
 
@@ -606,6 +634,26 @@ export function PicksAdmin() {
                     >
                       <Edit className="h-4 w-4" />
                     </button>
+                    {sale.picksCount > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setClearPicksSale(sale);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          color: '#6b7280'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
+                        title="Clear all picks"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -615,7 +663,7 @@ export function PicksAdmin() {
                           handleToggleActive(sale, e);
                         }
                       }}
-                      style={{ 
+                      style={{
                         background: 'none',
                         border: 'none',
                         cursor: 'pointer',
@@ -652,6 +700,12 @@ export function PicksAdmin() {
                       </p>
                     )}
                     
+                    {sale.picksCount > 0 && (
+                      <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                        {sale.picksCount} pick{sale.picksCount !== 1 ? 's' : ''}
+                      </p>
+                    )}
+
                     {sale.promoCode && (
                       <p className="text-xs text-muted-foreground" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                         Code: <span className="font-mono">{sale.promoCode}</span>
@@ -958,6 +1012,34 @@ export function PicksAdmin() {
               style={{ fontFamily: 'DM Sans, sans-serif', backgroundColor: '#dc2626', color: '#fff' }}
             >
               Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear Picks Confirmation Dialog */}
+      <AlertDialog open={!!clearPicksSale} onOpenChange={(open) => {
+        if (!open) setClearPicksSale(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Clear All Picks
+            </AlertDialogTitle>
+            <AlertDialogDescription style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Are you sure you want to clear all {clearPicksSale?.picksCount} picks from <strong>{clearPicksSale?.saleName}</strong>? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setClearPicksSale(null)} style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearPicks}
+              disabled={clearingPicks}
+              style={{ fontFamily: 'DM Sans, sans-serif', backgroundColor: '#dc2626', color: '#fff' }}
+            >
+              {clearingPicks ? 'Clearing...' : 'Clear All Picks'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
